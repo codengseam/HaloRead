@@ -1,0 +1,74 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Build site
+        continue-on-error: true
+        run: python scripts/build_site.py --output output --site site
+
+      - name: Create placeholder if output empty
+        run: |
+          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
+            echo "output/ 为空或不存在，创建占位文件以确保部署不失败"
+            mkdir -p site/data
+            if [ ! -f site/data/index.json ]; then
+              echo '{}' > site/data/index.json
+            fi
+            if [ ! -f site/index.html ]; then
+              cat > site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="zh-CN">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>个人 AI 深度阅读助手</title>
+          </head>
+          <body>
+            <h1>个人 AI 深度阅读助手</h1>
+            <p>站点尚未生成任何笔记内容。</p>
+          </body>
+          </html>
+          EOF
+            fi
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -259,7 +259,32 @@ python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法
 python src/web/app.py
 ```
 
-## 十四、核心原则
+## 十四、静态站点部署
+
+### 本地预览
+
+```bash
+# 1. 生成笔记（需要配置 API Key 或使用 --stub）
+python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法
+
+# 2. 构建静态站点
+python scripts/build_site.py
+
+# 3. 本地预览
+python -m http.server 8080 -d site
+```
+
+### GitHub Pages 部署
+
+项目已配置 GitHub Actions（`.github/workflows/pages.yml`），push 到 master 分支后自动构建并部署。
+
+1. 在仓库 Settings → Pages → Source 选择 "GitHub Actions"
+2. push 代码到 master 分支
+3. Actions 自动运行：安装依赖 → 构建站点 → 部署到 GitHub Pages
+
+注意：`output/` 目录被 `.gitignore` 忽略，CI 中会从仓库代码构建。如需在 CI 中生成笔记，请通过 `workflow_dispatch` 手动触发并配置 Secrets。
+
+## 十五、核心原则
 
 - **简洁**：不堆技术，能用提示词和简单流程解决就不用复杂架构。
 - **可信**：每个观点要有来源，每个名家点评要有出处。
