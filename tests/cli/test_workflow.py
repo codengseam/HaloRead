@@ -24,7 +24,7 @@ def workflow(tmp_path):
         "paths": {
             "output": str(output_dir),
             "logs": str(logs_dir),
-            "src/cli/prompts": "src/cli/prompts",
+            "prompts": "src/cli/prompts",
             "templates": "templates",
         },
         "rules": {

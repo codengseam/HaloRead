@@ -15,7 +15,7 @@ from src.cli.utils.quality import (
     run_quality_checks,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 SECTIONS = ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道"]
 REQUIRED_FRONTMATTER = ["title", "book", "chapter", "event", "created_at", "source_agents"]

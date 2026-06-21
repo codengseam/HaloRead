@@ -14,7 +14,7 @@ from src.cli.agents.orchestrator import OrchestratorAgent
 from src.cli.agents.philosopher import PhilosopherAgent
 from src.cli.utils.llm import MockLLMClient
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROMPTS_DIR = PROJECT_ROOT / "src/cli/prompts"
 
 SECTIONS = ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道"]
