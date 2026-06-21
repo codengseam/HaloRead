@@ -93,8 +93,8 @@ def build_workflow(output_base: Optional[str] = None) -> StateGraph:
                 f"质量问题: {state.get('errors', [])}\n",
                 encoding="utf-8",
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("无法写入日志文件 %s: %s", log_path, exc)
 
         path = save_markdown(
             book=state["book"],

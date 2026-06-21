@@ -10,7 +10,7 @@ def build_frontmatter(
     event: str,
     source_agents: List[str],
 ) -> str:
-    created_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    created_at = datetime.now().astimezone().replace(microsecond=0).isoformat()
     agents_yaml = "\n".join(f"  - {agent}" for agent in source_agents)
     return f"""---
 title: "{title}"

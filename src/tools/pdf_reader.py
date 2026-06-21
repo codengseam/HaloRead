@@ -53,28 +53,27 @@ class PDFReader:
             logger.info("MCP not available, falling back to file system: %s", exc)
             return None
 
-    def _read_with_pypdf2(self, file_path: Path) -> Optional[dict]:
-        """使用 PyPDF2 读取 PDF。"""
+    def _read_with_pypdf(self, file_path: Path) -> Optional[dict]:
+        """使用 pypdf 读取 PDF。"""
         try:
-            import PyPDF2  # type: ignore
+            from pypdf import PdfReader  # type: ignore
         except ImportError:
             return None
 
         try:
             text_parts: list[str] = []
-            with file_path.open("rb") as fh:
-                reader = PyPDF2.PdfReader(fh)
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text_parts.append(page_text)
+            reader = PdfReader(str(file_path))
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
             return {
                 "text": "\n\n".join(text_parts),
                 "pages": len(reader.pages),
-                "source": "PyPDF2",
+                "source": "pypdf",
             }
         except Exception as exc:  # noqa: BLE001
-            logger.warning("PyPDF2 failed to read %s: %s", file_path, exc)
+            logger.warning("pypdf failed to read %s: %s", file_path, exc)
             return None
 
     def _read_with_pdfplumber(self, file_path: Path) -> Optional[dict]:
@@ -113,7 +112,7 @@ class PDFReader:
 
         for reader_fn in (
             self._read_with_mcp,
-            self._read_with_pypdf2,
+            self._read_with_pypdf,
             self._read_with_pdfplumber,
         ):
             result = reader_fn(file_path)
@@ -153,21 +152,20 @@ class PDFReader:
             pass
 
         try:
-            import PyPDF2  # type: ignore
+            from pypdf import PdfReader  # type: ignore
 
             text_parts = []
-            with file_path.open("rb") as fh:
-                reader = PyPDF2.PdfReader(fh)
-                total = len(reader.pages)
-                end = min(end, total + 1)
-                for idx in range(start - 1, end - 1):
-                    page_text = reader.pages[idx].extract_text()
-                    if page_text:
-                        text_parts.append(page_text)
+            reader = PdfReader(str(file_path))
+            total = len(reader.pages)
+            end = min(end, total + 1)
+            for idx in range(start - 1, end - 1):
+                page_text = reader.pages[idx].extract_text()
+                if page_text:
+                    text_parts.append(page_text)
             return {
                 "text": "\n\n".join(text_parts),
                 "pages": end - start,
-                "source": "PyPDF2",
+                "source": "pypdf",
             }
         except ImportError:
             pass
