@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from src.utils.llm import LLMClient
-from src.utils.markdown import build_frontmatter
+from src.cli.utils.llm import LLMClient
+from src.cli.utils.markdown import build_frontmatter
 
 
 class EditorAgent:

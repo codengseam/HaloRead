@@ -6,8 +6,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from src.utils.llm import LLMClient
-from src.utils.markdown import build_output_path
+from src.cli.utils.llm import LLMClient
+from src.cli.utils.markdown import build_output_path
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_OUTPUT_DIR = _PROJECT_ROOT / "output"

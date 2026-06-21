@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.agents.base import SpecialistAgent
+from src.cli.agents.base import SpecialistAgent
 
 
 class PhilosopherAgent(SpecialistAgent):

@@ -31,7 +31,7 @@ def _deep_resolve(obj: Any) -> Any:
 class Config:
     def __init__(self, config_path: str | Path | None = None) -> None:
         load_dotenv(_PROJECT_ROOT / ".env")
-        self._config_path = Path(config_path) if config_path else _PROJECT_ROOT / "config.yaml"
+        self._config_path = Path(config_path) if config_path else _PROJECT_ROOT / "config.cli.yaml"
         self._data = self._load()
 
     def _load(self) -> dict[str, Any]:

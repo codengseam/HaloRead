@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from src.agents.biographer import BiographerAgent
-from src.agents.context_analyst import ContextAnalystAgent
-from src.agents.critic import CriticAgent
-from src.agents.editor import EditorAgent
-from src.agents.historian import HistorianAgent
-from src.agents.orchestrator import OrchestratorAgent
-from src.agents.philosopher import PhilosopherAgent
-from src.utils.llm import MockLLMClient
+from src.cli.agents.biographer import BiographerAgent
+from src.cli.agents.context_analyst import ContextAnalystAgent
+from src.cli.agents.critic import CriticAgent
+from src.cli.agents.editor import EditorAgent
+from src.cli.agents.historian import HistorianAgent
+from src.cli.agents.orchestrator import OrchestratorAgent
+from src.cli.agents.philosopher import PhilosopherAgent
+from src.cli.utils.llm import MockLLMClient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PROMPTS_DIR = PROJECT_ROOT / "prompts"
+PROMPTS_DIR = PROJECT_ROOT / "src/cli/prompts"
 
 SECTIONS = ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道"]
 

@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.core.workflow import DeepReadingWorkflow
-from src.utils.config import Config
-from src.utils.llm import MockLLMClient
+from src.cli.core.workflow import DeepReadingWorkflow
+from src.cli.utils.config import Config
+from src.cli.utils.llm import MockLLMClient
 
 SECTIONS = ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道"]
 REQUIRED_FRONTMATTER = ["title", "book", "chapter", "event", "created_at", "source_agents"]
@@ -24,7 +24,7 @@ def workflow(tmp_path):
         "paths": {
             "output": str(output_dir),
             "logs": str(logs_dir),
-            "prompts": "prompts",
+            "src/cli/prompts": "src/cli/prompts",
             "templates": "templates",
         },
         "rules": {

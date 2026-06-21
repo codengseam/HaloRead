@@ -7,18 +7,18 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from src.agents.biographer import BiographerAgent
-from src.agents.context_analyst import ContextAnalystAgent
-from src.agents.critic import CriticAgent
-from src.agents.editor import EditorAgent
-from src.agents.historian import HistorianAgent
-from src.agents.orchestrator import OrchestratorAgent
-from src.agents.philosopher import PhilosopherAgent
-from src.utils.config import Config
-from src.utils.llm import LLMClient, build_llm
-from src.utils.logger import make_log_path
-from src.utils.markdown import build_output_path, save_markdown
-from src.utils.quality import run_quality_checks
+from src.cli.agents.biographer import BiographerAgent
+from src.cli.agents.context_analyst import ContextAnalystAgent
+from src.cli.agents.critic import CriticAgent
+from src.cli.agents.editor import EditorAgent
+from src.cli.agents.historian import HistorianAgent
+from src.cli.agents.orchestrator import OrchestratorAgent
+from src.cli.agents.philosopher import PhilosopherAgent
+from src.cli.utils.config import Config
+from src.cli.utils.llm import LLMClient, build_llm
+from src.cli.utils.logger import make_log_path
+from src.cli.utils.markdown import build_output_path, save_markdown
+from src.cli.utils.quality import run_quality_checks
 
 
 class WorkflowState(TypedDict, total=False):

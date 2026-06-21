@@ -7,7 +7,7 @@ llm:
 paths:
   output: output
   logs: logs
-  prompts: prompts
+  prompts: src/cli/prompts
   templates: templates
 
 rules:

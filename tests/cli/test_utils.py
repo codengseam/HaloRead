@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from src.utils.config import Config
-from src.utils.markdown import build_frontmatter, build_output_path, save_markdown
-from src.utils.quality import (
+from src.cli.utils.config import Config
+from src.cli.utils.markdown import build_frontmatter, build_output_path, save_markdown
+from src.cli.utils.quality import (
     check_ai_flavor,
     check_chinese_english_mix,
     check_citations,
@@ -22,7 +22,7 @@ REQUIRED_FRONTMATTER = ["title", "book", "chapter", "event", "created_at", "sour
 
 
 def test_config_loads_default_config_yaml():
-    cfg = Config(PROJECT_ROOT / "config.yaml")
+    cfg = Config(PROJECT_ROOT / "config.cli.yaml")
     assert isinstance(cfg.llm, dict)
     assert isinstance(cfg.paths, dict)
     assert isinstance(cfg.rules, dict)
@@ -35,7 +35,7 @@ def test_config_resolves_environment_variables(monkeypatch):
     monkeypatch.setenv("LLM_BASE_URL", "https://test.example.com/v1")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
 
-    cfg = Config(PROJECT_ROOT / "config.yaml")
+    cfg = Config(PROJECT_ROOT / "config.cli.yaml")
     assert cfg.llm["model"] == "gpt-test"
     assert cfg.llm["base_url"] == "https://test.example.com/v1"
     assert cfg.llm["api_key"] == "test-key"

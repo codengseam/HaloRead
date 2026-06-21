@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
-from src.utils.llm import LLMClient
+from src.cli.utils.llm import LLMClient
 
 
 @dataclass
