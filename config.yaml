@@ -1,6 +1,10 @@
-# 个人 AI 深度阅读助手 — 工具与存储层配置
+# 个人 AI 深度阅读助手配置
 
-# 生成笔记的输出目录（相对于项目根目录）
+output:
+  base_dir: output
+  filename_pattern: "{chapter}_{event}.md"
+
+# 生成笔记的输出目录（与 output.base_dir 保持一致，供工具层读取）
 output_dir: "output"
 
 # Obsidian Vault 目录；留空则使用环境变量 OBSIDIAN_VAULT_PATH
@@ -8,6 +12,13 @@ vault_dir: ""
 
 # 缓存目录（搜索来源、中间结果等）
 cache_dir: ".cache"
+
+logs:
+  base_dir: logs
+
+llm:
+  # 默认温度，叙事类 Agent 可稍高，分析类可稍低
+  default_temperature: 0.7
 
 # 默认使用的大模型名称
 model: "qwen-plus"
@@ -24,7 +35,21 @@ trusted_domains:
   - "sinica.edu.tw"             # 中央研究院
   - "himalaya.socanth.cam.ac.uk" # 剑桥喜马拉雅数字图书馆（可选）
 
+# Agent 输出结构检查开关
+quality_check:
+  enabled: true
+  required_sections:
+    - 讲事情
+    - 讲人物
+    - 讲背景
+    - 讲道理
+    - 问道悟道
+
 # MCP 服务器名称映射
 mcp_servers:
   pdf_reader: "mcp_pdf-reader-mcp"  # 读取本地 PDF 史料
   obsidian: "mcp_mcp-obsidian"      # 读写 Obsidian Vault
+
+# 可选：Google Custom Search 配置
+google_search_api_key: ""
+google_search_engine_id: ""

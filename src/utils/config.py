@@ -2,38 +2,57 @@
 
 from __future__ import annotations
 
+import os
 import re
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional, Union
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover
+    load_dotenv = None  # type: ignore
 
 
-def load_config(path: Path = Path("config.yaml")) -> dict[str, Any]:
+def load_config(config_path: Optional[Union[Path, str]] = None) -> Dict[str, Any]:
     """读取 YAML 配置文件。
 
     若已安装 PyYAML，则使用标准 YAML 解析；否则使用内置的简单解析器
     处理本项目用到的基本键值（字符串、列表、单层字典）。
+    读取前会先加载同目录 .env 文件（若 python-dotenv 已安装）。
     """
+    if load_dotenv is not None:
+        load_dotenv()
+
+    if config_path is None:
+        config_path = Path("config.yaml")
+    else:
+        config_path = Path(config_path)
+
+    if not config_path.exists():
+        warnings.warn(f"配置文件不存在: {config_path}", RuntimeWarning)
+        return {}
+
     try:
         import yaml
 
-        with path.open("r", encoding="utf-8") as f:
+        with config_path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except ImportError:
         warnings.warn("PyYAML 未安装，使用内置简单 YAML 解析器", RuntimeWarning)
-    except FileNotFoundError:
-        warnings.warn(f"配置文件不存在: {path}", RuntimeWarning)
+    except Exception as exc:
+        warnings.warn(f"YAML 解析失败: {exc}", RuntimeWarning)
         return {}
 
-    return _parse_simple_yaml(path)
+    return _parse_simple_yaml(config_path)
 
 
-def _parse_simple_yaml(path: Path) -> dict[str, Any]:
+def _parse_simple_yaml(path: Path) -> Dict[str, Any]:
     """极简 YAML 解析，仅支持顶层 key: value / list / dict。"""
-    result: dict[str, Any] = {}
-    current_key: str | None = None
-    current_list: list[Any] | None = None
-    current_dict: dict[str, Any] | None = None
+    result: Dict[str, Any] = {}
+    current_key: Optional[str] = None
+    current_list: Optional[list] = None
+    current_dict: Optional[Dict[str, Any]] = None
 
     with path.open("r", encoding="utf-8") as f:
         for raw_line in f:
@@ -93,12 +112,17 @@ def _parse_simple_yaml(path: Path) -> dict[str, Any]:
     return result
 
 
-def load_env(path: Path = Path(".env")) -> dict[str, str]:
+def load_env(path: Optional[Union[Path, str]] = Path(".env")) -> Dict[str, str]:
     """读取 .env 文件为键值对字典。
 
     忽略空行与以 # 开头的注释行；值两端的引号会被去除。
     """
-    env: dict[str, str] = {}
+    if path is None:
+        path = Path(".env")
+    else:
+        path = Path(path)
+
+    env: Dict[str, str] = {}
     if not path.exists():
         return env
 
@@ -119,3 +143,12 @@ def load_env(path: Path = Path(".env")) -> dict[str, str]:
             env[key] = value
 
     return env
+
+
+def get_llm_config() -> Dict[str, str]:
+    """从环境变量读取 LLM 配置。"""
+    return {
+        "api_key": os.getenv("LLM_API_KEY", ""),
+        "base_url": os.getenv("LLM_BASE_URL", ""),
+        "model": os.getenv("LLM_MODEL", "qwen-max-latest"),
+    }
