@@ -1,5 +1,7 @@
 .env
-output/
+output/*
+!output/资治通鉴/
+!output/资治通鉴/*.md
 logs/
 
 __pycache__/
