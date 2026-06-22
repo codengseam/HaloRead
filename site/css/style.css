@@ -124,6 +124,19 @@ body {
     display: flex;
     align-items: center;
     gap: 14px;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 10px;
+    outline-offset: 4px;
+    transition: opacity 0.2s ease;
+}
+
+.brand-lockup:hover {
+    opacity: 0.85;
+}
+
+.brand-lockup:focus-visible {
+    outline: 2px solid var(--accent);
 }
 
 .brand-badge {

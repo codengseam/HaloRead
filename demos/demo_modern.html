@@ -63,6 +63,20 @@
       display: flex;
       align-items: center;
       gap: 14px;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      border-radius: 10px;
+      outline-offset: 4px;
+      transition: opacity 0.2s ease;
+    }
+
+    .brand-lockup:hover {
+      opacity: 0.85;
+    }
+
+    .brand-lockup:focus-visible {
+      outline: 2px solid var(--accent);
     }
 
     .brand-badge {
@@ -206,13 +220,13 @@
   <div class="showcase">
     <div class="stage">
       <header class="brand-header">
-        <div class="brand-lockup">
+        <a class="brand-lockup" href="#" title="回到书架">
           <div class="brand-badge" aria-label="豪">豪</div>
           <div class="brand-text">
             <span class="brand-name">豪书斋</span>
             <span class="brand-motto">读古人书，悟今世事</span>
           </div>
-        </div>
+        </a>
         <nav class="brand-actions" aria-label="主导航">
           <a class="nav-link" href="#">书架</a>
           <a class="nav-link" href="#">专题</a>
