@@ -19,6 +19,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# 把项目根加入 sys.path，使 scripts/ 独立运行时也能 import src.utils.sorting
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from src.utils.sorting import sort_notes_tree  # noqa: E402
+
 try:
     import yaml  # type: ignore
 except ImportError:
@@ -241,8 +248,7 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(md_path, dest)
 
-    # 构建按字母排序的 tree：book -> chapter -> event
-    # 同时为每本书构建独立的 tree（只含本书 chapters）
+    # 构建每本书的 tree（book -> chapter -> event）
     book_trees: dict[str, list[dict[str, Any]]] = {}
     for book_name in sorted(books.keys()):
         chapters: list[dict[str, Any]] = []
@@ -259,7 +265,7 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
             )
         book_trees[book_name] = chapters
 
-    # 顶层 tree：所有书合并（向后兼容）
+    # 顶层 tree（向后兼容），并按朝代/序号规则排序
     tree: list[dict[str, Any]] = []
     for book_name in sorted(books.keys()):
         tree.append(
@@ -269,6 +275,7 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
                 "children": book_trees[book_name],
             }
         )
+    sort_notes_tree(tree)
 
     # 构建 books 数组（含元数据 + 本书 tree + 计数）
     books_array: list[dict[str, Any]] = []

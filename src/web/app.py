@@ -10,6 +10,12 @@ from typing import Any
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from src.utils.sorting import sort_notes_tree  # noqa: E402
+
 try:
     import yaml  # type: ignore
 except ImportError:
@@ -17,7 +23,6 @@ except ImportError:
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
 OUTPUT_DIR = BASE_DIR / "output"
 MAIN_SCRIPT = BASE_DIR / "src" / "main.py"
 
@@ -266,9 +271,9 @@ def list_notes():
         )
 
     tree = []
-    for book_name in sorted(books.keys()):
+    for book_name in books.keys():
         book_node = {"title": book_name, "type": "book", "children": []}
-        for chapter_name in sorted(books[book_name].keys()):
+        for chapter_name in books[book_name].keys():
             events = sorted(
                 books[book_name][chapter_name], key=lambda e: e["path"]
             )
@@ -280,6 +285,7 @@ def list_notes():
                 }
             )
         tree.append(book_node)
+    sort_notes_tree(tree)
     return jsonify(tree)
 
 
