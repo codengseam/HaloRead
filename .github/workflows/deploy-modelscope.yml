@@ -1,0 +1,63 @@
+name: Deploy to ModelScope Studio
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'output/**'
+      - 'scripts/build_site.py'
+      - '.github/workflows/deploy-modelscope.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: modelscope-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Build static site
+        run: python scripts/build_site.py --output output --site site
+
+      - name: Verify build output
+        run: |
+          if [ ! -f site/data/index.json ]; then
+            echo "::error::site/data/index.json not found, build failed"
+            exit 1
+          fi
+          echo "Build verified: site/data/index.json exists"
+
+      - name: Push to ModelScope Studio
+        env:
+          MS_TOKEN: ${{ secrets.MODELSCOPE_API_TOKEN }}
+          MS_REPO: ${{ vars.MODELSCOPE_STUDIO_REPO }}
+        run: |
+          # 将构建产物推送到魔搭创空间 Git 仓库
+          # MS_REPO 格式: https://www.modelscope.cn/studios/<user>/<studio>.git
+          cd site
+
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "deploy: sync from GitHub ${{ github.sha }}"
+
+          # 使用 token 认证推送（token 不会出现在日志中）
+          AUTH_REPO=$(echo "$MS_REPO" | sed "s|https://|https://oauth2:${MS_TOKEN}@|")
+          git push --force "$AUTH_REPO" HEAD:master
+
+          echo "✅ Deployed to ModelScope Studio"
