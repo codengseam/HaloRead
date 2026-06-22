@@ -46,18 +46,41 @@ jobs:
           MS_TOKEN: ${{ secrets.MODELSCOPE_API_TOKEN }}
           MS_REPO: ${{ vars.MODELSCOPE_STUDIO_REPO }}
         run: |
-          # 将构建产物推送到魔搭创空间 Git 仓库
-          # MS_REPO 格式: https://www.modelscope.cn/studios/<user>/<studio>.git
+          set -e
+
+          # ---- 诊断：检查环境变量是否已配置 ----
+          if [ -z "$MS_TOKEN" ]; then
+            echo "::error::MODELSCOPE_API_TOKEN 未配置。请前往 GitHub Settings → Secrets → Actions 添加。"
+            exit 1
+          fi
+          echo "✅ MODELSCOPE_API_TOKEN 已配置"
+
+          if [ -z "$MS_REPO" ]; then
+            echo "::error::MODELSCOPE_STUDIO_REPO 未配置。请前往 GitHub Settings → Variables → Actions 添加。"
+            exit 1
+          fi
+          echo "✅ MODELSCOPE_STUDIO_REPO = $MS_REPO"
+
+          # ---- 将构建产物推送到魔搭创空间 Git 仓库 ----
           cd site
 
-          git init
+          git init -b master
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "deploy: sync from GitHub ${{ github.sha }}"
 
-          # 使用 token 认证推送（token 不会出现在日志中）
+          # 使用 token 认证推送
           AUTH_REPO=$(echo "$MS_REPO" | sed "s|https://|https://oauth2:${MS_TOKEN}@|")
-          git push --force "$AUTH_REPO" HEAD:master
+
+          # 先尝试 master，失败则尝试 main
+          if git push --force "$AUTH_REPO" HEAD:master 2>&1; then
+            echo "✅ 已推送到 master 分支"
+          elif git push --force "$AUTH_REPO" HEAD:main 2>&1; then
+            echo "✅ 已推送到 main 分支"
+          else
+            echo "::error::推送到魔搭仓库失败，请检查 Token 和仓库地址是否正确。"
+            exit 1
+          fi
 
           echo "✅ Deployed to ModelScope Studio"
