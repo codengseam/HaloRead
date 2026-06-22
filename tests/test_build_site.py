@@ -30,12 +30,23 @@ source_agents:
 商鞅入秦，徙木立信。
 """
 
+SAMPLE_META_YAML = """title: 资治通鉴
+category: 史
+author: 司马光
+description: 司马光主编的编年体通史
+cover: 📜
+sort: 1
+"""
+
 
 def _create_sample_output(output_dir: Path) -> None:
-    """在 output_dir 下创建样例笔记。"""
+    """在 output_dir 下创建样例笔记及元数据。"""
     note_path = output_dir / "资治通鉴" / "周纪二_商鞅变法.md"
     note_path.parent.mkdir(parents=True, exist_ok=True)
     note_path.write_text(SAMPLE_FRONTMATTER, encoding="utf-8")
+
+    meta_path = output_dir / "资治通鉴" / "_meta.yaml"
+    meta_path.write_text(SAMPLE_META_YAML, encoding="utf-8")
 
 
 def test_build_site_creates_site_directory():
@@ -213,3 +224,162 @@ def test_build_site_cli():
         assert (
             site_dir / "notes" / "资治通鉴" / "周纪二_商鞅变法.md"
         ).exists()
+
+
+def test_index_json_books_structure():
+    """books 数组存在、长度正确、字段正确。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+        data = json.loads(
+            (site_dir / "data" / "index.json").read_text(encoding="utf-8")
+        )
+        books = data["books"]
+        assert isinstance(books, list)
+        assert len(books) == 1
+
+        book = books[0]
+        assert book["id"] == "资治通鉴"
+        assert book["title"] == "资治通鉴"
+        assert book["category"] == "史"
+        assert book["author"] == "司马光"
+        assert book["cover"] == "📜"
+        assert book["sort"] == 1
+        assert book["chapter_count"] == 1
+        assert book["note_count"] == 1
+
+
+def test_index_json_books_tree_per_book():
+    """某本书的 tree 只含本书章节，不含其他书。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        # 额外创建第二本书（无 _meta.yaml）
+        note2 = output_dir / "论语" / "学而_学而时习之.md"
+        note2.parent.mkdir(parents=True, exist_ok=True)
+        note2.write_text(
+            """---
+title: "学而时习之"
+book: "论语"
+chapter: "学而"
+event: "学而时习之"
+---
+
+## 讲事情
+
+学而时习之，不亦说乎。
+""",
+            encoding="utf-8",
+        )
+        build_site(str(output_dir), str(site_dir))
+        data = json.loads(
+            (site_dir / "data" / "index.json").read_text(encoding="utf-8")
+        )
+        books = data["books"]
+        assert len(books) == 2
+
+        zz_book = next(b for b in books if b["id"] == "资治通鉴")
+        assert len(zz_book["tree"]) == 1
+        assert zz_book["tree"][0]["title"] == "周纪二"
+        # 资治通鉴的 tree 不应包含论语的章节
+        for ch in zz_book["tree"]:
+            assert ch["title"] != "学而"
+
+        ly_book = next(b for b in books if b["id"] == "论语")
+        assert len(ly_book["tree"]) == 1
+        assert ly_book["tree"][0]["title"] == "学而"
+
+
+def test_index_json_categories():
+    """categories 列表存在且包含 '史'。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+        data = json.loads(
+            (site_dir / "data" / "index.json").read_text(encoding="utf-8")
+        )
+        categories = data["categories"]
+        assert isinstance(categories, list)
+        assert "史" in categories
+
+
+def test_index_json_backward_compat():
+    """顶层 tree 和 notes 仍存在且结构不变。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+        data = json.loads(
+            (site_dir / "data" / "index.json").read_text(encoding="utf-8")
+        )
+        # 顶层 tree 仍存在
+        assert "tree" in data
+        tree = data["tree"]
+        assert len(tree) == 1
+        assert tree[0]["title"] == "资治通鉴"
+        assert tree[0]["type"] == "book"
+        assert len(tree[0]["children"]) == 1
+        assert tree[0]["children"][0]["title"] == "周纪二"
+
+        # notes 仍存在
+        assert "notes" in data
+        notes = data["notes"]
+        assert "资治通鉴/周纪二_商鞅变法.md" in notes
+
+
+def test_book_meta_defaults():
+    """无 _meta.yaml 时，category 为 '未分类'、cover 为 '📖'。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        # 创建一本没有 _meta.yaml 的书
+        note_path = output_dir / "无名书" / "第一章_某事件.md"
+        note_path.parent.mkdir(parents=True, exist_ok=True)
+        note_path.write_text(
+            """---
+title: "某事件"
+book: "无名书"
+chapter: "第一章"
+event: "某事件"
+---
+
+## 讲事情
+
+某事件内容。
+""",
+            encoding="utf-8",
+        )
+        build_site(str(output_dir), str(site_dir))
+        data = json.loads(
+            (site_dir / "data" / "index.json").read_text(encoding="utf-8")
+        )
+        books = data["books"]
+        assert len(books) == 1
+        book = books[0]
+        assert book["category"] == "未分类"
+        assert book["cover"] == "📖"
+        assert book["title"] == "无名书"
+        assert book["sort"] == 99
+        assert book["author"] == ""
+        assert book["description"] == ""
+
+
+def test_stats_includes_categories():
+    """stats.categories 为 int。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+        data = json.loads(
+            (site_dir / "data" / "index.json").read_text(encoding="utf-8")
+        )
+        assert "categories" in data["stats"]
+        assert isinstance(data["stats"]["categories"], int)
+        assert data["stats"]["categories"] == 1

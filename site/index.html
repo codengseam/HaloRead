@@ -23,20 +23,33 @@
     </header>
 
     <div class="layout">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>笔记目录</h2>
+        <!-- 书架视图 -->
+        <section class="view-bookshelf" id="viewBookshelf">
+            <div class="bookshelf" id="bookshelf">
+                <div class="empty-state">正在加载书架…</div>
             </div>
-            <nav id="treeNav" class="tree-nav">
-                <div class="empty-state">正在加载目录…</div>
-            </nav>
-        </aside>
+        </section>
 
-        <main class="reader" id="reader">
-            <div class="reader-placeholder">
-                <p>请在左侧选择一篇笔记开始阅读。</p>
-            </div>
-        </main>
+        <!-- 阅读视图 -->
+        <section class="view-reader" id="viewReader" hidden>
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <button id="backBtn" class="back-btn" type="button">
+                        <span class="back-arrow" aria-hidden="true">←</span>
+                        <span>返回书架</span>
+                    </button>
+                    <h2 id="currentBookTitle" class="sidebar-book-title">笔记目录</h2>
+                </div>
+                <nav id="treeNav" class="tree-nav">
+                    <div class="empty-state">正在加载目录…</div>
+                </nav>
+            </aside>
+            <main class="reader" id="reader">
+                <div class="reader-placeholder">
+                    <p>请在左侧选择一篇笔记开始阅读。</p>
+                </div>
+            </main>
+        </section>
     </div>
 
     <div id="modalOverlay" class="modal-overlay" aria-hidden="true">

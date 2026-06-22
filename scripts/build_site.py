@@ -24,7 +24,7 @@ try:
 except ImportError:
     yaml = None  # type: ignore
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 FRONTMATTER_PATTERN = r"^---\s*\n(.*?)\n---\s*\n?"
 
 
@@ -113,6 +113,63 @@ def _normalize_created_at(value: Any) -> str:
     return str(value)
 
 
+def _load_book_meta(book_dir: Path, book_name: str) -> dict[str, Any]:
+    """读取 book_dir/_meta.yaml，返回规范化后的元数据字典。
+
+    无文件或解析失败时返回默认值：
+    title=book_name, category="未分类", description="", author="",
+    cover="📖", sort=99。
+    """
+    defaults: dict[str, Any] = {
+        "title": book_name,
+        "category": "未分类",
+        "description": "",
+        "author": "",
+        "cover": "📖",
+        "sort": 99,
+    }
+    meta_path = book_dir / "_meta.yaml"
+    if not meta_path.exists() or yaml is None:
+        return defaults
+    try:
+        data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return defaults
+    if not isinstance(data, dict):
+        return defaults
+
+    result = dict(defaults)
+    for key in ("title", "category", "description", "author", "cover"):
+        value = data.get(key)
+        if value is not None:
+            result[key] = str(value)
+    sort_value = data.get("sort")
+    if sort_value is not None:
+        try:
+            result["sort"] = int(sort_value)
+        except (TypeError, ValueError):
+            pass
+    return result
+
+
+def _category_sort_key(category: str) -> tuple[int, str]:
+    """返回 (priority, category) 用于排序。
+
+    优先级：经(1) < 史(2) < 子(3) < 集(4) < 其他(50) < 未分类(99)。
+    其他分类按字符串序（近似拼音序）排列。
+    """
+    priority_map = {
+        "经": 1,
+        "史": 2,
+        "子": 3,
+        "集": 4,
+        "未分类": 99,
+    }
+    if category in priority_map:
+        return (priority_map[category], category)
+    return (50, category)
+
+
 def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
     """扫描 output/ 下的 Markdown 笔记，生成静态站点到 site/。
 
@@ -185,25 +242,70 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
             shutil.copy2(md_path, dest)
 
     # 构建按字母排序的 tree：book -> chapter -> event
-    tree: list[dict[str, Any]] = []
+    # 同时为每本书构建独立的 tree（只含本书 chapters）
+    book_trees: dict[str, list[dict[str, Any]]] = {}
     for book_name in sorted(books.keys()):
-        book_node: dict[str, Any] = {
-            "title": book_name,
-            "type": "book",
-            "children": [],
-        }
+        chapters: list[dict[str, Any]] = []
         for chapter_name in sorted(books[book_name].keys()):
             events = sorted(
                 books[book_name][chapter_name], key=lambda e: e["path"]
             )
-            book_node["children"].append(
+            chapters.append(
                 {
                     "title": chapter_name,
                     "type": "chapter",
                     "children": events,
                 }
             )
-        tree.append(book_node)
+        book_trees[book_name] = chapters
+
+    # 顶层 tree：所有书合并（向后兼容）
+    tree: list[dict[str, Any]] = []
+    for book_name in sorted(books.keys()):
+        tree.append(
+            {
+                "title": book_name,
+                "type": "book",
+                "children": book_trees[book_name],
+            }
+        )
+
+    # 构建 books 数组（含元数据 + 本书 tree + 计数）
+    books_array: list[dict[str, Any]] = []
+    for book_name in books.keys():
+        book_dir = output_path / book_name
+        meta = _load_book_meta(book_dir, book_name)
+        chapter_count = len(book_trees[book_name])
+        note_count = sum(len(ch["children"]) for ch in book_trees[book_name])
+        books_array.append(
+            {
+                "id": book_name,
+                "title": meta["title"],
+                "category": meta["category"],
+                "description": meta["description"],
+                "author": meta["author"],
+                "cover": meta["cover"],
+                "sort": meta["sort"],
+                "chapter_count": chapter_count,
+                "note_count": note_count,
+                "tree": book_trees[book_name],
+            }
+        )
+
+    # 排序：category 优先级 → book sort → title
+    books_array.sort(
+        key=lambda b: (
+            _category_sort_key(b["category"])[0],
+            b["sort"],
+            b["title"],
+        )
+    )
+
+    # categories 列表（按优先级排序，只含实际出现的分类）
+    categories = sorted(
+        {b["category"] for b in books_array},
+        key=_category_sort_key,
+    )
 
     index = {
         "version": VERSION,
@@ -211,7 +313,13 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
         .astimezone()
         .replace(microsecond=0)
         .isoformat(),
-        "stats": {"books": len(books), "notes": len(notes)},
+        "stats": {
+            "books": len(books),
+            "notes": len(notes),
+            "categories": len(categories),
+        },
+        "books": books_array,
+        "categories": categories,
         "tree": tree,
         "notes": notes,
     }
