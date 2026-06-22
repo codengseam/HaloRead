@@ -73,8 +73,9 @@ class MockLLMClient:
             return "变革需要制度与信任的双重杠杆：徙木立信解决信任，严法解决激励。\n\n来源：\n- 《资治通鉴·周纪二》"
 
         # 计划评审 Agent：根据角色返回模拟评审意见
+        # 用「计划评审专家 - {角色}视角」精确匹配，避免子串误命中
         if "计划评审专家" in combined:
-            if "架构师" in combined:
+            if "计划评审专家 - 架构师" in combined:
                 return (
                     "## 架构师评审\n\n"
                     "### 总体评价\n"
@@ -90,7 +91,7 @@ class MockLLMClient:
                     "### 建议\n"
                     "- 将 PDF 预处理放在 Orchestrator 之后、Specialist 之前"
                 )
-            if "测试" in combined:
+            if "计划评审专家 - 测试" in combined:
                 return (
                     "## 测试评审\n\n"
                     "### 总体评价\n"
@@ -108,7 +109,7 @@ class MockLLMClient:
                     "- 新增 test_pdf_batch.py 覆盖正常/异常路径\n"
                     "- workflow.py 改动后运行全量 pytest 验证回归"
                 )
-            if "规则" in combined:
+            if "计划评审专家 - 规则" in combined:
                 return (
                     "## 规则评审\n\n"
                     "### 总体评价\n"
