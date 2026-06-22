@@ -79,6 +79,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # 先提交本地构建产物，使其成为 tracked 文件
+          git add -A
+          git commit -m "build: local build from ${{ github.sha }}" --allow-empty
+
           # 用 token 配置认证（避免 token 出现在 URL/日志中）
           AUTH_REPO=$(echo "$MS_REPO" | sed "s|https://|https://oauth2:${MS_TOKEN}@|")
 
@@ -88,22 +92,20 @@ jobs:
             echo "✅ 已拉取远端 master 分支，准备 merge"
 
             # 合并远端历史（允许无关历史，处理首次同步）
-            if git merge modelscope/master --allow-unrelated-histories -m "Merge remote before deploy" 2>&1; then
+            # 冲突时用本地版本覆盖远端文件（构建产物优先）
+            if git merge modelscope/master --allow-unrelated-histories -X ours -m "Merge remote before deploy" 2>&1; then
               echo "✅ Merge 成功"
             else
-              # 合并冲突时保留本地版本（构建产物优先）
-              echo "⚠️ Merge 冲突，保留本地版本"
-              git checkout --ours .
-              git add .
-              git commit -m "Resolve conflicts, keep local build" --no-edit
+              echo "⚠️ Merge 失败，尝试重置为本地版本"
+              git reset --hard HEAD
             fi
           else
             echo "ℹ️ 远端 master 分支不存在（首次部署），直接 push"
           fi
 
-          # 添加并提交本地构建产物
+          # 再次添加并提交（确保所有本地构建产物都已纳入）
           git add -A
-          git commit -m "deploy: sync from GitHub ${{ github.sha }}" --allow-empty
+          git commit -m "deploy: sync from GitHub ${{ github.sha }}" --allow-empty || echo "无变更需要提交"
 
           # 推送到魔搭 master 分支
           if git push "$AUTH_REPO" HEAD:master 2>&1; then
