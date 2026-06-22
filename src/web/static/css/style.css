@@ -102,6 +102,8 @@ body {
     -webkit-font-smoothing: antialiased;
     background-color: var(--bg-paper);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     transition: background-color 0.25s ease, color 0.25s ease;
 }
 
@@ -354,9 +356,15 @@ body {
 
 /* ===== 页面主容器 ===== */
 .page-main {
-    min-height: calc(100% - 72px);
-    height: calc(100% - 56px);
+    flex: 1;
     overflow: hidden;
+    min-height: 0;
+}
+
+/* 首页视图允许滚动 */
+body[data-view="home"] .page-main {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* ===== 首页视图 ===== */
@@ -367,6 +375,15 @@ body {
 
 .home-view[hidden],
 .reader-view[hidden] {
+    display: none;
+}
+
+/* ===== 视图切换：header 互斥显示 ===== */
+body[data-view="home"] .toolbar {
+    display: none;
+}
+
+body[data-view="reader"] .brand-header {
     display: none;
 }
 
@@ -621,7 +638,7 @@ body {
 /* ===== 阅读视图 ===== */
 .reader-view {
     display: flex;
-    height: calc(100vh - 72px);
+    height: 100%;
     overflow: hidden;
 }
 
@@ -1229,6 +1246,11 @@ body.ui-hidden .bottom-bar {
     transform: translateY(100%);
 }
 
+/* 首页视图隐藏底部工具栏（移动端） */
+body[data-view="home"] .bottom-bar {
+    display: none;
+}
+
 /* ============ 弹窗（生成新笔记 / 提示） ============ */
 .modal-overlay {
     position: fixed;
@@ -1542,7 +1564,7 @@ body.ui-hidden .bottom-bar {
 
     .reader-view {
         flex-direction: column;
-        height: calc(100vh - 64px);
+        height: 100%;
     }
 
     .sidebar {
@@ -1572,7 +1594,6 @@ body.ui-hidden .bottom-bar {
 
     .markdown-body {
         padding: 1.5rem 1.1rem 1rem;
-        font-size: 15px;
     }
 
     .chapter-nav {

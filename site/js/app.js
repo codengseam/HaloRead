@@ -355,6 +355,7 @@
     /* ============ 视图切换 ============ */
     function switchView(view) {
         state.currentView = view;
+        document.body.dataset.view = view;
         if (view === 'home') {
             elements.homeView.hidden = false;
             elements.readerView.hidden = true;
@@ -383,8 +384,17 @@
         if (elements.currentBookTitle) {
             elements.currentBookTitle.textContent = (book && book.title) || bookId;
         }
-        elements.reader.innerHTML = '<div class="reader-placeholder"><p>请在左侧选择一篇笔记开始阅读。</p></div>';
+        elements.reader.innerHTML = '<div class="reader-placeholder"><p>正在加载…</p></div>';
         refreshTreeView();
+
+        // 优先跳转到缓存页，无缓存则打开第一章
+        const cachedPath = getCachedPosition(bookId);
+        const bookNotes = flattenTree(state.currentBookTree);
+        if (cachedPath && bookNotes.some((n) => n.path === cachedPath)) {
+            loadNote(cachedPath);
+        } else if (bookNotes.length > 0) {
+            loadNote(bookNotes[0].path);
+        }
     }
 
     function backToHome() {
@@ -521,6 +531,11 @@
                 elements.toolbarChapter.textContent = chapterText;
             }
             updateChapterNav();
+
+            // 缓存当前阅读位置
+            if (state.currentBook) {
+                saveCachedPosition(state.currentBook, path);
+            }
         } catch (err) {
             elements.reader.innerHTML = '<div class="reader-placeholder">加载失败，请重试。</div>';
             showError('无法加载笔记内容。', err);
@@ -586,6 +601,25 @@
     function saveSettings(settings) {
         try {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        } catch (err) {
+            // 存储失败时静默处理
+        }
+    }
+
+    /* ============ 阅读位置缓存 ============ */
+    function getCachedPosition(bookId) {
+        try {
+            return localStorage.getItem('reader-position-' + bookId);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function saveCachedPosition(bookId, path) {
+        try {
+            if (bookId && path) {
+                localStorage.setItem('reader-position-' + bookId, path);
+            }
         } catch (err) {
             // 存储失败时静默处理
         }
@@ -897,6 +931,10 @@
         }
         if (elements.backBtn) {
             elements.backBtn.addEventListener('click', backToHome);
+        }
+        const brandLockup = document.querySelector('.brand-lockup');
+        if (brandLockup) {
+            brandLockup.addEventListener('click', backToHome);
         }
         if (elements.refreshBtn) {
             elements.refreshBtn.addEventListener('click', async () => {
