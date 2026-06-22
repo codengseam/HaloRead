@@ -30,6 +30,16 @@ def _has_frontmatter(text: str) -> bool:
     return text.strip().startswith("---")
 
 
+SECTION_TO_AGENT = {
+    "讲事情": "historian",
+    "讲人物": "biographer",
+    "讲背景": "context_analyst",
+    "讲道理": "critic",
+    "问道悟道": "philosopher",
+    "结语": "editor",
+}
+
+
 def run(state: AgentState) -> Dict[str, Any]:
     """汇总 Specialist Agent 输出，生成完整 Markdown 讲书笔记。"""
     book = state["book"]
@@ -61,12 +71,17 @@ def run(state: AgentState) -> Dict[str, Any]:
     # 若 LLM 未生成 frontmatter，则自行补齐
     if not _has_frontmatter(content):
         title = f"{book}·{chapter}·{event}"
+        # 将段落标题映射为 Specialist Agent 名称
+        agent_names = [
+            SECTION_TO_AGENT.get(section, section)
+            for section in sections.keys()
+        ] if sections else ["editor"]
         frontmatter = build_frontmatter(
             title=title,
             book=book,
             chapter=chapter,
             event=event,
-            source_agents=["Editor Agent"],
+            source_agents=agent_names,
         )
         body_title = f"# {title}\n\n"
         content = frontmatter + body_title + content

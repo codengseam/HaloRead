@@ -3,6 +3,18 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 
+def _sanitize_filename(name: str) -> str:
+    """简单的文件名安全化，防止路径穿越。
+
+    替换路径分隔符与 ``..``，剥离首尾空白与下划线。
+    """
+    if not name:
+        return "untitled"
+    safe = name.strip().replace("/", "_").replace("\\", "_").replace("..", "_")
+    safe = safe.strip("_")
+    return safe or "untitled"
+
+
 def build_frontmatter(
     title: str,
     book: str,
@@ -10,15 +22,16 @@ def build_frontmatter(
     event: str,
     source_agents: List[str],
 ) -> str:
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    agents_str = ", ".join(source_agents)
+    created_at = datetime.now().astimezone().replace(microsecond=0).isoformat()
+    agents_yaml = "\n".join(f"  - {agent}" for agent in source_agents)
     return f"""---
-title: {title}
-book: {book}
-chapter: {chapter}
-event: {event}
-created_at: {created_at}
-source_agents: {agents_str}
+title: "{title}"
+book: "{book}"
+chapter: "{chapter}"
+event: "{event}"
+created_at: "{created_at}"
+source_agents:
+{agents_yaml}
 ---
 
 """
@@ -31,6 +44,9 @@ def save_markdown(
     content: str,
     base_dir: Union[Path, str] = "output",
 ) -> Path:
+    book = _sanitize_filename(book)
+    chapter = _sanitize_filename(chapter)
+    event = _sanitize_filename(event)
     base = Path(base_dir)
     book_dir = base / book
     book_dir.mkdir(parents=True, exist_ok=True)

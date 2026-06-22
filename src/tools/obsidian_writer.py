@@ -127,9 +127,9 @@ class ObsidianWriter:
         """合并 metadata frontmatter 与正文。"""
         metadata = metadata or {}
         if "created_at" not in metadata:
-            metadata["created_at"] = datetime.now().isoformat(timespec="seconds")
+            metadata["created_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
         if "updated_at" not in metadata:
-            metadata["updated_at"] = datetime.now().isoformat(timespec="seconds")
+            metadata["updated_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
         return self._to_frontmatter(metadata) + content
 
     def merge_frontmatter(self, content: str, metadata: dict) -> str:
@@ -144,13 +144,17 @@ class ObsidianWriter:
         """
         existing_meta, body = self._parse_frontmatter(content)
         merged = {**existing_meta, **metadata}
-        merged["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        merged["updated_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
         return self._to_frontmatter(merged) + body
 
     def _write_via_mcp(
         self, note_path: str, content: str, metadata: Optional[dict]
     ) -> Optional[dict]:
-        """尝试通过 MCP 服务器写入笔记。"""
+        """尝试通过 MCP 服务器写入笔记。
+
+        MCP API（``mcp.Client`` / ``client.call``）在当前环境中不可用，
+        此处通过 try/except 优雅降级，返回 ``None`` 以触发文件系统 fallback。
+        """
         try:
             import mcp  # type: ignore
 
@@ -177,7 +181,7 @@ class ObsidianWriter:
                 "detail": result,
             }
         except Exception as exc:  # noqa: BLE001
-            logger.warning("MCP Obsidian writer unavailable: %s", exc)
+            logger.info("MCP not available, falling back to file system: %s", exc)
             return None
 
     def _full_path(self, note_path: str) -> Path:
@@ -240,7 +244,7 @@ class ObsidianWriter:
                 old_note = target.read_text(encoding="utf-8")
                 old_meta, _ = self._parse_frontmatter(old_note)
                 merged_meta = {**old_meta, **(metadata or {})}
-                merged_meta["updated_at"] = datetime.now().isoformat(timespec="seconds")
+                merged_meta["updated_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
                 new_content = self._to_frontmatter(merged_meta) + content
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to parse existing note %s: %s", target, exc)

@@ -1,10 +1,13 @@
 import json
+import logging
 import re
 from typing import Any, Dict
 
 from src.core.state import AgentState
 from src.utils.llm import create_llm
 from src.utils.prompts import load_prompt
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_json_response(response: str) -> Dict[str, Any]:
@@ -21,7 +24,7 @@ def run(state: AgentState, interactive: bool = False) -> Dict[str, Any]:
     """解析用户输入，确定书名、章节、事件和输出路径。
 
     如果 state 中已有 book/chapter/event，则直接使用；否则调用 LLM 解析。
-    非交互模式下，缺失字段会被填充默认值。
+    非交互模式下，缺失字段填充为"未知书籍"/"未知章节"/"未知事件"。
     """
     book = state.get("book", "")
     chapter = state.get("chapter", "")
@@ -48,22 +51,33 @@ def run(state: AgentState, interactive: bool = False) -> Dict[str, Any]:
         },
     )
     llm = create_llm(temperature=0.2)
-    response = llm.invoke(prompt).content
-    parsed = _parse_json_response(response)
 
-    book = parsed.get("book", book) or book
-    chapter = parsed.get("chapter", chapter) or chapter
-    event = parsed.get("event", event) or event
-    missing = parsed.get("missing", [])
+    try:
+        response = llm.invoke(prompt).content
+        parsed = _parse_json_response(response)
+        book = parsed.get("book", book) or book
+        chapter = parsed.get("chapter", chapter) or chapter
+        event = parsed.get("event", event) or event
+        missing = parsed.get("missing", [])
+    except Exception as exc:
+        # LLM 返回非 JSON 时，记录错误并使用默认值
+        logger.warning("LLM 调用失败: %s", exc)
+        missing = []
+        if not book:
+            missing.append("book")
+        if not chapter:
+            missing.append("chapter")
+        if not event:
+            missing.append("event")
 
-    # 非交互模式下，为缺失字段填充默认值
+    # 非交互模式下，为缺失字段填充默认值（不使用 user_input 作为书名）
     if not interactive:
         if "book" in missing or not book:
-            book = book or user_input or "未知书籍"
+            book = book or "未知书籍"
         if "chapter" in missing or not chapter:
             chapter = chapter or "未知章节"
         if "event" in missing or not event:
-            event = event or user_input or book or "未知事件"
+            event = event or "未知事件"
 
     output_path = f"output/{book}/{chapter}_{event}.md"
 

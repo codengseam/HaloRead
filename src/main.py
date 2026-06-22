@@ -8,17 +8,71 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def _generate_stub(book: str, chapter: str, event: str, output_dir: str) -> Path:
+def _sanitize_filename(name: str) -> str:
+    """简单的文件名安全化，防止路径穿越。
+
+    替换路径分隔符与 ``..``，剥离首尾空白与下划线。
+    """
+    if not name:
+        return "untitled"
+    safe = name.strip().replace("/", "_").replace("\\", "_").replace("..", "_")
+    safe = safe.strip("_")
+    return safe or "untitled"
+
+
+def _parse_slots_from_input(user_input: str) -> tuple[str, str, str]:
+    """从自然语言输入中按空白符切分，尝试提取书名/章节/事件。
+
+    仅用于 stub 模式下的简单解析；真实生成仍由 Orchestrator 调用 LLM 处理。
+    """
+    parts = [p for p in user_input.split() if p]
+    if len(parts) >= 3:
+        return parts[0], parts[1], " ".join(parts[2:])
+    if len(parts) == 2:
+        return parts[0], parts[1], ""
+    if len(parts) == 1:
+        return parts[0], "", ""
+    return "", "", ""
+
+
+def _generate_stub(
+    book: str, chapter: str, event: str, user_input: str, output_dir: str,
+    dry_run: bool = False,
+) -> Path:
     """Generate a placeholder note for testing the web interface without API keys."""
+    # stub 模式支持从 --input 简单解析三个槽位
+    if not (book and chapter and event) and user_input:
+        parsed_book, parsed_chapter, parsed_event = _parse_slots_from_input(user_input)
+        book = book or parsed_book
+        chapter = chapter or parsed_chapter
+        event = event or parsed_event
+
+    if not (book and chapter and event):
+        print(
+            "Error: --stub 模式需要明确指定 --book、--chapter、--event，"
+            "或提供包含这三项的 --input。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    book = _sanitize_filename(book)
+    chapter = _sanitize_filename(chapter)
+    event = _sanitize_filename(event)
+
     target_dir = Path(output_dir) / book
-    target_dir.mkdir(parents=True, exist_ok=True)
     output_path = target_dir / f"{chapter}_{event}.md"
+
+    if dry_run:
+        print(f"[STUB DRY RUN] 预期保存路径：{output_path}")
+        return output_path
+
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     if output_path.exists():
         print(f"File already exists: {output_path}")
         return output_path
 
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now().astimezone().replace(microsecond=0).isoformat()
     sections = ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道", "结语"]
     lines = [
         f'---',
@@ -68,9 +122,13 @@ def main() -> int:
         user_input = " ".join(parts)
 
     if args.stub:
-        output_path = _generate_stub(book, chapter, event, args.output_dir)
-        if args.dry_run:
-            print(f"[STUB DRY RUN] 预期保存路径：{output_path}")
+        output_path = _generate_stub(
+            book, chapter, event, user_input, args.output_dir, dry_run=args.dry_run
+        )
+        return 0
+
+    if args.dry_run:
+        print("[DRY RUN] 跳过工作流调用，不生成笔记。")
         return 0
 
     from src.core.workflow import build_workflow
@@ -90,16 +148,16 @@ def main() -> int:
     app = build_workflow(output_base=args.output_dir)
     final_state = app.invoke(initial_state)
 
+    if final_state.get("errors"):
+        print("质量检查未通过：")
+        for issue in final_state["errors"]:
+            print(f"  - {issue}")
+        return 1
+
     output_path = Path(final_state["output_path"])
-    if args.dry_run:
-        print("[DRY RUN] 生成结果：")
-        print(final_state["final_markdown"][:2000])
-        print(f"\n...（省略）\n")
-        print(f"预期保存路径：{output_path}")
-    else:
-        print(f"已生成笔记：{output_path}")
-        print("\n--- 内容预览 ---\n")
-        print(final_state["final_markdown"][:1500])
+    print(f"已生成笔记：{output_path}")
+    print("\n--- 内容预览 ---\n")
+    print(final_state["final_markdown"][:1500])
 
     return 0
 

@@ -3,6 +3,7 @@
 
     const state = {
         treeData: [],
+        notesIndex: {},
         activePath: null,
         searchQuery: '',
         searchMode: false
@@ -16,13 +17,7 @@
         refreshBtn: document.getElementById('refreshBtn'),
         modalOverlay: document.getElementById('modalOverlay'),
         modalClose: document.getElementById('modalClose'),
-        cancelBtn: document.getElementById('cancelBtn'),
-        generateForm: document.getElementById('generateForm'),
-        inputArea: document.getElementById('inputArea'),
-        bookInput: document.getElementById('bookInput'),
-        chapterInput: document.getElementById('chapterInput'),
-        eventInput: document.getElementById('eventInput'),
-        submitBtn: document.getElementById('submitBtn')
+        cancelBtn: document.getElementById('cancelBtn')
     };
 
     function escapeHtml(text) {
@@ -44,27 +39,6 @@
     function showError(message, err) {
         console.error(message, err || '');
         alert(message);
-    }
-
-    async function fetchJson(url, options) {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-            const detail = await response.text().catch(() => '');
-            throw new Error(`请求失败 (${response.status}): ${detail || response.statusText}`);
-        }
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-            return await response.json();
-        }
-        return await response.text();
-    }
-
-    function normalizeTree(data) {
-        if (!data) return [];
-        if (Array.isArray(data)) return data;
-        if (data.notes && Array.isArray(data.notes)) return data.notes;
-        if (data.tree && Array.isArray(data.tree)) return data.tree;
-        return [];
     }
 
     function nodeMatches(node, query) {
@@ -162,8 +136,13 @@
 
     async function loadTree() {
         try {
-            const data = await fetchJson('/api/notes');
-            state.treeData = normalizeTree(data);
+            const response = await fetch('data/index.json');
+            if (!response.ok) {
+                throw new Error(`请求失败 (${response.status}): ${response.statusText}`);
+            }
+            const data = await response.json();
+            state.treeData = data.tree || [];
+            state.notesIndex = data.notes || {};
             state.searchMode = false;
             refreshTreeView();
         } catch (err) {
@@ -172,7 +151,7 @@
             empty.className = 'empty-state';
             empty.textContent = '加载目录失败';
             elements.treeNav.appendChild(empty);
-            showError('无法加载笔记目录，请检查后端服务是否正常运行。', err);
+            showError('无法加载笔记目录，请检查 data/index.json 是否存在。', err);
         }
     }
 
@@ -185,7 +164,7 @@
     }
 
     function parseFrontmatter(content) {
-        const match = content.match(/^---\n([\s\S]*?)\n---\n*/);
+        const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n*/);
         if (!match) return { meta: null, body: content };
         const metaBlock = match[1];
         const body = content.slice(match[0].length);
@@ -215,8 +194,12 @@
 
         elements.reader.innerHTML = '<div class="reader-placeholder">正在加载笔记…</div>';
         try {
-            const encodedPath = encodeURI(path);
-            const content = await fetchJson(`/api/notes/${encodedPath}`);
+            const content = await fetch('notes/' + encodeURI(path)).then((r) => {
+                if (!r.ok) {
+                    throw new Error(`请求失败 (${r.status}): ${r.statusText}`);
+                }
+                return r.text();
+            });
             const { meta, body } = parseFrontmatter(content || '');
             const html = sanitizeHtml(marked.parse(body, { gfm: true }));
 
@@ -241,59 +224,11 @@
     function openModal() {
         elements.modalOverlay.classList.add('open');
         elements.modalOverlay.setAttribute('aria-hidden', 'false');
-        elements.inputArea.focus();
     }
 
     function closeModal() {
         elements.modalOverlay.classList.remove('open');
         elements.modalOverlay.setAttribute('aria-hidden', 'true');
-    }
-
-    function resetForm() {
-        elements.generateForm.reset();
-    }
-
-    async function handleGenerate(event) {
-        event.preventDefault();
-        const userInput = elements.inputArea.value.trim();
-        const book = elements.bookInput.value.trim();
-        const chapter = elements.chapterInput.value.trim();
-        const eventName = elements.eventInput.value.trim();
-
-        let payload;
-        if (userInput) {
-            payload = { input: userInput };
-        } else {
-            if (!book || !chapter || !eventName) {
-                alert('请填写自然语言输入，或完整的书名、章节和事件信息。');
-                return;
-            }
-            payload = { book, chapter, event: eventName };
-        }
-
-        const originalText = elements.submitBtn.textContent;
-        elements.submitBtn.disabled = true;
-        elements.submitBtn.textContent = '生成中…';
-
-        try {
-            const result = await fetchJson('/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            closeModal();
-            resetForm();
-            await loadTree();
-            if (result && result.path) {
-                await loadNote(result.path);
-            }
-            alert('笔记生成成功，目录已刷新。');
-        } catch (err) {
-            showError('笔记生成失败，请检查后端服务或输入内容。', err);
-        } finally {
-            elements.submitBtn.disabled = false;
-            elements.submitBtn.textContent = originalText;
-        }
     }
 
     function handleSearch(event) {
@@ -314,19 +249,50 @@
     async function handleSearchEnter(event) {
         if (event.key !== 'Enter') return;
         event.preventDefault();
-        const query = elements.searchInput.value.trim();
+        const query = elements.searchInput.value.trim().toLowerCase();
         if (!query) {
             state.searchMode = false;
             refreshTreeView();
             return;
         }
-        try {
-            const data = await fetchJson(`/api/search?q=${encodeURIComponent(query)}`);
-            state.searchMode = true;
-            renderSearchResults(data.results || [], query);
-        } catch (err) {
-            showError('搜索失败，请检查后端服务。', err);
+
+        const results = [];
+        for (const [path, note] of Object.entries(state.notesIndex || {})) {
+            const title = note.title || note.event || '';
+            const content = note.content || '';
+            const titleLower = title.toLowerCase();
+            const contentLower = content.toLowerCase();
+
+            let matched = false;
+            let snippet = '';
+
+            if (titleLower.includes(query)) {
+                matched = true;
+                snippet = content.slice(0, 100).replace(/\n/g, ' ');
+                if (content.length > 100) snippet += '…';
+            } else if (contentLower.includes(query)) {
+                matched = true;
+                const idx = contentLower.indexOf(query);
+                const start = Math.max(0, idx - 30);
+                const end = Math.min(content.length, idx + query.length + 60);
+                snippet = content.slice(start, end).replace(/\n/g, ' ');
+                if (start > 0) snippet = '…' + snippet;
+                if (end < content.length) snippet += '…';
+            }
+
+            if (matched) {
+                results.push({
+                    path: path,
+                    book: note.book,
+                    chapter: note.chapter,
+                    event: note.event,
+                    title: title,
+                    snippet: snippet
+                });
+            }
         }
+        state.searchMode = true;
+        renderSearchResults(results, elements.searchInput.value.trim());
     }
 
     function renderSearchResults(results, query) {
@@ -394,8 +360,9 @@
             elements.refreshBtn.addEventListener('click', loadTree);
         }
         elements.modalClose.addEventListener('click', closeModal);
-        elements.cancelBtn.addEventListener('click', closeModal);
-        elements.generateForm.addEventListener('submit', handleGenerate);
+        if (elements.cancelBtn) {
+            elements.cancelBtn.addEventListener('click', closeModal);
+        }
         elements.modalOverlay.addEventListener('click', (event) => {
             if (event.target === elements.modalOverlay) {
                 closeModal();

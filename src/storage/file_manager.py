@@ -107,6 +107,7 @@ class FileManager:
         name = name.strip()
         # 保留中文、日文、韩文、字母、数字、下划线、连字符、句点、空格
         safe = re.sub(r"[^\w\s\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af._-]", "_", name)
+        safe = safe.replace("..", "_")
         safe = re.sub(r"\s+", "_", safe)
         safe = re.sub(r"_+", "_", safe)
         safe = safe.strip("_-")
@@ -128,12 +129,14 @@ class FileManager:
         返回:
             写入后的绝对路径。
         """
+        if metadata is not None:
+            metadata = dict(metadata)
         path = self.ensure_dir(Path(path))
         if metadata is not None:
             missing = REQUIRED_FRONTMATTER - set(metadata.keys())
             if missing:
                 logger.warning("Markdown frontmatter 缺少必要字段: %s", missing)
-            now = datetime.now().isoformat(timespec="seconds")
+            now = datetime.now().astimezone().replace(microsecond=0).isoformat()
             metadata.setdefault("created_at", now)
             metadata.setdefault("updated_at", now)
             fm_body = yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False) if yaml else _simple_yaml_dump(metadata)
@@ -145,16 +148,21 @@ class FileManager:
 
 
 def split_markdown(text: str) -> dict[str, Any]:
-    """切分 Markdown 文本的 frontmatter 与正文。"""
-    if not text.startswith("---"):
+    """切分 Markdown 文本的 frontmatter 与正文。
+
+    使用与 ``obsidian_writer.py`` 一致的正则表达式解析 frontmatter，
+    避免 ``split("---", 2)`` 在 frontmatter 值包含 ``---`` 时错误切分。
+    """
+    pattern = r"^---\s*\n(.*?)\n---\s*\n?"
+    match = re.match(pattern, text, re.DOTALL)
+    if not match:
         return {"frontmatter": {}, "content": text}
 
-    parts = text.split("---", 2)
-    if len(parts) < 3 or parts[1].strip() == "":
-        return {"frontmatter": {}, "content": text}
+    fm_text = match.group(1).strip()
+    if fm_text == "":
+        return {"frontmatter": {}, "content": text[match.end():]}
 
-    fm_text = parts[1].strip()
-    content = parts[2].lstrip("\n")
+    content = text[match.end():]
 
     if yaml is not None:
         try:

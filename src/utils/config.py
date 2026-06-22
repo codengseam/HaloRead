@@ -146,9 +146,14 @@ def load_env(path: Optional[Union[Path, str]] = Path(".env")) -> Dict[str, str]:
 
 
 def get_llm_config() -> Dict[str, str]:
-    """从环境变量读取 LLM 配置。"""
+    """从环境变量与 config.yaml 读取 LLM 配置。
+
+    优先级：环境变量 > config.yaml > 默认值。
+    """
+    config = load_config(Path("/workspace/config.yaml")) if Path("/workspace/config.yaml").exists() else {}
+    config_model = config.get("model") if isinstance(config, dict) else None
     return {
         "api_key": os.getenv("LLM_API_KEY", ""),
         "base_url": os.getenv("LLM_BASE_URL", ""),
-        "model": os.getenv("LLM_MODEL", "qwen-max-latest"),
+        "model": os.getenv("LLM_MODEL") or config_model or "qwen-plus",
     }

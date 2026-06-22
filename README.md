@@ -79,9 +79,10 @@ Specialist Agents 并行工作：
 ## 七、文件结构
 
 ```
-doc/
+.
 ├── README.md              # 项目规划与背景
 ├── RULES.md               # 内容生成规则
+├── .env.example           # 环境变量示例（API Key 等）
 ├── output/                # 生成的讲书笔记，按书分类、章节排序
 │   ├── 资治通鉴/
 │   │   ├── 周纪一_三家分晋.md
@@ -99,11 +100,17 @@ doc/
 │   │   ├── philosopher.py     # 悟道专家
 │   │   └── editor.py          # 编辑专家
 │   ├── core/              # 工作流编排
-│   ├── web/               # HTML 管理界面
-│   └── skills/            # 项目级 Skill 定义（可选）
+│   ├── storage/           # 文件与元数据存储
+│   ├── tools/             # MCP / PDF / Obsidian / Web 搜索工具
+│   ├── utils/             # 公共工具
+│   └── web/               # Flask Web 管理界面（静态资源、模板、API）
 ├── prompts/               # Agent 提示词文件
-├── templates/             # Markdown 输出模板
-└── tests/                 # 测试用例
+├── scripts/               # 辅助脚本（静态站点构建等）
+├── site/                  # 静态站点产物（由 scripts/build_site.py 生成）
+├── tests/                 # 测试用例
+├── .github/               # GitHub Actions 配置（Pages 自动部署）
+├── config.yaml            # 项目配置
+└── requirements.txt       # Python 依赖
 ```
 
 ## 八、命名规范
@@ -238,7 +245,7 @@ doc/
    - 生成后自动检查：结构完整性、引用真实性、中英文混杂、AI 味句式等；
    - 必要时触发二次修订 Agent。
 
-## 十三、快速开始（待实现）
+## 十三、快速开始
 
 ```bash
 # 1. 安装依赖
@@ -251,11 +258,39 @@ cp .env.example .env
 # 3. 生成一篇笔记
 python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法
 
+# 使用 --stub 无需 API Key 生成占位笔记
+python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法 --stub
+
 # 4. 启动 HTML 管理界面
 python src/web/app.py
 ```
 
-## 十四、核心原则
+## 十四、静态站点部署
+
+### 本地预览
+
+```bash
+# 1. 生成笔记（需要配置 API Key 或使用 --stub）
+python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法
+
+# 2. 构建静态站点
+python scripts/build_site.py
+
+# 3. 本地预览
+python -m http.server 8080 -d site
+```
+
+### GitHub Pages 部署
+
+项目已配置 GitHub Actions（`.github/workflows/pages.yml`），push 到 master 分支后自动构建并部署。
+
+1. 在仓库 Settings → Pages → Source 选择 "GitHub Actions"
+2. push 代码到 master 分支
+3. Actions 自动运行：安装依赖 → 构建站点 → 部署到 GitHub Pages
+
+注意：`output/` 目录被 `.gitignore` 忽略，CI 中会从仓库代码构建。如需在 CI 中生成笔记，请通过 `workflow_dispatch` 手动触发并配置 Secrets。
+
+## 十五、核心原则
 
 - **简洁**：不堆技术，能用提示词和简单流程解决就不用复杂架构。
 - **可信**：每个观点要有来源，每个名家点评要有出处。

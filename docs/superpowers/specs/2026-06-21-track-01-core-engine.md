@@ -87,13 +87,13 @@
 
 ## 验收标准
 
-- [ ] 能成功运行 `python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法`
-- [ ] 能成功运行自然语言输入并正确解析
-- [ ] 输出 Markdown 包含完整 5 段 + 结语
-- [ ] 每个 Specialist 有独立 Prompt 文件
-- [ ] Editor 能汇总并润色
-- [ ] 有基础单元测试覆盖 Agent 输出格式
-- [ ] 质量检查能识别常见 AI 味句式和结构缺失
+- [x] 能成功运行 `python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法`
+- [x] 能成功运行自然语言输入并正确解析
+- [x] 输出 Markdown 包含完整 5 段 + 结语
+- [x] 每个 Specialist 有独立 Prompt 文件
+- [x] Editor 能汇总并润色
+- [x] 有基础单元测试覆盖 Agent 输出格式
+- [x] 质量检查能识别常见 AI 味句式和结构缺失
 
 ## 建议执行方式
 
