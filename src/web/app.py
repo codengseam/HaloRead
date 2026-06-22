@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
@@ -99,7 +99,8 @@ def get_note(filepath):
     if not file_path.exists() or not file_path.is_file():
         return jsonify({"error": "Not found"}), 404
 
-    return file_path.read_text(encoding="utf-8")
+    content = file_path.read_text(encoding="utf-8")
+    return Response(content, mimetype="text/plain; charset=utf-8")
 
 
 @app.route("/api/search", methods=["GET"])

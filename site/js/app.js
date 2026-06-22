@@ -26,6 +26,16 @@
         return div.innerHTML;
     }
 
+    function sanitizeHtml(html) {
+        // 移除 script 标签
+        html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+        // 移除 on* 事件属性
+        html = html.replace(/\son\w+\s*=\s*"[^"]*"/gi, '');
+        html = html.replace(/\son\w+\s*=\s*'[^']*'/gi, '');
+        html = html.replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
+        return html;
+    }
+
     function showError(message, err) {
         console.error(message, err || '');
         alert(message);
@@ -154,7 +164,7 @@
     }
 
     function parseFrontmatter(content) {
-        const match = content.match(/^---\n([\s\S]*?)\n---\n*/);
+        const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n*/);
         if (!match) return { meta: null, body: content };
         const metaBlock = match[1];
         const body = content.slice(match[0].length);
@@ -191,7 +201,7 @@
                 return r.text();
             });
             const { meta, body } = parseFrontmatter(content || '');
-            const html = marked.parse(body, { gfm: true });
+            const html = sanitizeHtml(marked.parse(body, { gfm: true }));
 
             let metaHtml = '';
             if (meta && (meta.title || meta.created_at)) {
@@ -250,14 +260,27 @@
         for (const [path, note] of Object.entries(state.notesIndex || {})) {
             const title = note.title || note.event || '';
             const content = note.content || '';
-            const searchText = (title + ' ' + content).toLowerCase();
-            if (searchText.includes(query)) {
-                const idx = searchText.indexOf(query);
+            const titleLower = title.toLowerCase();
+            const contentLower = content.toLowerCase();
+
+            let matched = false;
+            let snippet = '';
+
+            if (titleLower.includes(query)) {
+                matched = true;
+                snippet = content.slice(0, 100).replace(/\n/g, ' ');
+                if (content.length > 100) snippet += '…';
+            } else if (contentLower.includes(query)) {
+                matched = true;
+                const idx = contentLower.indexOf(query);
                 const start = Math.max(0, idx - 30);
                 const end = Math.min(content.length, idx + query.length + 60);
-                let snippet = content.slice(start, end).replace(/\n/g, ' ');
+                snippet = content.slice(start, end).replace(/\n/g, ' ');
                 if (start > 0) snippet = '…' + snippet;
-                if (end < content.length) snippet = snippet + '…';
+                if (end < content.length) snippet += '…';
+            }
+
+            if (matched) {
                 results.push({
                     path: path,
                     book: note.book,

@@ -73,7 +73,6 @@ class VaultSync:
         frontmatter.setdefault("vault_path", vault_relative_path)
         if not frontmatter.get("sources"):
             frontmatter["sources"] = frontmatter.get("source_agents", [])
-        self.fm.write_markdown(local_path, content, frontmatter)
 
         current_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         exists = self.note_exists(vault_relative_path)
@@ -107,6 +106,10 @@ class VaultSync:
         else:
             result = self.writer.write_note(vault_relative_path, content, frontmatter)
             status = "created"
+
+        # 同步决策完成后，回写本地文件以记录 vault_path 与 sources
+        self.fm.write_markdown(local_path, content, frontmatter)
+
         logger.info("同步到 Vault: %s (%s)", vault_relative_path, status)
         return {
             "status": status,
@@ -122,7 +125,7 @@ class VaultSync:
         safe_book = self.fm.sanitize_filename(book)
         moc_path = f"{safe_book}/MOC.md"
 
-        now = datetime.now().isoformat(timespec="seconds")
+        now = datetime.now().astimezone().replace(microsecond=0).isoformat()
         lines = [f"# 《{book}》讲书笔记索引", "", "## 章节", ""]
 
         for note in sorted(notes):

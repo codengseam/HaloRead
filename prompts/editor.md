@@ -64,12 +64,17 @@ frontmatter 格式如下：
 
 ```yaml
 ---
-title: {book}·{chapter}·{event}
-book: {book}
-chapter: {chapter}
-event: {event}
-created_at: <当前时间，格式 YYYY-MM-DD HH:MM:SS>
-source_agents: Editor Agent
+title: "{book}·{chapter}·{event}"
+book: "{book}"
+chapter: "{chapter}"
+event: "{event}"
+created_at: "2026-06-21T23:00:00+08:00"
+source_agents:
+  - historian
+  - biographer
+  - context_analyst
+  - critic
+  - philosopher
 ---
 ```
 

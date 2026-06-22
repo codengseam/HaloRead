@@ -36,6 +36,7 @@ SECTION_TO_AGENT = {
     "讲背景": "context_analyst",
     "讲道理": "critic",
     "问道悟道": "philosopher",
+    "结语": "editor",
 }
 
 

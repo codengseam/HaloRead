@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'output/**'
+      - 'site/**'
+      - 'scripts/build_site.py'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -29,39 +34,21 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
 
       - name: Install dependencies
         run: pip install pyyaml
 
       - name: Build site
-        continue-on-error: true
         run: python scripts/build_site.py --output output --site site
 
-      - name: Create placeholder if output empty
+      - name: Verify build output
         run: |
-          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
-            echo "output/ 为空或不存在，创建占位文件以确保部署不失败"
-            mkdir -p site/data
-            if [ ! -f site/data/index.json ]; then
-              echo '{}' > site/data/index.json
-            fi
-            if [ ! -f site/index.html ]; then
-              cat > site/index.html <<'EOF'
-          <!DOCTYPE html>
-          <html lang="zh-CN">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>个人 AI 深度阅读助手</title>
-          </head>
-          <body>
-            <h1>个人 AI 深度阅读助手</h1>
-            <p>站点尚未生成任何笔记内容。</p>
-          </body>
-          </html>
-          EOF
-            fi
+          if [ ! -f site/data/index.json ] || ! python -c "import json,sys; json.load(open('site/data/index.json'))" 2>/dev/null; then
+            echo "::error::site/data/index.json 不存在或无效，构建失败"
+            exit 1
           fi
+          echo "site/data/index.json 存在且有效"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

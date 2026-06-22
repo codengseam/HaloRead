@@ -3,6 +3,18 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 
+def _sanitize_filename(name: str) -> str:
+    """简单的文件名安全化，防止路径穿越。
+
+    替换路径分隔符与 ``..``，剥离首尾空白与下划线。
+    """
+    if not name:
+        return "untitled"
+    safe = name.strip().replace("/", "_").replace("\\", "_").replace("..", "_")
+    safe = safe.strip("_")
+    return safe or "untitled"
+
+
 def build_frontmatter(
     title: str,
     book: str,
@@ -32,6 +44,9 @@ def save_markdown(
     content: str,
     base_dir: Union[Path, str] = "output",
 ) -> Path:
+    book = _sanitize_filename(book)
+    chapter = _sanitize_filename(chapter)
+    event = _sanitize_filename(event)
     base = Path(base_dir)
     book_dir = base / book
     book_dir.mkdir(parents=True, exist_ok=True)

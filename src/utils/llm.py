@@ -3,7 +3,6 @@
 提供与 ChatOpenAI 相同接口的 MockLLMClient，用于无 API Key 时的测试与占位生成。
 """
 
-import json
 import os
 from typing import Any, Optional
 
@@ -49,7 +48,7 @@ class MockLLMClient:
                 f'book: "资治通鉴"\n'
                 f'chapter: "周纪二"\n'
                 f'event: "商鞅变法"\n'
-                f'created_at: "2026-06-21T00:00:00"\n'
+                f'created_at: "2026-06-21T00:00:00+00:00"\n'
                 f'source_agents: ["historian", "biographer", "context_analyst", "critic", "philosopher"]\n'
                 "---\n\n"
                 "# 资治通鉴·周纪二：商鞅变法\n\n"

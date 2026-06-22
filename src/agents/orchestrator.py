@@ -1,10 +1,13 @@
 import json
+import logging
 import re
 from typing import Any, Dict
 
 from src.core.state import AgentState
 from src.utils.llm import create_llm
 from src.utils.prompts import load_prompt
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_json_response(response: str) -> Dict[str, Any]:
@@ -56,8 +59,9 @@ def run(state: AgentState, interactive: bool = False) -> Dict[str, Any]:
         chapter = parsed.get("chapter", chapter) or chapter
         event = parsed.get("event", event) or event
         missing = parsed.get("missing", [])
-    except (json.JSONDecodeError, Exception) as exc:
+    except Exception as exc:
         # LLM 返回非 JSON 时，记录错误并使用默认值
+        logger.warning("LLM 调用失败: %s", exc)
         missing = []
         if not book:
             missing.append("book")

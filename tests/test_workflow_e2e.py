@@ -4,16 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from src.core.workflow import build_workflow
-
-
-@pytest.fixture(autouse=True)
-def mock_env(monkeypatch):
-    """启用 Mock 模式，无需 API Key。"""
-    monkeypatch.setenv("DEEP_READING_MOCK", "1")
-    yield
 
 
 def test_workflow_end_to_end_with_mock():

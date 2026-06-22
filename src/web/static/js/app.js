@@ -31,6 +31,16 @@
         return div.innerHTML;
     }
 
+    function sanitizeHtml(html) {
+        // 移除 script 标签
+        html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+        // 移除 on* 事件属性
+        html = html.replace(/\son\w+\s*=\s*"[^"]*"/gi, '');
+        html = html.replace(/\son\w+\s*=\s*'[^']*'/gi, '');
+        html = html.replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
+        return html;
+    }
+
     function showError(message, err) {
         console.error(message, err || '');
         alert(message);
@@ -208,7 +218,7 @@
             const encodedPath = encodeURI(path);
             const content = await fetchJson(`/api/notes/${encodedPath}`);
             const { meta, body } = parseFrontmatter(content || '');
-            const html = marked.parse(body, { gfm: true });
+            const html = sanitizeHtml(marked.parse(body, { gfm: true }));
 
             let metaHtml = '';
             if (meta && (meta.title || meta.created_at)) {

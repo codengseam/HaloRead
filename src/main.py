@@ -8,6 +8,18 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _sanitize_filename(name: str) -> str:
+    """简单的文件名安全化，防止路径穿越。
+
+    替换路径分隔符与 ``..``，剥离首尾空白与下划线。
+    """
+    if not name:
+        return "untitled"
+    safe = name.strip().replace("/", "_").replace("\\", "_").replace("..", "_")
+    safe = safe.strip("_")
+    return safe or "untitled"
+
+
 def _parse_slots_from_input(user_input: str) -> tuple[str, str, str]:
     """从自然语言输入中按空白符切分，尝试提取书名/章节/事件。
 
@@ -24,7 +36,8 @@ def _parse_slots_from_input(user_input: str) -> tuple[str, str, str]:
 
 
 def _generate_stub(
-    book: str, chapter: str, event: str, user_input: str, output_dir: str
+    book: str, chapter: str, event: str, user_input: str, output_dir: str,
+    dry_run: bool = False,
 ) -> Path:
     """Generate a placeholder note for testing the web interface without API keys."""
     # stub 模式支持从 --input 简单解析三个槽位
@@ -42,9 +55,18 @@ def _generate_stub(
         )
         sys.exit(1)
 
+    book = _sanitize_filename(book)
+    chapter = _sanitize_filename(chapter)
+    event = _sanitize_filename(event)
+
     target_dir = Path(output_dir) / book
-    target_dir.mkdir(parents=True, exist_ok=True)
     output_path = target_dir / f"{chapter}_{event}.md"
+
+    if dry_run:
+        print(f"[STUB DRY RUN] 预期保存路径：{output_path}")
+        return output_path
+
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     if output_path.exists():
         print(f"File already exists: {output_path}")
@@ -100,9 +122,13 @@ def main() -> int:
         user_input = " ".join(parts)
 
     if args.stub:
-        output_path = _generate_stub(book, chapter, event, user_input, args.output_dir)
-        if args.dry_run:
-            print(f"[STUB DRY RUN] 预期保存路径：{output_path}")
+        output_path = _generate_stub(
+            book, chapter, event, user_input, args.output_dir, dry_run=args.dry_run
+        )
+        return 0
+
+    if args.dry_run:
+        print("[DRY RUN] 跳过工作流调用，不生成笔记。")
         return 0
 
     from src.core.workflow import build_workflow
@@ -122,16 +148,16 @@ def main() -> int:
     app = build_workflow(output_base=args.output_dir)
     final_state = app.invoke(initial_state)
 
+    if final_state.get("errors"):
+        print("质量检查未通过：")
+        for issue in final_state["errors"]:
+            print(f"  - {issue}")
+        return 1
+
     output_path = Path(final_state["output_path"])
-    if args.dry_run:
-        print("[DRY RUN] 生成结果：")
-        print(final_state["final_markdown"][:2000])
-        print(f"\n...（省略）\n")
-        print(f"预期保存路径：{output_path}")
-    else:
-        print(f"已生成笔记：{output_path}")
-        print("\n--- 内容预览 ---\n")
-        print(final_state["final_markdown"][:1500])
+    print(f"已生成笔记：{output_path}")
+    print("\n--- 内容预览 ---\n")
+    print(final_state["final_markdown"][:1500])
 
     return 0
 

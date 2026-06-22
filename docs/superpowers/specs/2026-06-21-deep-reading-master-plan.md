@@ -67,13 +67,13 @@ Vault       界面          （可选输入）
 
 ## 6. 验收标准（总）
 
-- [ ] 输入 `python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法` 能生成符合 RULES.md 的 Markdown。
-- [ ] 用户输入自然语言（如"我刚读完资治通鉴周纪二商鞅变法"）也能被正确解析并生成。
-- [ ] 文件保存路径正确，frontmatter 完整。
-- [ ] 各 Specialist Agent 输出可被 Editor 正确汇总。
-- [ ] 支持通过 Trae Skill 触发。
-- [ ] HTML 界面能按书/章节分类展示已生成笔记。
-- [ ] Obsidian MCP 能自动写入 Vault。
+- [x] 输入 `python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法` 能生成符合 RULES.md 的 Markdown。
+- [x] 用户输入自然语言（如"我刚读完资治通鉴周纪二商鞅变法"）也能被正确解析并生成。
+- [x] 文件保存路径正确，frontmatter 完整。
+- [x] 各 Specialist Agent 输出可被 Editor 正确汇总。
+- [x] 支持通过 Trae Skill 触发。
+- [x] HTML 界面能按书/章节分类展示已生成笔记。
+- [x] Obsidian MCP 能自动写入 Vault。
 
 ## 7. 子计划间依赖图
 

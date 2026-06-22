@@ -74,7 +74,7 @@ python src/main.py --book "{book}" --chapter "{chapter}" --event "{event}"
 
 命令执行目录为项目根目录（即包含 `src/main.py` 和 `RULES.md` 的目录）。
 
-**占位模式（--stub）说明**：使用 `--stub` 标志时必须显式传 `--book`/`--chapter`/`--event`，不能只用 `--input`，因为占位生成器需要明确的三个槽位来构造文件路径和占位内容。
+**占位模式（--stub）说明**：`--stub` 标志支持从 `--input` 解析书名/章节/事件，也可以显式传 `--book`/`--chapter`/`--event`。当只提供 `--input` 时，占位生成器会按空白符切分输入，自动提取三个槽位用于构造文件路径和占位内容。
 
 ## 第五步：返回结果
 

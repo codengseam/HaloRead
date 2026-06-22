@@ -127,9 +127,9 @@ class ObsidianWriter:
         """合并 metadata frontmatter 与正文。"""
         metadata = metadata or {}
         if "created_at" not in metadata:
-            metadata["created_at"] = datetime.now().isoformat(timespec="seconds")
+            metadata["created_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
         if "updated_at" not in metadata:
-            metadata["updated_at"] = datetime.now().isoformat(timespec="seconds")
+            metadata["updated_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
         return self._to_frontmatter(metadata) + content
 
     def merge_frontmatter(self, content: str, metadata: dict) -> str:
@@ -144,7 +144,7 @@ class ObsidianWriter:
         """
         existing_meta, body = self._parse_frontmatter(content)
         merged = {**existing_meta, **metadata}
-        merged["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        merged["updated_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
         return self._to_frontmatter(merged) + body
 
     def _write_via_mcp(
@@ -244,7 +244,7 @@ class ObsidianWriter:
                 old_note = target.read_text(encoding="utf-8")
                 old_meta, _ = self._parse_frontmatter(old_note)
                 merged_meta = {**old_meta, **(metadata or {})}
-                merged_meta["updated_at"] = datetime.now().isoformat(timespec="seconds")
+                merged_meta["updated_at"] = datetime.now().astimezone().replace(microsecond=0).isoformat()
                 new_content = self._to_frontmatter(merged_meta) + content
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to parse existing note %s: %s", target, exc)

@@ -15,3 +15,11 @@ data/
 # 静态站点构建产物（由 CI 生成，不提交）
 site/data/
 site/notes/
+
+.DS_Store
+*.log
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/

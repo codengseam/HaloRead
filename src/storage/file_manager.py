@@ -107,6 +107,7 @@ class FileManager:
         name = name.strip()
         # 保留中文、日文、韩文、字母、数字、下划线、连字符、句点、空格
         safe = re.sub(r"[^\w\s\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af._-]", "_", name)
+        safe = safe.replace("..", "_")
         safe = re.sub(r"\s+", "_", safe)
         safe = re.sub(r"_+", "_", safe)
         safe = safe.strip("_-")
@@ -128,12 +129,14 @@ class FileManager:
         返回:
             写入后的绝对路径。
         """
+        if metadata is not None:
+            metadata = dict(metadata)
         path = self.ensure_dir(Path(path))
         if metadata is not None:
             missing = REQUIRED_FRONTMATTER - set(metadata.keys())
             if missing:
                 logger.warning("Markdown frontmatter 缺少必要字段: %s", missing)
-            now = datetime.now().isoformat(timespec="seconds")
+            now = datetime.now().astimezone().replace(microsecond=0).isoformat()
             metadata.setdefault("created_at", now)
             metadata.setdefault("updated_at", now)
             fm_body = yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False) if yaml else _simple_yaml_dump(metadata)
@@ -157,7 +160,7 @@ def split_markdown(text: str) -> dict[str, Any]:
 
     fm_text = match.group(1).strip()
     if fm_text == "":
-        return {"frontmatter": {}, "content": text}
+        return {"frontmatter": {}, "content": text[match.end():]}
 
     content = text[match.end():]
 

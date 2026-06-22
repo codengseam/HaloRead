@@ -82,6 +82,7 @@ Specialist Agents 并行工作：
 .
 ├── README.md              # 项目规划与背景
 ├── RULES.md               # 内容生成规则
+├── .env.example           # 环境变量示例（API Key 等）
 ├── output/                # 生成的讲书笔记，按书分类、章节排序
 │   ├── 资治通鉴/
 │   │   ├── 周纪一_三家分晋.md
@@ -102,10 +103,12 @@ Specialist Agents 并行工作：
 │   ├── storage/           # 文件与元数据存储
 │   ├── tools/             # MCP / PDF / Obsidian / Web 搜索工具
 │   ├── utils/             # 公共工具
-│   └── web/               # HTML 管理界面
+│   └── web/               # Flask Web 管理界面（静态资源、模板、API）
 ├── prompts/               # Agent 提示词文件
-├── templates/             # Markdown 输出模板
+├── scripts/               # 辅助脚本（静态站点构建等）
+├── site/                  # 静态站点产物（由 scripts/build_site.py 生成）
 ├── tests/                 # 测试用例
+├── .github/               # GitHub Actions 配置（Pages 自动部署）
 ├── config.yaml            # 项目配置
 └── requirements.txt       # Python 依赖
 ```
@@ -254,6 +257,9 @@ cp .env.example .env
 
 # 3. 生成一篇笔记
 python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法
+
+# 使用 --stub 无需 API Key 生成占位笔记
+python src/main.py --book 资治通鉴 --chapter 周纪二 --event 商鞅变法 --stub
 
 # 4. 启动 HTML 管理界面
 python src/web/app.py

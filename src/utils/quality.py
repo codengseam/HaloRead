@@ -27,7 +27,7 @@ def check_structure(content: str, required_sections: List[str]) -> List[str]:
     """检查正文是否包含所有必需章节。"""
     issues = []
     for section in required_sections:
-        if section not in content:
+        if f"## {section}" not in content:
             issues.append(f"缺少章节：{section}")
     return issues
 
