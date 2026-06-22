@@ -2,18 +2,31 @@
     'use strict';
 
     const state = {
-        treeData: [],
+        booksData: [],
+        categories: [],
+        notesIndex: {},
+        currentView: 'home', // 'home' | 'reader'
+        currentBook: null,
+        currentBookTree: [],
         activePath: null,
         searchQuery: '',
+        selectedCategory: 'all',
         searchMode: false
     };
 
     const elements = {
+        homeView: document.getElementById('homeView'),
+        readerView: document.getElementById('readerView'),
+        bookshelfGrid: document.getElementById('bookshelfGrid'),
+        categoryTabs: document.getElementById('categoryTabs'),
+        searchInput: document.getElementById('searchInput'),
+        heroStats: document.getElementById('heroStats'),
         treeNav: document.getElementById('treeNav'),
         reader: document.getElementById('reader'),
-        searchInput: document.getElementById('searchInput'),
+        backBtn: document.getElementById('backBtn'),
+        currentBookTitle: document.getElementById('currentBookTitle'),
         newNoteBtn: document.getElementById('newNoteBtn'),
-        refreshBtn: document.getElementById('refreshBtn'),
+        newNoteLink: document.getElementById('newNoteLink'),
         modalOverlay: document.getElementById('modalOverlay'),
         modalClose: document.getElementById('modalClose'),
         cancelBtn: document.getElementById('cancelBtn'),
@@ -32,9 +45,7 @@
     }
 
     function sanitizeHtml(html) {
-        // 移除 script 标签
         html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-        // 移除 on* 事件属性
         html = html.replace(/\son\w+\s*=\s*"[^"]*"/gi, '');
         html = html.replace(/\son\w+\s*=\s*'[^']*'/gi, '');
         html = html.replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
@@ -52,19 +63,182 @@
             const detail = await response.text().catch(() => '');
             throw new Error(`请求失败 (${response.status}): ${detail || response.statusText}`);
         }
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-            return await response.json();
-        }
-        return await response.text();
+        return response.json();
     }
 
-    function normalizeTree(data) {
-        if (!data) return [];
-        if (Array.isArray(data)) return data;
-        if (data.notes && Array.isArray(data.notes)) return data.notes;
-        if (data.tree && Array.isArray(data.tree)) return data.tree;
-        return [];
+    // ===== 书架 =====
+
+    function renderHeroStats(stats) {
+        if (!stats) {
+            elements.heroStats.innerHTML = '<span>正在统计书目…</span>';
+            return;
+        }
+        elements.heroStats.innerHTML = `
+            <div class="stat"><span class="stat-value">${stats.books || 0}</span><span class="stat-label">部典籍</span></div>
+            <div class="stat"><span class="stat-value">${stats.notes || 0}</span><span class="stat-label">篇笔记</span></div>
+            <div class="stat"><span class="stat-value">${stats.categories || 0}</span><span class="stat-label">个分类</span></div>
+        `;
+    }
+
+    function renderCategoryTabs() {
+        const container = elements.categoryTabs;
+        container.innerHTML = '';
+
+        const allBtn = document.createElement('button');
+        allBtn.className = 'category-tab' + (state.selectedCategory === 'all' ? ' active' : '');
+        allBtn.textContent = '全部';
+        allBtn.dataset.category = 'all';
+        allBtn.type = 'button';
+        allBtn.role = 'tab';
+        allBtn.setAttribute('aria-selected', state.selectedCategory === 'all' ? 'true' : 'false');
+        allBtn.addEventListener('click', () => selectCategory('all'));
+        container.appendChild(allBtn);
+
+        state.categories.forEach((cat) => {
+            const btn = document.createElement('button');
+            btn.className = 'category-tab' + (state.selectedCategory === cat ? ' active' : '');
+            btn.textContent = cat;
+            btn.dataset.category = cat;
+            btn.type = 'button';
+            btn.role = 'tab';
+            btn.setAttribute('aria-selected', state.selectedCategory === cat ? 'true' : 'false');
+            btn.addEventListener('click', () => selectCategory(cat));
+            container.appendChild(btn);
+        });
+    }
+
+    function selectCategory(category) {
+        state.selectedCategory = category;
+        renderCategoryTabs();
+        renderBookshelf();
+    }
+
+    function filterBooks() {
+        let books = state.booksData;
+
+        if (state.selectedCategory !== 'all') {
+            books = books.filter((book) => book.category === state.selectedCategory);
+        }
+
+        const query = state.searchQuery.trim().toLowerCase();
+        if (query) {
+            books = books.filter((book) => {
+                const title = (book.title || '').toLowerCase();
+                const author = (book.author || '').toLowerCase();
+                const category = (book.category || '').toLowerCase();
+                const description = (book.description || '').toLowerCase();
+                return title.includes(query) || author.includes(query) || category.includes(query) || description.includes(query);
+            });
+        }
+
+        return books;
+    }
+
+    function renderBookshelf() {
+        const container = elements.bookshelfGrid;
+        container.innerHTML = '';
+
+        const books = filterBooks();
+
+        if (books.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = state.searchQuery ? '未找到匹配的书籍' : '书架暂无书籍';
+            container.appendChild(empty);
+            return;
+        }
+
+        books.forEach((book) => {
+            const card = document.createElement('button');
+            card.className = 'book-card';
+            card.type = 'button';
+            card.dataset.bookId = book.id;
+
+            const cover = document.createElement('div');
+            cover.className = 'book-cover';
+            cover.textContent = book.cover || '📖';
+            card.appendChild(cover);
+
+            const info = document.createElement('div');
+            info.className = 'book-info';
+
+            const category = document.createElement('div');
+            category.className = 'book-category';
+            category.textContent = book.category || '未分类';
+            info.appendChild(category);
+
+            const title = document.createElement('div');
+            title.className = 'book-title';
+            title.textContent = book.title || book.id;
+            info.appendChild(title);
+
+            if (book.author) {
+                const author = document.createElement('div');
+                author.className = 'book-author';
+                author.textContent = book.author;
+                info.appendChild(author);
+            }
+
+            if (book.description) {
+                const desc = document.createElement('div');
+                desc.className = 'book-description';
+                desc.textContent = book.description;
+                info.appendChild(desc);
+            }
+
+            const stats = document.createElement('div');
+            stats.className = 'book-stats';
+            stats.textContent = `章节 ${book.chapter_count || 0} · 笔记 ${book.note_count || 0}`;
+            info.appendChild(stats);
+
+            card.appendChild(info);
+            card.addEventListener('click', () => openBook(book.id));
+            container.appendChild(card);
+        });
+    }
+
+    function handleSearch(event) {
+        state.searchQuery = event.target.value;
+        renderBookshelf();
+    }
+
+    // ===== 阅读视图 =====
+
+    function switchView(view) {
+        state.currentView = view;
+        if (view === 'home') {
+            elements.homeView.hidden = false;
+            elements.readerView.hidden = true;
+            document.body.style.overflow = '';
+        } else {
+            elements.homeView.hidden = true;
+            elements.readerView.hidden = false;
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function openBook(bookId) {
+        const book = state.booksData.find((b) => b.id === bookId);
+        if (!book) return;
+
+        state.currentBook = bookId;
+        state.currentBookTree = book.tree || [];
+        state.activePath = null;
+
+        switchView('reader');
+        elements.currentBookTitle.textContent = book.title || bookId;
+        elements.reader.innerHTML = '<div class="reader-placeholder"><p>请在左侧选择一篇笔记开始阅读。</p></div>';
+        refreshTreeView();
+    }
+
+    function backToHome() {
+        state.currentBook = null;
+        state.currentBookTree = [];
+        state.activePath = null;
+        state.searchQuery = '';
+        elements.searchInput.value = '';
+        switchView('home');
+        renderBookshelf();
     }
 
     function nodeMatches(node, query) {
@@ -160,32 +334,14 @@
         return ul;
     }
 
-    async function loadTree() {
-        try {
-            const data = await fetchJson('/api/notes');
-            state.treeData = normalizeTree(data);
-            state.searchMode = false;
-            refreshTreeView();
-        } catch (err) {
-            elements.treeNav.innerHTML = '';
-            const empty = document.createElement('div');
-            empty.className = 'empty-state';
-            empty.textContent = '加载目录失败';
-            elements.treeNav.appendChild(empty);
-            showError('无法加载笔记目录，请检查后端服务是否正常运行。', err);
-        }
-    }
-
     function refreshTreeView() {
-        const filtered = filterTree(state.treeData, state.searchQuery);
-        const rendered = renderTree(filtered);
+        const rendered = renderTree(state.currentBookTree);
         elements.treeNav.innerHTML = '';
         elements.treeNav.appendChild(rendered);
-        expandMatchedNodes(elements.treeNav);
     }
 
     function parseFrontmatter(content) {
-        const match = content.match(/^---\n([\s\S]*?)\n---\n*/);
+        const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n*/);
         if (!match) return { meta: null, body: content };
         const metaBlock = match[1];
         const body = content.slice(match[0].length);
@@ -202,6 +358,16 @@
 
     async function loadNote(path, targetElement) {
         if (!path) return;
+
+        // 如果笔记属于当前未打开的书，自动切换
+        const note = state.notesIndex[path];
+        if (note && note.book && note.book !== state.currentBook) {
+            const book = state.booksData.find((b) => b.id === note.book);
+            if (book) {
+                openBook(book.id);
+            }
+        }
+
         state.activePath = path;
 
         const allLeaves = elements.treeNav.querySelectorAll('.tree-leaf');
@@ -215,8 +381,12 @@
 
         elements.reader.innerHTML = '<div class="reader-placeholder">正在加载笔记…</div>';
         try {
-            const encodedPath = encodeURI(path);
-            const content = await fetchJson(`/api/notes/${encodedPath}`);
+            const content = await fetch(`/api/notes/${encodeURI(path)}`).then((r) => {
+                if (!r.ok) {
+                    throw new Error(`请求失败 (${r.status}): ${r.statusText}`);
+                }
+                return r.text();
+            });
             const { meta, body } = parseFrontmatter(content || '');
             const html = sanitizeHtml(marked.parse(body, { gfm: true }));
 
@@ -238,6 +408,30 @@
         }
     }
 
+    // ===== 数据加载 =====
+
+    async function loadIndex() {
+        try {
+            const data = await fetchJson('/api/index');
+            state.booksData = data.books || [];
+            state.categories = data.categories || [];
+            state.notesIndex = data.notes || {};
+
+            renderHeroStats(data.stats);
+            renderCategoryTabs();
+            renderBookshelf();
+        } catch (err) {
+            elements.bookshelfGrid.innerHTML = '';
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = '加载书架失败';
+            elements.bookshelfGrid.appendChild(empty);
+            showError('无法加载书架数据，请检查后端服务是否正常运行。', err);
+        }
+    }
+
+    // ===== 生成新笔记 =====
+
     function openModal() {
         elements.modalOverlay.classList.add('open');
         elements.modalOverlay.setAttribute('aria-hidden', 'false');
@@ -247,10 +441,6 @@
     function closeModal() {
         elements.modalOverlay.classList.remove('open');
         elements.modalOverlay.setAttribute('aria-hidden', 'true');
-    }
-
-    function resetForm() {
-        elements.generateForm.reset();
     }
 
     async function handleGenerate(event) {
@@ -282,97 +472,25 @@
                 body: JSON.stringify(payload)
             });
             closeModal();
-            resetForm();
-            await loadTree();
-            if (result && result.path) {
-                await loadNote(result.path);
+            elements.generateForm.reset();
+            await loadIndex();
+            if (state.currentView === 'reader') {
+                refreshTreeView();
             }
-            alert('笔记生成成功，目录已刷新。');
+            if (result && result.path) {
+                const note = state.notesIndex[result.path];
+                if (note && note.book) {
+                    openBook(note.book);
+                    await loadNote(result.path);
+                }
+            }
+            alert('笔记生成成功，书架已刷新。');
         } catch (err) {
             showError('笔记生成失败，请检查后端服务或输入内容。', err);
         } finally {
             elements.submitBtn.disabled = false;
             elements.submitBtn.textContent = originalText;
         }
-    }
-
-    function handleSearch(event) {
-        state.searchQuery = event.target.value.trim().toLowerCase();
-        if (!state.searchQuery) {
-            state.searchMode = false;
-            refreshTreeView();
-            return;
-        }
-        if (state.searchMode) {
-            state.searchMode = false;
-            refreshTreeView();
-        } else {
-            refreshTreeView();
-        }
-    }
-
-    async function handleSearchEnter(event) {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        const query = elements.searchInput.value.trim();
-        if (!query) {
-            state.searchMode = false;
-            refreshTreeView();
-            return;
-        }
-        try {
-            const data = await fetchJson(`/api/search?q=${encodeURIComponent(query)}`);
-            state.searchMode = true;
-            renderSearchResults(data.results || [], query);
-        } catch (err) {
-            showError('搜索失败，请检查后端服务。', err);
-        }
-    }
-
-    function renderSearchResults(results, query) {
-        elements.treeNav.innerHTML = '';
-        if (results.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'empty-state';
-            empty.textContent = `未找到与「${query}」相关的笔记`;
-            elements.treeNav.appendChild(empty);
-            return;
-        }
-        const header = document.createElement('div');
-        header.className = 'search-results-header';
-        header.textContent = `找到 ${results.length} 条结果`;
-        elements.treeNav.appendChild(header);
-
-        const list = document.createElement('ul');
-        list.className = 'search-results';
-        results.forEach((item) => {
-            const li = document.createElement('li');
-            li.className = 'search-result-item';
-
-            const title = document.createElement('button');
-            title.className = 'search-result-title';
-            title.type = 'button';
-            title.textContent = item.title || item.path;
-            title.addEventListener('click', () => loadNote(item.path));
-            li.appendChild(title);
-
-            if (item.book || item.chapter) {
-                const meta = document.createElement('div');
-                meta.className = 'search-result-meta';
-                meta.textContent = [item.book, item.chapter].filter(Boolean).join(' / ');
-                li.appendChild(meta);
-            }
-
-            if (item.snippet) {
-                const snippet = document.createElement('div');
-                snippet.className = 'search-result-snippet';
-                snippet.textContent = item.snippet;
-                li.appendChild(snippet);
-            }
-
-            list.appendChild(li);
-        });
-        elements.treeNav.appendChild(list);
     }
 
     function handleKeyDown(event) {
@@ -388,11 +506,12 @@
         }
 
         elements.searchInput.addEventListener('input', handleSearch);
-        elements.searchInput.addEventListener('keydown', handleSearchEnter);
+        elements.backBtn.addEventListener('click', backToHome);
         elements.newNoteBtn.addEventListener('click', openModal);
-        if (elements.refreshBtn) {
-            elements.refreshBtn.addEventListener('click', loadTree);
-        }
+        elements.newNoteLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            openModal();
+        });
         elements.modalClose.addEventListener('click', closeModal);
         elements.cancelBtn.addEventListener('click', closeModal);
         elements.generateForm.addEventListener('submit', handleGenerate);
@@ -403,7 +522,7 @@
         });
         document.addEventListener('keydown', handleKeyDown);
 
-        loadTree();
+        loadIndex();
     }
 
     if (document.readyState === 'loading') {

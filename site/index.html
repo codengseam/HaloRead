@@ -3,41 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>深度阅读助手</title>
+    <title>豪书斋 · 读古人书，悟今世事</title>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
     <script src="js/app.js" defer></script>
 </head>
 <body>
-    <header class="toolbar">
-        <div class="toolbar-brand">
-            <div class="brand-lockup">
-                <div class="brand-badge" aria-label="豪">豪</div>
-                <div class="brand-text">
-                    <span class="brand-name">豪书斋</span>
-                    <span class="brand-motto">读古人书，悟今世事</span>
-                </div>
+    <header class="brand-header">
+        <div class="brand-lockup">
+            <div class="brand-badge" aria-label="豪">豪</div>
+            <div class="brand-text">
+                <span class="brand-name">豪书斋</span>
+                <span class="brand-motto">读古人书，悟今世事</span>
             </div>
         </div>
-        <div class="toolbar-search">
-            <input type="text" id="searchInput" placeholder="搜索书名、章节或事件…（回车搜索正文）" autocomplete="off">
-        </div>
-        <div class="toolbar-actions">
-            <button id="refreshBtn" class="btn-secondary" type="button">刷新目录</button>
-            <button id="newNoteBtn" class="btn-primary" type="button">生成新笔记</button>
-        </div>
+        <nav class="brand-actions" aria-label="主导航">
+            <a class="nav-link" href="#bookshelf">书架</a>
+            <a class="nav-link" href="#" id="newNoteLink">生成新笔记</a>
+            <button class="btn-primary" id="newNoteBtn" type="button">开始阅读</button>
+        </nav>
     </header>
 
-    <div class="layout">
-        <!-- 书架视图 -->
-        <section class="view-bookshelf" id="viewBookshelf">
-            <div class="bookshelf" id="bookshelf">
-                <div class="empty-state">正在加载书架…</div>
-            </div>
+    <main class="page-main">
+        <section class="home-view" id="homeView">
+            <section class="hero">
+                <div class="hero-inner">
+                    <h1 class="hero-title">深读一部经典，看见千年人心</h1>
+                    <p class="hero-subtitle">从《资治通鉴》到历代典籍，用现代视角重讲古人故事。</p>
+                    <div class="hero-stats" id="heroStats">
+                        <span>正在统计书目…</span>
+                    </div>
+                    <div class="hero-cta">
+                        <a href="#bookshelf" class="btn-primary">浏览书架</a>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bookshelf-section" id="bookshelf">
+                <div class="bookshelf-header">
+                    <h2 class="bookshelf-title">书架</h2>
+                    <div class="bookshelf-controls">
+                        <div class="category-tabs" id="categoryTabs" role="tablist" aria-label="分类筛选">
+                            <button class="category-tab active" data-category="all" role="tab" aria-selected="true" type="button">全部</button>
+                        </div>
+                        <div class="bookshelf-search">
+                            <input type="text" id="searchInput" placeholder="搜索书名、章节或事件…" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bookshelf-grid" id="bookshelfGrid">
+                    <div class="empty-state">正在加载书架…</div>
+                </div>
+            </section>
         </section>
 
-        <!-- 阅读视图 -->
-        <section class="view-reader" id="viewReader" hidden>
+        <section class="reader-view" id="readerView" hidden>
             <aside class="sidebar">
                 <div class="sidebar-header">
                     <button id="backBtn" class="back-btn" type="button">
@@ -50,13 +71,13 @@
                     <div class="empty-state">正在加载目录…</div>
                 </nav>
             </aside>
-            <main class="reader" id="reader">
+            <div class="reader" id="reader">
                 <div class="reader-placeholder">
                     <p>请在左侧选择一篇笔记开始阅读。</p>
                 </div>
-            </main>
+            </div>
         </section>
-    </div>
+    </main>
 
     <div id="modalOverlay" class="modal-overlay" aria-hidden="true">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -77,6 +98,3 @@
     </div>
 </body>
 </html>
-=======
-<html lang="zh
->>>>>>> origin/main

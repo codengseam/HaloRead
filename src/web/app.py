@@ -1,10 +1,19 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
+
+try:
+    import yaml  # type: ignore
+except ImportError:
+    yaml = None  # type: ignore
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
@@ -57,6 +66,192 @@ def _extract_path_from_output(stdout):
     return None
 
 
+def _parse_note_path(rel_path: str) -> tuple[str, str, str] | None:
+    """解析相对路径为 (book, chapter, event)。"""
+    parts = rel_path.split("/")
+    if len(parts) < 2:
+        return None
+    book = parts[0]
+    stem = parts[-1]
+    if stem.endswith(".md"):
+        stem = stem[:-3]
+    if "_" in stem:
+        chapter, event = stem.split("_", 1)
+    else:
+        chapter = stem
+        event = ""
+    return book, chapter, event
+
+
+def _load_book_meta(book_dir: Path, book_name: str) -> dict[str, Any]:
+    """读取 book_dir/_meta.yaml 元数据，失败时返回默认值。"""
+    defaults: dict[str, Any] = {
+        "title": book_name,
+        "category": "未分类",
+        "description": "",
+        "author": "",
+        "cover": "📖",
+        "sort": 99,
+    }
+    meta_path = book_dir / "_meta.yaml"
+    if not meta_path.exists() or yaml is None:
+        return defaults
+    try:
+        data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return defaults
+    if not isinstance(data, dict):
+        return defaults
+
+    result = dict(defaults)
+    for key in ("title", "category", "description", "author", "cover"):
+        value = data.get(key)
+        if value is not None:
+            result[key] = str(value)
+    sort_value = data.get("sort")
+    if sort_value is not None:
+        try:
+            result["sort"] = int(sort_value)
+        except (TypeError, ValueError):
+            pass
+    return result
+
+
+def _category_sort_key(category: str) -> tuple[int, str]:
+    """分类排序键：经 < 史 < 子 < 集 < 其他 < 未分类。"""
+    priority_map = {
+        "经": 1,
+        "史": 2,
+        "子": 3,
+        "集": 4,
+        "未分类": 99,
+    }
+    if category in priority_map:
+        return (priority_map[category], category)
+    return (50, category)
+
+
+def _read_note_content(rel_path: str) -> str:
+    """读取笔记正文，失败时返回空字符串。"""
+    try:
+        return (OUTPUT_DIR / rel_path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _build_index() -> dict[str, Any]:
+    """扫描 output/ 目录，构建与静态站点 index.json 兼容的数据。"""
+    notes: dict[str, dict[str, Any]] = {}
+    books: dict[str, dict[str, list[dict[str, Any]]]] = {}
+
+    if OUTPUT_DIR.exists():
+        for md_path in sorted(OUTPUT_DIR.rglob("*.md")):
+            rel = md_path.relative_to(OUTPUT_DIR)
+            rel_str = str(rel).replace(os.sep, "/")
+            parsed = _parse_note_path(rel_str)
+            if parsed is None:
+                continue
+            book, chapter, event = parsed
+            content = _read_note_content(rel_str)
+            title = event or chapter
+
+            notes[rel_str] = {
+                "path": rel_str,
+                "book": book,
+                "chapter": chapter,
+                "event": event,
+                "title": title,
+                "content": content,
+            }
+            books.setdefault(book, {}).setdefault(chapter, []).append(
+                {
+                    "title": event or chapter,
+                    "type": "event",
+                    "path": rel_str,
+                }
+            )
+
+    # 每本书的目录树
+    book_trees: dict[str, list[dict[str, Any]]] = {}
+    for book_name in sorted(books.keys()):
+        chapters: list[dict[str, Any]] = []
+        for chapter_name in sorted(books[book_name].keys()):
+            events = sorted(
+                books[book_name][chapter_name], key=lambda e: e["path"]
+            )
+            chapters.append(
+                {
+                    "title": chapter_name,
+                    "type": "chapter",
+                    "children": events,
+                }
+            )
+        book_trees[book_name] = chapters
+
+    # 顶层合并树
+    tree: list[dict[str, Any]] = []
+    for book_name in sorted(books.keys()):
+        tree.append(
+            {
+                "title": book_name,
+                "type": "book",
+                "children": book_trees[book_name],
+            }
+        )
+
+    # 书籍数组（含元数据）
+    books_array: list[dict[str, Any]] = []
+    for book_name in books.keys():
+        book_dir = OUTPUT_DIR / book_name
+        meta = _load_book_meta(book_dir, book_name)
+        chapters = book_trees[book_name]
+        note_count = sum(len(ch["children"]) for ch in chapters)
+        books_array.append(
+            {
+                "id": book_name,
+                "title": meta["title"],
+                "category": meta["category"],
+                "description": meta["description"],
+                "author": meta["author"],
+                "cover": meta["cover"],
+                "sort": meta["sort"],
+                "chapter_count": len(chapters),
+                "note_count": note_count,
+                "tree": chapters,
+            }
+        )
+
+    books_array.sort(
+        key=lambda b: (
+            _category_sort_key(b["category"])[0],
+            b["sort"],
+            b["title"],
+        )
+    )
+
+    categories = sorted(
+        {b["category"] for b in books_array},
+        key=_category_sort_key,
+    )
+
+    return {
+        "version": "1.1.0",
+        "generated_at": datetime.now()
+        .astimezone()
+        .replace(microsecond=0)
+        .isoformat(),
+        "stats": {
+            "books": len(books_array),
+            "notes": len(notes),
+            "categories": len(categories),
+        },
+        "books": books_array,
+        "categories": categories,
+        "tree": tree,
+        "notes": notes,
+    }
+
+
 @app.route("/api/notes", methods=["GET"])
 def list_notes():
     """Return a tree of notes: book -> chapter -> event."""
@@ -86,6 +281,12 @@ def list_notes():
             )
         tree.append(book_node)
     return jsonify(tree)
+
+
+@app.route("/api/index", methods=["GET"])
+def index_data():
+    """Return the full bookshelf index (books, categories, notes, tree)."""
+    return jsonify(_build_index())
 
 
 @app.route("/api/notes/<path:filepath>", methods=["GET"])
