@@ -129,3 +129,31 @@
 
 **无需更新规则/checklist**：本次为功能修复，未暴露新的共性写作问题；rules.md 已有「相邻章重复」的隐含约束（§二.2 跨事件引用），无需新增条款。
 
+
+### 2026-06-23：手机端吸底栏专项优化（魔搭空间版本）
+
+**触发问题**：用户反馈"上一章 目录 设置 下一章"吸底栏在手机端仍有问题。魔搭空间版本 = site/ 主版本（经 `.github/workflows/deploy-modelscope.yml` 部署到 ModelScope Studio，用 iframe/WebView 嵌入）。
+
+**多 Agent 分析根因**（前端专家视角）：
+1. **魔搭 iframe 内 body height:100% 塌缩**（最严重）：原吸底靠 `body{height:100%;display:flex;flex-direction:column}` + `.bottom-bar{flex-shrink:0}`，iframe 高度异常时整条 flex 链塌缩，底栏失效。本地无法复现。
+2. **iPhone safe-area 双重缺失**：viewport 无 `viewport-fit=cover` + `.bottom-bar` 无 `padding-bottom:env(safe-area-inset-bottom)`，home indicator 遮挡按钮且点击被系统拦截。
+3. **Chrome 安卓动态地址栏抖动**：body 100% 随地址栏伸缩变化，底栏位置抖动。
+4. **display 硬切**：`body.ui-hidden .bottom-bar{display:none}` 瞬变无过渡，且 flex 链重算导致阅读区跳变。
+5. **transition:transform 死代码**：声明了过渡但 JS 从未修改 transform。
+
+**修复方案**：放弃 flex 吸底，改 `position:fixed` + safe-area（移动端吸底导航工业标准，不依赖 body 高度链路）。
+- `index.html` viewport 加 `viewport-fit=cover`
+- `.bottom-bar` 改 `position:fixed; bottom:0; padding-bottom:env(safe-area-inset-bottom)`
+- 移动端 `.reader` 加 `padding-bottom:calc(50px + env(safe-area-inset-bottom))` 防遮挡
+- `body.ui-hidden .bottom-bar` 改 `transform:translateY(100%)`（滑出动画，复活死代码 transition）
+- 首页仍 `display:none`（不占位）
+
+**架构教训（已沉淀）**：
+- 移动端吸底栏**不能依赖 body flex 高度链路**——iframe 嵌入环境（魔搭/飞书/企微）和动态地址栏都会让 `height:100%` 塌缩/抖动。`position:fixed` 脱离文档流，不受 body 高度影响，是唯一可靠方案。
+- `100dvh` 在 iframe 内参考的仍是 iframe 高度而非可视高度，救不了 flex 方案。
+- iPhone 全面屏必须 `viewport-fit=cover` + `env(safe-area-inset-bottom)` 双管齐下，缺一个则 safe-area 返回 0。
+- fixed 元素脱离 flex 链后，滚动区（`.reader`）必须补 `padding-bottom` 让出底栏高度，否则内容被遮挡。
+- 显隐切换用 `transform` 而非 `display:none`，可配合 `transition` 实现平滑动画，且不触发 flex 链重算。
+
+**无需更新规则/checklist**：本次为前端布局修复，未涉及讲书笔记写作规则。魔搭部署配置（iframe 高度）属 site/ 代码之外，若仍有问题需检查魔搭侧 iframe 高度设置。
+
