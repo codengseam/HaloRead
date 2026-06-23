@@ -335,26 +335,60 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
         key=_category_sort_key,
     )
 
-    index = {
-        "version": VERSION,
-        "generated_at": datetime.now()
+    generated_at = (
+        datetime.now()
         .astimezone()
         .replace(microsecond=0)
-        .isoformat(),
-        "stats": {
-            "books": len(books),
-            "notes": len(notes),
-            "categories": len(categories),
-        },
+        .isoformat()
+    )
+    stats = {
+        "books": len(books),
+        "notes": len(notes),
+        "categories": len(categories),
+    }
+
+    # 首页索引：仅含元数据与目录树，不含笔记正文，保证首屏极速加载
+    index = {
+        "version": VERSION,
+        "generated_at": generated_at,
+        "stats": stats,
         "books": books_array,
         "categories": categories,
         "tree": tree,
-        "notes": notes,
     }
 
     index_path = data_dir / "index.json"
     index_path.write_text(
         json.dumps(index, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    # 搜索索引：仅含标题、路径、出处和摘要，按需加载
+    search_notes = []
+    for rel_str, note in notes.items():
+        content = note.get("content", "")
+        snippet = content[:300].replace("\n", " ")
+        if len(content) > 300:
+            snippet = snippet.rstrip() + "…"
+        search_notes.append(
+            {
+                "path": rel_str,
+                "book": note.get("book", ""),
+                "chapter": note.get("chapter", ""),
+                "event": note.get("event", ""),
+                "title": note.get("title", ""),
+                "snippet": snippet,
+            }
+        )
+    search_index = {
+        "version": VERSION,
+        "generated_at": generated_at,
+        "stats": stats,
+        "notes": search_notes,
+    }
+    search_index_path = data_dir / "search-index.json"
+    search_index_path.write_text(
+        json.dumps(search_index, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 

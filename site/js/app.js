@@ -10,6 +10,16 @@
         paragraphSpacing: 1.0
     };
 
+    // 本地缓存键
+    const CACHE_PREFIX = 'halo-';
+    const CACHE_VERSION = 'v1';
+    const INDEX_CACHE_KEY = CACHE_PREFIX + 'index';
+    const INDEX_META_KEY = CACHE_PREFIX + 'index-meta';
+    const SEARCH_CACHE_KEY = CACHE_PREFIX + 'search-index';
+    const SEARCH_META_KEY = CACHE_PREFIX + 'search-meta';
+    const NOTE_CACHE_PREFIX = CACHE_PREFIX + 'note-';
+    const MAX_CACHED_NOTES = 50;
+
     const state = {
         booksData: [],
         categories: [],
@@ -23,7 +33,9 @@
         searchQuery: '',
         selectedCategory: 'all',
         bookshelfQuery: '',
-        searchMode: false
+        searchMode: false,
+        searchIndexLoaded: false,
+        searchNotes: []
     };
 
     const elements = {
@@ -86,6 +98,108 @@
     function showError(message, err) {
         console.error(message, err || '');
         alert(message);
+    }
+
+    /* ============ 本地缓存工具 ============ */
+    function getCachedJson(key) {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function setCachedJson(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (err) {
+            // 存储配额不足时静默失败
+        }
+    }
+
+    function getCachedText(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function setCachedText(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch (err) {
+            // 存储配额不足时静默失败
+        }
+    }
+
+    function clearOutdatedCache() {
+        const versionKey = CACHE_PREFIX + 'cache-version';
+        try {
+            const stored = localStorage.getItem(versionKey);
+            if (stored === CACHE_VERSION) return;
+        } catch (err) {
+            return;
+        }
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(CACHE_PREFIX)) {
+                localStorage.removeItem(key);
+            }
+        }
+        try {
+            localStorage.setItem(versionKey, CACHE_VERSION);
+        } catch (err) {
+            // ignore
+        }
+    }
+
+    function cleanupNoteCache(maxCount) {
+        const entries = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(NOTE_CACHE_PREFIX) && !key.endsWith('-meta')) {
+                const meta = getCachedJson(key + '-meta') || {};
+                entries.push({ key: key, loadedAt: meta.loaded_at || 0 });
+            }
+        }
+        if (entries.length <= maxCount) return;
+        entries.sort((a, b) => a.loadedAt - b.loadedAt);
+        entries.slice(0, entries.length - maxCount).forEach((item) => {
+            localStorage.removeItem(item.key);
+            localStorage.removeItem(item.key + '-meta');
+        });
+    }
+
+    async function loadCachedThenFetch(url, cacheKey, metaKey, onData) {
+        const cached = getCachedJson(cacheKey);
+        const meta = getCachedJson(metaKey);
+
+        // 有缓存先渲染，后台静默更新
+        if (cached && meta && meta.generated_at) {
+            onData(cached);
+        }
+
+        try {
+            const data = await fetchJson(url, { cache: 'no-cache' });
+            setCachedJson(cacheKey, data);
+            setCachedJson(metaKey, {
+                version: data.version || '',
+                generated_at: data.generated_at || ''
+            });
+            // 只有数据变化才再次触发渲染，避免闪烁
+            if (!cached || meta?.generated_at !== data.generated_at) {
+                onData(data);
+            }
+            return data;
+        } catch (err) {
+            if (cached) {
+                console.warn('[豪书斋] 网络请求失败，使用缓存数据:', url, err);
+                return cached;
+            }
+            throw err;
+        }
     }
 
     async function fetchJson(url, options) {
@@ -517,7 +631,23 @@
         elements.reader.innerHTML = '<div class="reader-placeholder">正在加载笔记…</div>';
         elements.reader.scrollTop = 0;
         try {
-            const content = await fetchJson('notes/' + encodeURI(path));
+            const cacheKey = NOTE_CACHE_PREFIX + path;
+            const metaKey = cacheKey + '-meta';
+            let content;
+            try {
+                content = await fetchJson('notes/' + encodeURI(path));
+                setCachedText(cacheKey, content);
+                setCachedJson(metaKey, { loaded_at: Date.now() });
+                cleanupNoteCache(MAX_CACHED_NOTES);
+            } catch (fetchErr) {
+                const cached = getCachedText(cacheKey);
+                if (cached) {
+                    console.warn('[豪书斋] 笔记网络加载失败，使用本地缓存:', path, fetchErr);
+                    content = cached;
+                } else {
+                    throw fetchErr;
+                }
+            }
             const { meta, body } = parseFrontmatter(content || '');
             const html = sanitizeHtml(marked.parse(body, { gfm: true }));
             const metaHtml = buildMetaHtml(meta);
@@ -547,20 +677,28 @@
     }
 
     /* ============ 数据加载（静态站点） ============ */
+    function applyIndexData(data) {
+        state.booksData = data.books || [];
+        state.categories = data.categories || [];
+        state.treeData = data.tree || [];
+        state.flatNotes = flattenTree(state.treeData);
+        state.searchMode = false;
+    }
+
     async function loadIndex() {
         try {
-            const data = await fetchJson('data/index.json');
-            state.booksData = data.books || [];
-            state.categories = data.categories || [];
-            state.treeData = data.tree || [];
-            state.notesIndex = data.notes || {};
-            state.flatNotes = flattenTree(state.treeData);
-            state.searchMode = false;
-
-            renderHeroStats(data.stats);
-            renderCategoryTabs();
-            renderBookshelf();
-            updateChapterNav();
+            await loadCachedThenFetch(
+                'data/index.json',
+                INDEX_CACHE_KEY,
+                INDEX_META_KEY,
+                (data) => {
+                    applyIndexData(data);
+                    renderHeroStats(data.stats);
+                    renderCategoryTabs();
+                    renderBookshelf();
+                    updateChapterNav();
+                }
+            );
         } catch (err) {
             elements.bookshelfGrid.innerHTML = '';
             const empty = document.createElement('div');
@@ -573,21 +711,43 @@
 
     async function loadTree() {
         try {
-            const data = await fetchJson('data/index.json');
-            state.treeData = data.tree || [];
-            state.flatNotes = flattenTree(state.treeData);
-            if (state.currentBook) {
-                const bookNode = state.treeData.find((b) => b.title === state.currentBook);
-                state.currentBookTree = bookNode ? [bookNode] : state.treeData;
-            } else {
-                state.currentBookTree = state.treeData;
-            }
-            state.searchMode = false;
-            refreshTreeView();
-            updateChapterNav();
+            await loadCachedThenFetch(
+                'data/index.json',
+                INDEX_CACHE_KEY,
+                INDEX_META_KEY,
+                (data) => {
+                    applyIndexData(data);
+                    if (state.currentBook) {
+                        const bookNode = state.treeData.find((b) => b.title === state.currentBook);
+                        state.currentBookTree = bookNode ? [bookNode] : state.treeData;
+                    } else {
+                        state.currentBookTree = state.treeData;
+                    }
+                    refreshTreeView();
+                    updateChapterNav();
+                }
+            );
         } catch (err) {
             showError('无法加载笔记目录，请检查 data/index.json 是否存在。', err);
         }
+    }
+
+    async function ensureSearchIndex() {
+        if (state.searchIndexLoaded) return state.searchNotes;
+        await loadCachedThenFetch(
+            'data/search-index.json',
+            SEARCH_CACHE_KEY,
+            SEARCH_META_KEY,
+            (data) => {
+                state.searchNotes = data.notes || [];
+                state.searchIndexLoaded = true;
+            }
+        );
+        if (!state.searchIndexLoaded) {
+            state.searchNotes = [];
+            state.searchIndexLoaded = true;
+        }
+        return state.searchNotes;
     }
 
     /* ============ 阅读设置 ============ */
@@ -803,7 +963,7 @@
         refreshTreeView();
     }
 
-    function handleTreeSearchEnter(event) {
+    async function handleTreeSearchEnter(event) {
         if (event.key !== 'Enter') return;
         event.preventDefault();
         const query = elements.searchInput.value.trim();
@@ -812,43 +972,52 @@
             refreshTreeView();
             return;
         }
-        const results = [];
-        for (const [path, note] of Object.entries(state.notesIndex || {})) {
-            const title = note.title || note.event || '';
-            const content = note.content || '';
-            const titleLower = title.toLowerCase();
-            const contentLower = content.toLowerCase();
+
+        elements.treeNav.innerHTML = '<div class="empty-state">正在加载搜索结果…</div>';
+        try {
+            const searchNotes = await ensureSearchIndex();
+            const results = [];
             const queryLower = query.toLowerCase();
 
-            let matched = false;
-            let snippet = '';
-            if (titleLower.includes(queryLower)) {
-                matched = true;
-                snippet = content.slice(0, 100).replace(/\n/g, ' ');
-                if (content.length > 100) snippet += '…';
-            } else if (contentLower.includes(queryLower)) {
-                matched = true;
-                const idx = contentLower.indexOf(queryLower);
-                const start = Math.max(0, idx - 30);
-                const end = Math.min(content.length, idx + query.length + 60);
-                snippet = content.slice(start, end).replace(/\n/g, ' ');
-                if (start > 0) snippet = '…' + snippet;
-                if (end < content.length) snippet += '…';
-            }
+            for (const note of searchNotes) {
+                const title = note.title || note.event || '';
+                const snippet = note.snippet || '';
+                const titleLower = title.toLowerCase();
+                const snippetLower = snippet.toLowerCase();
 
-            if (matched) {
-                results.push({
-                    path: path,
-                    book: note.book,
-                    chapter: note.chapter,
-                    event: note.event,
-                    title: title,
-                    snippet: snippet
-                });
+                let matched = false;
+                let displaySnippet = snippet.slice(0, 100);
+                if (snippet.length > 100) displaySnippet += '…';
+
+                if (titleLower.includes(queryLower)) {
+                    matched = true;
+                } else if (snippetLower.includes(queryLower)) {
+                    matched = true;
+                    const idx = snippetLower.indexOf(queryLower);
+                    const start = Math.max(0, idx - 30);
+                    const end = Math.min(snippet.length, idx + query.length + 60);
+                    displaySnippet = snippet.slice(start, end);
+                    if (start > 0) displaySnippet = '…' + displaySnippet;
+                    if (end < snippet.length) displaySnippet += '…';
+                }
+
+                if (matched) {
+                    results.push({
+                        path: note.path,
+                        book: note.book,
+                        chapter: note.chapter,
+                        event: note.event,
+                        title: title,
+                        snippet: displaySnippet
+                    });
+                }
             }
+            state.searchMode = true;
+            renderSearchResults(results, query);
+        } catch (err) {
+            elements.treeNav.innerHTML = '<div class="empty-state">搜索索引加载失败</div>';
+            showError('无法加载搜索索引，请检查 data/search-index.json 是否存在。', err);
         }
-        state.searchMode = true;
-        renderSearchResults(results, query);
     }
 
     function renderSearchResults(results, query) {
@@ -1010,6 +1179,8 @@
     }
 
     function init() {
+        clearOutdatedCache();
+
         if (typeof marked === 'undefined') {
             elements.reader.innerHTML = '<div class="reader-placeholder">Markdown 渲染组件加载失败，请检查网络连接。</div>';
             console.error('marked.js is not loaded');

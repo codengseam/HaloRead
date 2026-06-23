@@ -7,6 +7,19 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
     <script src="js/app.js" defer></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(function (registration) {
+                        console.log('[豪书斋] Service Worker 注册成功:', registration.scope);
+                    })
+                    .catch(function (error) {
+                        console.warn('[豪书斋] Service Worker 注册失败:', error);
+                    });
+            });
+        }
+    </script>
 </head>
 <body data-theme="day" data-font="serif" data-view="home">
     <header class="brand-header">
