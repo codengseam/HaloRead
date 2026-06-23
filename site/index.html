@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>豪书斋 · 读古人书，悟今世事</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/paragraph-comments.css">
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
     <script src="js/app.js" defer></script>
+    <script src="js/paragraph-comments.js" defer></script>
 </head>
 <body data-theme="day" data-font="serif" data-view="home">
     <header class="brand-header">
@@ -35,6 +37,23 @@
         </div>
         <div class="toolbar-actions">
             <button id="refreshBtn" class="btn-secondary" type="button">刷新目录</button>
+            <button id="pcConfigBtn" class="pc-toolbar-btn" type="button" aria-label="段评同步设置" title="段评同步设置">段评</button>
+            <button id="pcExpertBtn" class="pc-toolbar-btn" type="button" aria-label="启用专家团评判" title="启用专家团评判">名家评判</button>
+            <details class="pc-export-menu" id="pcExportMenu">
+                <summary class="pc-toolbar-btn" title="导出评论">导出评论</summary>
+                <div class="pc-export-dropdown" role="menu">
+                    <button type="button" data-pc-export="note" role="menuitem">当前笔记</button>
+                    <button type="button" data-pc-export="all" role="menuitem">全站</button>
+                    <button type="button" data-pc-export="agents" role="menuitem">导出给专家</button>
+                </div>
+            </details>
+            <details class="pc-export-menu" id="pcImportMenu">
+                <summary class="pc-toolbar-btn" title="导入评论">导入评论</summary>
+                <div class="pc-export-dropdown" role="menu">
+                    <button type="button" data-pc-import="comments" role="menuitem">导入段评 JSON</button>
+                    <button type="button" data-pc-import="expert" role="menuitem">导入专家评判</button>
+                </div>
+            </details>
             <button id="settingsBtn" class="icon-btn" type="button" aria-label="阅读设置">⚙</button>
             <button id="newNoteBtnToolbar" class="btn-primary" type="button">生成新笔记</button>
         </div>
@@ -158,5 +177,67 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // 段评工具栏按钮接线（deferred 脚本在 DOMContentLoaded 前已执行）
+        document.addEventListener('DOMContentLoaded', function () {
+            var PC = window.ParagraphComments;
+            if (!PC) return;
+
+            var cfgBtn = document.getElementById('pcConfigBtn');
+            if (cfgBtn) {
+                cfgBtn.addEventListener('click', function () { PC.openConfigModal(); });
+            }
+
+            var expertBtn = document.getElementById('pcExpertBtn');
+            if (expertBtn) {
+                expertBtn.addEventListener('click', function () { PC.openExpertDialog(); });
+            }
+
+            var exportMenu = document.getElementById('pcExportMenu');
+            if (exportMenu) {
+                exportMenu.addEventListener('click', function (e) {
+                    var btn = e.target.closest('[data-pc-export]');
+                    if (!btn) return;
+                    var mode = btn.getAttribute('data-pc-export');
+                    if (mode === 'note') PC.exportNote();
+                    else if (mode === 'all') PC.exportAll();
+                    else if (mode === 'agents') PC.exportForAgents();
+                    exportMenu.open = false; // 关闭下拉
+                });
+            }
+
+            // 导入评论 / 导入专家评判：通过隐藏的 file input 触发
+            var importMenu = document.getElementById('pcImportMenu');
+            var fileInput = document.getElementById('pcImportFile');
+            var importMode = 'comments';
+            if (importMenu && fileInput) {
+                importMenu.addEventListener('click', function (e) {
+                    var btn = e.target.closest('[data-pc-import]');
+                    if (!btn) return;
+                    importMode = btn.getAttribute('data-pc-import');
+                    importMenu.open = false;
+                    fileInput.value = '';
+                    fileInput.click();
+                });
+                fileInput.addEventListener('change', function () {
+                    var file = fileInput.files && fileInput.files[0];
+                    if (!file) return;
+                    var reader = new FileReader();
+                    reader.onload = function (ev) {
+                        var text = ev.target.result || '';
+                        if (importMode === 'expert') {
+                            PC.importExpertReview(text);
+                        } else {
+                            PC.importJSON(text, 'merge');
+                        }
+                    };
+                    reader.onerror = function () { alert('读取文件失败'); };
+                    reader.readAsText(file, 'utf-8');
+                });
+            }
+        });
+    </script>
+    <input type="file" id="pcImportFile" accept=".json,application/json" hidden>
 </body>
 </html>

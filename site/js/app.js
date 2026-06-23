@@ -1,6 +1,14 @@
 (function () {
     'use strict';
 
+    // 站点根路径（兼容魔搭子路径部署，如 /studios/xxx/haosz/）
+    const SITE_BASE = (() => {
+        const p = window.location.pathname.replace(/\/[^/]*$/, '/');
+        const idx = p.indexOf('/versions/');
+        if (idx >= 0) return p.slice(0, idx) + '/';
+        return p;
+    })();
+
     const SETTINGS_KEY = 'reader-settings';
     const DEFAULT_SETTINGS = {
         theme: 'day',
@@ -88,7 +96,8 @@
     }
 
     async function fetchJson(url, options) {
-        const response = await fetch(url, options);
+        const fullUrl = (/^https?:/i.test(url) || url.startsWith('data:')) ? url : (SITE_BASE + url);
+        const response = await fetch(fullUrl, options);
         if (!response.ok) {
             const detail = await response.text().catch(() => '');
             throw new Error(`请求失败 (${response.status}): ${detail || response.statusText}`);
@@ -544,6 +553,15 @@
 
             elements.reader.innerHTML = `<article class="markdown-body">${metaHtml}${html}</article>${navHtml}`;
             bindChapterNavButtons();
+
+            // —— 段落评论系统接入钩子 ——
+            // 笔记渲染完成后分发 note:loaded 事件，供 paragraph-comments.js 自动注入段评能力
+            const article = elements.reader.querySelector('.markdown-body');
+            if (article) {
+                document.dispatchEvent(new CustomEvent('note:loaded', {
+                    detail: { notePath: path, container: article, meta: meta || null }
+                }));
+            }
 
             if (elements.toolbarChapter) {
                 const chapterText = meta && meta.title ? meta.title : (state.flatNotes[idx] && state.flatNotes[idx].title) || '';
