@@ -135,9 +135,6 @@
 - `.cache/ai_course_plan.md`：章节方案模板，含模块划分、字数预估、文件命名规范。
 - 专家团评审模式（3 subagent 并行评审）可复用于其他方案评估场景。
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
 
 ### 2026-06-23：GitHub Pages 部署失败修复（.nojekyll 跳过 Jekyll）
 
@@ -342,7 +339,6 @@
 
 **无需更新讲书规则**：本次为站点构建、数据清理与工程规范，未涉及讲书笔记写作规则。
 
->>>>>>> origin/master
 ---
 
 ## 内容质检体系构建沉淀（2026-06-23）
@@ -394,7 +390,32 @@
 - `content_quality.py` 可作为其他 Markdown 内容质检的底层检测库。
 - `content_review_workflow.py` 可作为「三视角并行质检」的 LangGraph 模板复用。
 
-<<<<<<< HEAD
-=======
 
->>>>>>> origin/master
+
+---
+
+## 开发沉淀：阅读器三功能（壁纸/翻页/自动阅读）2026-06-23
+
+### 背景
+为静态站点阅读器新增三个阅读增强功能：阅读壁纸切换、上下滑动+点击翻页、番茄式自动阅读。
+
+### 流程
+1. 启用计划评审技能，因 LLM_API_KEY 未配置，改用 Task 工具并行启动 3 个专家子代理（架构师/测试/规则）做真实并行评审，报告存于 `docs/reviews/plan_review_20260623_reader_features.md`。
+2. 按评审意见实现：桌面端 tap 模式仅中央点击切换 UI（避免破坏桌面体验）、行高取 `.markdown-body` 计算值、rAF deltaTime clamp、touch/click 用 `tapHandled` 标志防双触发、夜间壁纸用 CSS 覆盖。
+3. 测试驱动：先确认 `site_e2e_test.js` 基线通过，再新增 `tests/test_reader_features.js`（54 项），覆盖壁纸/翻页/自动阅读/排除元素/末尾暂停/切章暂停。
+4. 真实测试：jsdom e2e（执行真实 app.js）+ HTTP 服务器冒烟（全 200）+ 语法检查。沙箱无系统浏览器，Puppeteer 下载失败，jsdom 为最接近真实浏览器的可行方案。
+
+### 新共性问题
+1. **`tests/test_web_reader.py` 基线已坏**：该测试针对 `src/web/` 旧路径（非 `site/`），且因缺 `langgraph` 模块直接报 ImportError，与本次改动无关但易误导。建议后续统一迁移到 `site/` 或标注废弃。
+2. **jsdom 测试需 polyfill**：rAF/TouchEvent/matchMedia 在 jsdom 缺失，测试需在入口注入 fake 实现，否则自动阅读与移动端翻页无法测。
+3. **评审技能的两条路径**：LLM_API_KEY 未配置时 plan-review Skill 的 Python 引擎不可用，退化为 Task 工具并行子代理（路径 A 增强版），效果接近但非 LangGraph 真并行。
+
+### 规则/工具更新
+- `.gitignore` 新增 `node_modules/`（测试时本地安装 jsdom/marked，避免误提交）。
+- 无需更新 `config.yaml`/`.env.example`（前端纯静态站点，无后端配置）。
+- 无需更新 `content-quality.md`/`quality.py`（本次为代码改动，非讲书内容）。
+
+### 可复用资产
+- `tests/test_reader_features.js` 的 rAF polyfill（`__rafQueue`/`__flushRaf`）可作为后续 jsdom 测试动画/滚动的模板。
+- `handleReaderTap` 的 touch/click 防双触发模式（`tapHandledByTouch` 标志 + 位移/时长阈值）可复用于其他移动端点击场景。
+- 壁纸用 CSS 渐变 + 内联 SVG data URI 实现的方案，无外部图片依赖，可复用于其他需要纹理背景的场景。
