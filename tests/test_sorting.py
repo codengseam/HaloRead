@@ -87,9 +87,21 @@ def test_chapter_sort_key_long_prefix_priority():
 
 
 def test_chapter_sort_key_shiji():
-    """史记按本纪/表/书/世家/列传顺序。"""
-    assert chapter_sort_key("史记", "本纪一") == (1, 1, "本纪一")
-    assert chapter_sort_key("史记", "列传七") == (5, 7, "列传七")
+    """史记按秦纪/汉纪/本纪/表/书/世家/列传顺序。"""
+    assert chapter_sort_key("史记", "秦纪一") == (1, 1, "秦纪一")
+    assert chapter_sort_key("史记", "汉纪一") == (2, 1, "汉纪一")
+    assert chapter_sort_key("史记", "列传七") == (7, 7, "列传七")
+
+
+def test_chapter_sort_key_tang_song_ming():
+    """唐纪/宋纪/明纪 按中文数字序号排序（修复字符串排序 bug）。"""
+    assert chapter_sort_key("唐纪", "唐纪一") == (1, 1, "唐纪一")
+    assert chapter_sort_key("唐纪", "唐纪三十三") == (1, 33, "唐纪三十三")
+    assert chapter_sort_key("宋纪", "宋纪三十三") == (1, 33, "宋纪三十三")
+    assert chapter_sort_key("明纪", "明纪一") == (1, 1, "明纪一")
+    assert chapter_sort_key("明纪", "明纪四十二") == (1, 42, "明纪四十二")
+    # 验证不再按字符串序（"明纪三" < "明纪三十" 是字符串序，数字序应为 3 < 30）
+    assert chapter_sort_key("明纪", "明纪三")[1] < chapter_sort_key("明纪", "明纪三十")[1]
 
 
 def test_chapter_sort_key_unconfigured_book():

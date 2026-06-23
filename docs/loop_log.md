@@ -188,3 +188,30 @@
 
 **测试覆盖**：全量 pytest 108 项通过（含新增 15 项 check_chapter_order 测试）；check_chapter_order.py 校验全站通过；7 个多事件章节排序全部正确。
 
+
+### 2026-06-23：非资治通鉴书籍阶段化重构 + 全站排序修复
+
+**触发问题**：用户发现明纪排序"全乱"，且除资治通鉴外其他书目录拆分过细（一章一事件），要求按历史阶段合并大章节，阶段内按时间排小标题。
+
+**多 Agent 分析结果**（历史专家 Agent 设计阶段映射）：
+- 根因1：唐纪/宋纪/明纪/史记未配置 `BOOK_CATEGORY_ORDER`，章节按字符串序排（明纪一<明纪七<明纪三<明纪三十）
+- 根因2：非资治通鉴 7 本书（三国/史记/唐纪/宋纪/明纪/孔子传/论语）原为"一章一事件"结构，目录层级冗余
+- 方案：7 本书按历史阶段重构为多事件大章节（三国6阶段/史记7阶段/唐纪6阶段/宋纪6阶段/明纪8阶段/孔子传6阶段/论语7阶段），阶段内事件按时间序排
+
+**修复**：
+1. `src/utils/sorting.py`：BOOK_CATEGORY_ORDER 补唐纪/宋纪/明纪配置；`sort_notes_tree` chapter 排序改为优先用 `chapter_sort` 字段（阶段历史顺序），无则回退 `chapter_sort_key`（朝代纪号）
+2. `scripts/migrate_stages.py`（新增）：一次性迁移脚本，STAGE_MAP 定义 7 本书阶段映射，重命名文件 + 更新 frontmatter（chapter/sort/chapter_sort 三字段）
+3. `scripts/build_site.py` + `src/web/app.py`：event 节点注入 chapter_sort，chapter 节点取首个事件的 chapter_sort，两端同步
+4. `tests/test_sorting.py`：更新史记配置测试，新增唐纪/宋纪/明纪测试
+
+**架构教训（已沉淀）**：
+- **双排序字段设计**：`chapter_sort`（阶段在书内的历史顺序，跨章）+ `sort`（事件在阶段内的时间顺序，章内）。两者职责分离，避免单字段既表达跨章又表达章内导致冲突。
+- **迁移脚本必须幂等**：migrate_stages.py 以 event 名为 key 查 STAGE_MAP，重命名文件 + 覆写 frontmatter，可重复运行。前几次运行因 tuple 解包顺序 bug 产生错误 sort 值，第 5 次修复后正确——幂等性让重跑成本极低。
+- **tuple 解包顺序 bug 是高频低级错误**：`build_event_to_stage` 返回 `(stage_name, chapter_sort, event_sort)`，但调用方写成 `new_chapter, sort_val, chapter_sort = ...` 解包，2/3 位互换导致全章事件 sort 值都等于 chapter_sort。教训：多字段 tuple 返回时优先用 dataclass/namedtuple 或 dict，避免位置解包。
+- **sort_notes_tree 两个消费者必须同步**：`build_site.py`（静态站点）和 `src/web/app.py`（Flask API）都调用 sort_notes_tree，但 chapter_sort 字段的注入逻辑需各自实现（build_site 从 frontmatter 解析，app.py 从 content 正则解析），两端解析逻辑必须一致。
+- **阶段划分以原书叙事时间线为准**：明纪 8 阶段（元末群雄→洪武之治→永乐盛世→土木之变→成弘正之治→嘉靖隆庆→万历怠政→明亡清军入关）严格按明代历史时间序，不按重要性排序。
+
+**测试覆盖**：全量 pytest 109 项通过；check_chapter_order.py 校验全站通过；7 本书 234 个文件迁移成功，阶段排序与事件排序全部正确。
+
+**无需更新规则/checklist**：本次为目录结构重构，未涉及讲书笔记写作规则。rules.md §五 frontmatter 与排序已覆盖 sort 字段说明，chapter_sort 属于迁移脚本内部字段无需写入写作规则。
+

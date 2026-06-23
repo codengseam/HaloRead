@@ -241,6 +241,7 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
                     "type": "event",
                     "path": rel_str,
                     "sort": frontmatter.get("sort"),
+                    "chapter_sort": frontmatter.get("chapter_sort"),
                 }
             )
 
@@ -257,11 +258,18 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
             events = sorted(
                 books[book_name][chapter_name], key=lambda e: e["path"]
             )
+            # chapter_sort 取第一个有值的事件（同章所有事件应相同）
+            chapter_sort = None
+            for ev in events:
+                if ev.get("chapter_sort") is not None:
+                    chapter_sort = ev["chapter_sort"]
+                    break
             chapters.append(
                 {
                     "title": chapter_name,
                     "type": "chapter",
                     "children": events,
+                    "chapter_sort": chapter_sort,
                 }
             )
         book_trees[book_name] = chapters

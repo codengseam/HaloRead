@@ -145,25 +145,34 @@ def _read_note_content(rel_path: str) -> str:
         return ""
 
 
-def _parse_sort_from_content(content: str) -> int | None:
-    """从 Markdown frontmatter 提取 sort 字段（章内事件排序）。
+def _parse_sort_from_content(content: str) -> tuple[int | None, int | None]:
+    """从 Markdown frontmatter 提取 sort 和 chapter_sort 字段。
 
+    返回 (sort, chapter_sort)，均为 None 表示无对应字段。
     与 build_site.py 的 frontmatter 解析保持一致，供 Flask API 排序使用。
     """
+    sort_val = None
+    chapter_sort_val = None
     if not content:
-        return None
+        return sort_val, chapter_sort_val
     match = re.match(r"^---\s*\n(.*?)\n---", content, re.DOTALL)
     if not match:
-        return None
+        return sort_val, chapter_sort_val
     for line in match.group(1).splitlines():
         stripped = line.strip()
-        if stripped.startswith("sort:"):
+        if stripped.startswith("sort:") and sort_val is None:
             value = stripped.split(":", 1)[1].strip()
             try:
-                return int(value)
+                sort_val = int(value)
             except ValueError:
-                return None
-    return None
+                pass
+        elif stripped.startswith("chapter_sort:") and chapter_sort_val is None:
+            value = stripped.split(":", 1)[1].strip()
+            try:
+                chapter_sort_val = int(value)
+            except ValueError:
+                pass
+    return sort_val, chapter_sort_val
 
 
 def _build_index() -> dict[str, Any]:
@@ -190,12 +199,14 @@ def _build_index() -> dict[str, Any]:
                 "title": title,
                 "content": content,
             }
+            sort_val, chapter_sort_val = _parse_sort_from_content(content)
             books.setdefault(book, {}).setdefault(chapter, []).append(
                 {
                     "title": event or chapter,
                     "type": "event",
                     "path": rel_str,
-                    "sort": _parse_sort_from_content(content),
+                    "sort": sort_val,
+                    "chapter_sort": chapter_sort_val,
                 }
             )
 
@@ -207,11 +218,17 @@ def _build_index() -> dict[str, Any]:
             events = sorted(
                 books[book_name][chapter_name], key=lambda e: e["path"]
             )
+            chapter_sort = None
+            for ev in events:
+                if ev.get("chapter_sort") is not None:
+                    chapter_sort = ev["chapter_sort"]
+                    break
             chapters.append(
                 {
                     "title": chapter_name,
                     "type": "chapter",
                     "children": events,
+                    "chapter_sort": chapter_sort,
                 }
             )
         book_trees[book_name] = chapters
@@ -288,12 +305,14 @@ def list_notes():
     books = {}
     for rel_path, book, chapter, event in _iter_notes():
         content = _read_note_content(rel_path)
+        sort_val, chapter_sort_val = _parse_sort_from_content(content)
         books.setdefault(book, {}).setdefault(chapter, []).append(
             {
                 "title": event or chapter,
                 "type": "event",
                 "path": rel_path,
-                "sort": _parse_sort_from_content(content),
+                "sort": sort_val,
+                "chapter_sort": chapter_sort_val,
             }
         )
 
@@ -304,11 +323,17 @@ def list_notes():
             events = sorted(
                 books[book_name][chapter_name], key=lambda e: e["path"]
             )
+            chapter_sort = None
+            for ev in events:
+                if ev.get("chapter_sort") is not None:
+                    chapter_sort = ev["chapter_sort"]
+                    break
             book_node["children"].append(
                 {
                     "title": chapter_name,
                     "type": "chapter",
                     "children": events,
+                    "chapter_sort": chapter_sort,
                 }
             )
         book_node["flat"] = is_flat_book(book_node["children"])
