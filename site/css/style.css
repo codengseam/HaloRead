@@ -18,6 +18,13 @@
     --reader-font-size: 18px;
     --reader-line-height: 1.9;
     --reader-paragraph-spacing: 1em;
+<<<<<<< HEAD
+=======
+
+    /* 魔搭 iframe 嵌入时的安全间距（预留平台顶栏/底栏空间） */
+    --modelscope-shell-top: 0px;
+    --modelscope-shell-bottom: 0px;
+>>>>>>> origin/master
 }
 
 /* 主题：白天（默认） */
@@ -1611,3 +1618,121 @@ body[data-view="home"] .bottom-bar {
         grid-template-columns: 1fr;
     }
 }
+<<<<<<< HEAD
+=======
+
+/* ============ 魔搭创空间嵌入优化 ============
+   说明：魔搭平台外壳（顶部标题条、左上角×、右上角⋮、右下角平台悬浮按钮）
+   位于 modelscope.cn 父页面，运行在我们的 iframe 之外，受同源策略保护，
+   无法通过本站 CSS/JS 直接隐藏。以下样式只作用于我们自己 iframe 内的元素，
+   避免在魔搭场景下出现双层导航/标题，并提供“沉浸阅读”入口。
+   参考规则：专家团评审结论 + 项目前端架构。
+======== */
+
+/* 检测处于 iframe/嵌入环境时，给 body 打上的标记类 */
+body.modelscope-embedded {
+    /* 隐藏与魔搭平台外壳重复或叠加的自有 UI */
+}
+
+body.modelscope-embedded .brand-header {
+    display: none !important;
+}
+
+body.modelscope-embedded .toolbar {
+    top: var(--modelscope-shell-top);
+}
+
+body.modelscope-embedded .bottom-bar {
+    display: none !important;
+}
+
+body.modelscope-embedded .page-main {
+    padding-top: calc(56px + var(--modelscope-shell-top));
+}
+
+body.modelscope-embedded .reader-view {
+    height: calc(100vh - var(--modelscope-shell-top) - var(--modelscope-shell-bottom));
+    max-height: calc(100vh - var(--modelscope-shell-top) - var(--modelscope-shell-bottom));
+}
+
+body.modelscope-embedded .reader {
+    padding-bottom: calc(1rem + var(--modelscope-shell-bottom));
+}
+
+/* 沉浸阅读按钮 */
+.immersive-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    color: var(--ink-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.immersive-btn:hover {
+    color: var(--ink-primary);
+    background-color: var(--bg-hover);
+    border-color: var(--accent-light);
+}
+
+.immersive-btn:active {
+    transform: translateY(1px);
+}
+
+/* 沉浸阅读模式：竖屏、无目录、内容占满 */
+body.modelscope-embedded:fullscreen,
+body.modelscope-embedded:-webkit-full-screen,
+body.immersive-mode {
+    overflow: hidden;
+}
+
+body.modelscope-embedded:fullscreen .brand-header,
+body.modelscope-embedded:-webkit-full-screen .brand-header,
+body.immersive-mode .brand-header,
+body.modelscope-embedded:fullscreen .toolbar,
+body.modelscope-embedded:-webkit-full-screen .toolbar,
+body.immersive-mode .toolbar,
+body.modelscope-embedded:fullscreen .reader-view .sidebar,
+body.modelscope-embedded:-webkit-full-screen .reader-view .sidebar,
+body.immersive-mode .reader-view .sidebar,
+body.modelscope-embedded:fullscreen .bottom-bar,
+body.modelscope-embedded:-webkit-full-screen .bottom-bar,
+body.immersive-mode .bottom-bar {
+    display: none !important;
+}
+
+body.modelscope-embedded:fullscreen .page-main,
+body.modelscope-embedded:-webkit-full-screen .page-main,
+body.immersive-mode .page-main {
+    padding-top: 0;
+    height: 100vh;
+}
+
+body.modelscope-embedded:fullscreen .reader-view,
+body.modelscope-embedded:-webkit-full-screen .reader-view,
+body.immersive-mode .reader-view {
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+}
+
+body.modelscope-embedded:fullscreen .reader,
+body.modelscope-embedded:-webkit-full-screen .reader,
+body.immersive-mode .reader {
+    width: 100%;
+}
+
+/* 保留正文在宽屏下居中 */
+body.modelscope-embedded:fullscreen .markdown-body,
+body.modelscope-embedded:-webkit-full-screen .markdown-body,
+body.immersive-mode .markdown-body {
+    max-width: 720px;
+    margin: 0 auto;
+}
+>>>>>>> origin/master

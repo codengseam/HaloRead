@@ -7,6 +7,22 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
     <script src="js/app.js" defer></script>
+<<<<<<< HEAD
+=======
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(function (registration) {
+                        console.log('[豪书斋] Service Worker 注册成功:', registration.scope);
+                    })
+                    .catch(function (error) {
+                        console.warn('[豪书斋] Service Worker 注册失败:', error);
+                    });
+            });
+        }
+    </script>
+>>>>>>> origin/master
 </head>
 <body data-theme="day" data-font="serif" data-view="home">
     <header class="brand-header">
@@ -36,6 +52,10 @@
         <div class="toolbar-actions">
             <button id="refreshBtn" class="btn-secondary" type="button">刷新目录</button>
             <button id="settingsBtn" class="icon-btn" type="button" aria-label="阅读设置">⚙</button>
+<<<<<<< HEAD
+=======
+            <button id="immersiveBtn" class="immersive-btn" type="button" aria-label="沉浸阅读" hidden>⛶ 沉浸</button>
+>>>>>>> origin/master
             <button id="newNoteBtnToolbar" class="btn-primary" type="button">生成新笔记</button>
         </div>
     </header>

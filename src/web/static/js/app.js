@@ -35,6 +35,7 @@
         heroStats: document.getElementById('heroStats'),
         treeNav: document.getElementById('treeNav'),
         reader: document.getElementById('reader'),
+        readerContent: document.getElementById('readerContent'),
         backBtn: document.getElementById('backBtn'),
         currentBookTitle: document.getElementById('currentBookTitle'),
         newNoteBtn: document.getElementById('newNoteBtn'),
@@ -957,6 +958,10 @@
 
     function handleKeyDown(event) {
         if (event.key === 'Escape') {
+            if (isImmersiveMode()) {
+                exitImmersiveMode();
+                return;
+            }
             if (elements.settingsPanel && elements.settingsPanel.classList.contains('open')) {
                 closeSettings();
             } else if (elements.modalOverlay && elements.modalOverlay.classList.contains('open')) {
@@ -982,6 +987,8 @@
 
         initSettings();
         initSidebarDrawer();
+        initTapZones();
+        initFullscreenButtons();
         initTapToggle();
 
         if (elements.bookshelfSearchInput) {

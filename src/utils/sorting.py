@@ -98,6 +98,20 @@ def chapter_sort_key(book: str, chapter: str) -> tuple[int, int, str]:
     return (_FALLBACK_ORDER, 0, chapter)
 
 
+def is_flat_book(chapters: list[dict[str, Any]]) -> bool:
+    """判断章节列表是否为"扁平"结构（所有章节标题都是纯数字）。
+
+    空列表返回 False；任一章节标题不是纯数字也返回 False。
+    """
+    if not chapters:
+        return False
+    for ch in chapters:
+        title = str(ch.get("title", "")).strip()
+        if not title.isdigit():
+            return False
+    return True
+
+
 def sort_notes_tree(tree: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """对 tree 结构就地按规则排序并返回。
 

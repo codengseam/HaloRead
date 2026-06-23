@@ -832,6 +832,10 @@ body[data-view="reader"] .brand-header {
     -webkit-overflow-scrolling: touch;
 }
 
+.reader-content {
+    min-height: 100%;
+}
+
 .reader-placeholder {
     flex: 1;
     min-height: 60vh;
@@ -1254,6 +1258,115 @@ body.ui-hidden .bottom-bar {
 /* 首页视图隐藏底部工具栏（移动端） */
 body[data-view="home"] .bottom-bar {
     display: none;
+}
+
+/* ============ 全屏沉浸式阅读 ============ */
+.reader-tap-zones {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    pointer-events: auto;
+}
+
+body[data-view="reader"] .reader-tap-zones {
+    display: flex;
+}
+
+.tap-zone {
+    height: 100%;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.15s ease;
+}
+
+.tap-zone:active {
+    background-color: rgba(139, 90, 43, 0.06);
+}
+
+.tap-zone.prev {
+    width: 33%;
+}
+
+.tap-zone.menu {
+    width: 34%;
+}
+
+.tap-zone.next {
+    width: 33%;
+}
+
+/* 全屏按钮：在 toolbar 与底栏中复用 */
+#fullscreenBtn,
+#fullscreenBtnBottom {
+    font-size: 1.1rem;
+}
+
+/* 沉浸式模式：隐藏顶栏、底栏、滚动条，扩展阅读区 */
+body.immersive-mode {
+    overflow: hidden;
+}
+
+/* 沉浸式模式下，仅在 ui-hidden 时隐藏顶栏/工具栏/底栏；
+   中间点击切换 ui-hidden 后可唤出 UI，仿番茄小说操作逻辑 */
+body.immersive-mode.ui-hidden .brand-header,
+body.immersive-mode.ui-hidden .toolbar,
+body.immersive-mode.ui-hidden .bottom-bar {
+    display: none;
+}
+
+body.immersive-mode:not(.ui-hidden) .toolbar,
+body.immersive-mode:not(.ui-hidden) .bottom-bar {
+    z-index: 70;
+}
+
+body.immersive-mode .reader-view {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background-color: var(--bg-paper);
+}
+
+body.immersive-mode .reader {
+    height: 100vh;
+    max-height: 100vh;
+    padding: 0;
+    scroll-behavior: smooth;
+}
+
+body.immersive-mode .markdown-body {
+    max-width: 760px;
+    padding: 3rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+}
+
+body.immersive-mode .reader-tap-zones {
+    display: flex;
+    z-index: 60;
+}
+
+body.immersive-mode.ui-hidden .reader-tap-zones {
+    pointer-events: auto;
+}
+
+/* 页面翻页动画：内容区轻微平移后复位，模拟番茄小说的翻页感 */
+.page-turn-next .markdown-body {
+    animation: pageTurnNext 0.25s ease;
+}
+
+.page-turn-prev .markdown-body {
+    animation: pageTurnPrev 0.25s ease;
+}
+
+@keyframes pageTurnNext {
+    0% { transform: translateX(0); opacity: 1; }
+    40% { transform: translateX(-12px); opacity: 0.85; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pageTurnPrev {
+    0% { transform: translateX(0); opacity: 1; }
+    40% { transform: translateX(12px); opacity: 0.85; }
+    100% { transform: translateX(0); opacity: 1; }
 }
 
 /* ============ 弹窗（生成新笔记 / 提示） ============ */
