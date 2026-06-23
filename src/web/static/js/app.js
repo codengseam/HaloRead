@@ -35,6 +35,7 @@
         heroStats: document.getElementById('heroStats'),
         treeNav: document.getElementById('treeNav'),
         reader: document.getElementById('reader'),
+        readerContent: document.getElementById('readerContent'),
         backBtn: document.getElementById('backBtn'),
         currentBookTitle: document.getElementById('currentBookTitle'),
         newNoteBtn: document.getElementById('newNoteBtn'),
@@ -48,6 +49,9 @@
         toolbarChapter: document.getElementById('toolbarChapter'),
         settingsBtn: document.getElementById('settingsBtn'),
         settingsBtnBottom: document.getElementById('settingsBtnBottom'),
+        fullscreenBtn: document.getElementById('fullscreenBtn'),
+        fullscreenBtnBottom: document.getElementById('fullscreenBtnBottom'),
+        readerTapZones: document.getElementById('readerTapZones'),
         settingsPanel: document.getElementById('settingsPanel'),
         settingsOverlay: document.getElementById('settingsOverlay'),
         settingsClose: document.getElementById('settingsClose'),
@@ -394,7 +398,7 @@
         if (elements.currentBookTitle) {
             elements.currentBookTitle.textContent = (book && book.title) || bookId;
         }
-        elements.reader.innerHTML = '<div class="reader-placeholder"><p>正在加载…</p></div>';
+        if (elements.readerContent) elements.readerContent.innerHTML = '<div class="reader-placeholder"><p>正在加载…</p></div>';
         refreshTreeView();
 
         // 优先跳转到缓存页，无缓存则打开第一章
@@ -520,7 +524,7 @@
             if (match) match.classList.add('active');
         }
 
-        elements.reader.innerHTML = '<div class="reader-placeholder">正在加载笔记…</div>';
+        if (elements.readerContent) elements.readerContent.innerHTML = '<div class="reader-placeholder">正在加载笔记…</div>';
         elements.reader.scrollTop = 0;
         try {
             const encodedPath = encodeURI(path);
@@ -534,7 +538,7 @@
             const next = idx >= 0 && idx < state.flatNotes.length - 1 ? state.flatNotes[idx + 1] : null;
             const navHtml = buildChapterNavHtml(prev, next);
 
-            elements.reader.innerHTML = `<article class="markdown-body">${metaHtml}${html}</article>${navHtml}`;
+            if (elements.readerContent) elements.readerContent.innerHTML = `<article class="markdown-body">${metaHtml}${html}</article>${navHtml}`;
             bindChapterNavButtons();
 
             if (elements.toolbarChapter) {
@@ -548,7 +552,7 @@
                 saveCachedPosition(state.currentBook, path);
             }
         } catch (err) {
-            elements.reader.innerHTML = '<div class="reader-placeholder">加载失败，请重试。</div>';
+            if (elements.readerContent) elements.readerContent.innerHTML = '<div class="reader-placeholder">加载失败，请重试。</div>';
             showError('无法加载笔记内容。', err);
         }
     }
@@ -774,8 +778,168 @@
         }
     }
 
+    /* ============ 全屏沉浸式阅读 ============ */
+    function getFullscreenElement() {
+        return document.fullscreenElement
+            || document.webkitFullscreenElement
+            || document.mozFullScreenElement
+            || document.msFullscreenElement
+            || null;
+    }
+
+    function requestFullscreen(el) {
+        if (el.requestFullscreen) return el.requestFullscreen();
+        if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+        if (el.mozRequestFullScreen) return el.mozRequestFullScreen();
+        if (el.msRequestFullscreen) return el.msRequestFullscreen();
+        return Promise.reject(new Error('Fullscreen API not supported'));
+    }
+
+    function exitFullscreen() {
+        if (document.exitFullscreen) return document.exitFullscreen();
+        if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+        if (document.mozCancelFullScreen) return document.mozCancelFullScreen();
+        if (document.msExitFullscreen) return document.msExitFullscreen();
+        return Promise.reject(new Error('Fullscreen API not supported'));
+    }
+
+    function isImmersiveMode() {
+        return document.body.classList.contains('immersive-mode');
+    }
+
+    function enterImmersiveMode() {
+        document.body.classList.add('immersive-mode');
+        document.body.classList.add('ui-hidden');
+        const target = document.documentElement;
+        requestFullscreen(target).catch((err) => {
+            console.warn('无法进入全屏:', err);
+        });
+        updateFullscreenButtons();
+    }
+
+    function exitImmersiveMode() {
+        document.body.classList.remove('immersive-mode');
+        document.body.classList.remove('ui-hidden');
+        if (getFullscreenElement()) {
+            exitFullscreen().catch((err) => {
+                console.warn('无法退出全屏:', err);
+            });
+        }
+        updateFullscreenButtons();
+    }
+
+    function toggleImmersiveMode() {
+        if (state.currentView !== 'reader') return;
+        if (isImmersiveMode()) {
+            exitImmersiveMode();
+        } else {
+            enterImmersiveMode();
+        }
+    }
+
+    function updateFullscreenButtons() {
+        const label = isImmersiveMode() ? '退出全屏' : '全屏阅读';
+        if (elements.fullscreenBtn) elements.fullscreenBtn.setAttribute('aria-label', label);
+        if (elements.fullscreenBtnBottom) elements.fullscreenBtnBottom.setAttribute('aria-label', label);
+    }
+
+    function initFullscreenButtons() {
+        if (elements.fullscreenBtn) {
+            elements.fullscreenBtn.addEventListener('click', toggleImmersiveMode);
+        }
+        if (elements.fullscreenBtnBottom) {
+            elements.fullscreenBtnBottom.addEventListener('click', toggleImmersiveMode);
+        }
+        document.addEventListener('fullscreenchange', () => {
+            if (!getFullscreenElement() && isImmersiveMode()) {
+                exitImmersiveMode();
+            }
+        });
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (!getFullscreenElement() && isImmersiveMode()) {
+                exitImmersiveMode();
+            }
+        });
+    }
+
+    /* ============ 点击翻页（番茄小说式左/中/右三区） ============ */
+    function isNearTop(el) {
+        return el.scrollTop <= 2;
+    }
+
+    function isNearBottom(el) {
+        return el.scrollHeight - el.scrollTop - el.clientHeight <= 2;
+    }
+
+    function pageHeight(el) {
+        // 留一点重叠，避免切行
+        return Math.max(1, el.clientHeight - 24);
+    }
+
+    function goNextPage() {
+        if (!elements.reader) return;
+        if (isNearBottom(elements.reader)) {
+            goNextChapter();
+            return;
+        }
+        const dy = pageHeight(elements.reader);
+        triggerPageTurnAnimation('next');
+        elements.reader.scrollBy({ top: dy, behavior: 'smooth' });
+    }
+
+    function goPrevPage() {
+        if (!elements.reader) return;
+        if (isNearTop(elements.reader)) {
+            goPrevChapter();
+            return;
+        }
+        const dy = pageHeight(elements.reader);
+        triggerPageTurnAnimation('prev');
+        elements.reader.scrollBy({ top: -dy, behavior: 'smooth' });
+    }
+
+    function triggerPageTurnAnimation(direction) {
+        const article = elements.reader && elements.reader.querySelector('.markdown-body');
+        if (!article) return;
+        const className = direction === 'next' ? 'page-turn-next' : 'page-turn-prev';
+        article.classList.remove('page-turn-next', 'page-turn-prev');
+        // 强制重排以重启动画
+        void article.offsetWidth;
+        article.classList.add(className);
+        setTimeout(() => {
+            article.classList.remove(className);
+        }, 260);
+    }
+
+    function shouldIgnoreTap(target) {
+        return target.closest('a, button, input, textarea, select, .modal, .settings-panel, .sidebar');
+    }
+
+    function handleTapZone(event) {
+        if (state.currentView !== 'reader') return;
+        const zone = event.target.closest('[data-zone]');
+        if (!zone) return;
+        if (shouldIgnoreTap(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const action = zone.dataset.zone;
+        if (action === 'prev') {
+            goPrevPage();
+        } else if (action === 'next') {
+            goNextPage();
+        } else if (action === 'menu') {
+            document.body.classList.toggle('ui-hidden');
+        }
+    }
+
+    function initTapZones() {
+        if (!elements.readerTapZones) return;
+        elements.readerTapZones.addEventListener('click', handleTapZone);
+    }
+
     /* ============ 点击中央切换 UI（移动端） ============ */
     function initTapToggle() {
+        // 已有触控层覆盖，旧逻辑仅作为桌面端/无触控层时的兜底保留
         if (!elements.reader) return;
         elements.reader.addEventListener('click', (e) => {
             if (window.innerWidth > 768) return;
@@ -957,6 +1121,10 @@
 
     function handleKeyDown(event) {
         if (event.key === 'Escape') {
+            if (isImmersiveMode()) {
+                exitImmersiveMode();
+                return;
+            }
             if (elements.settingsPanel && elements.settingsPanel.classList.contains('open')) {
                 closeSettings();
             } else if (elements.modalOverlay && elements.modalOverlay.classList.contains('open')) {
@@ -976,12 +1144,14 @@
 
     function init() {
         if (typeof marked === 'undefined') {
-            elements.reader.innerHTML = '<div class="reader-placeholder">Markdown 渲染组件加载失败，请检查网络连接。</div>';
+            if (elements.readerContent) elements.readerContent.innerHTML = '<div class="reader-placeholder">Markdown 渲染组件加载失败，请检查网络连接。</div>';
             console.error('marked.js is not loaded');
         }
 
         initSettings();
         initSidebarDrawer();
+        initTapZones();
+        initFullscreenButtons();
         initTapToggle();
 
         if (elements.bookshelfSearchInput) {
