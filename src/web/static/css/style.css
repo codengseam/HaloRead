@@ -17,6 +17,7 @@
     /* 阅读参数（可通过 JS / 设置面板调节） */
     --reader-font-size: 18px;
     --reader-line-height: 1.9;
+    --reader-paragraph-spacing: 1em;
 }
 
 /* 主题：白天（默认） */
@@ -109,8 +110,8 @@ body {
 
 /* ===== 品牌页头 ===== */
 .brand-header {
-    position: sticky;
-    top: 0;
+    position: relative;
+    flex-shrink: 0;
     z-index: 100;
     display: flex;
     align-items: center;
@@ -215,6 +216,7 @@ body {
     justify-content: space-between;
     gap: 1rem;
     height: 56px;
+    flex-shrink: 0;
     padding: 0 1.25rem;
     background-color: var(--bg-toolbar);
     border-bottom: 1px solid var(--border);
@@ -359,6 +361,8 @@ body {
     flex: 1;
     overflow: hidden;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 /* 首页视图允许滚动 */
@@ -371,6 +375,8 @@ body[data-view="home"] .page-main {
 .home-view {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .home-view[hidden],
@@ -638,13 +644,15 @@ body[data-view="reader"] .brand-header {
 /* ===== 阅读视图 ===== */
 .reader-view {
     display: flex;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
 }
 
 .layout {
     display: flex;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -879,7 +887,7 @@ body[data-view="reader"] .brand-header {
 }
 
 .markdown-body p {
-    margin: 0 0 1em 0;
+    margin: 0 0 var(--reader-paragraph-spacing) 0;
     text-indent: 2em;
 }
 
@@ -1202,10 +1210,7 @@ body[data-view="reader"] .brand-header {
 /* ============ 底部工具栏（移动端） ============ */
 .bottom-bar {
     display: none;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    flex-shrink: 0;
     height: 50px;
     background-color: var(--bg-toolbar);
     border-top: 1px solid var(--border);
@@ -1239,11 +1244,11 @@ body[data-view="reader"] .brand-header {
 
 /* 顶栏/底栏隐藏状态（移动端点击中央切换） */
 body.ui-hidden .toolbar {
-    transform: translateY(-100%);
+    display: none;
 }
 
 body.ui-hidden .bottom-bar {
-    transform: translateY(100%);
+    display: none;
 }
 
 /* 首页视图隐藏底部工具栏（移动端） */
@@ -1564,7 +1569,8 @@ body[data-view="home"] .bottom-bar {
 
     .reader-view {
         flex-direction: column;
-        height: 100%;
+        flex: 1;
+        min-height: 0;
     }
 
     .sidebar {
@@ -1589,7 +1595,7 @@ body[data-view="home"] .bottom-bar {
 
     .reader {
         max-height: none;
-        padding-bottom: 50px;
+        padding-bottom: 1rem;
     }
 
     .markdown-body {

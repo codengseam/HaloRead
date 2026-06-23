@@ -6,7 +6,8 @@
         theme: 'day',
         font: 'serif',
         fontSize: 18,
-        lineHeight: 1.9
+        lineHeight: 1.9,
+        paragraphSpacing: 1.0
     };
 
     const state = {
@@ -56,6 +57,8 @@
         fontSizeVal: document.getElementById('fontSizeVal'),
         lineHeightRange: document.getElementById('lineHeightRange'),
         lineHeightVal: document.getElementById('lineHeightVal'),
+        paragraphSpacingRange: document.getElementById('paragraphSpacingRange'),
+        paragraphSpacingVal: document.getElementById('paragraphSpacingVal'),
         resetSettingsBtn: document.getElementById('resetSettingsBtn'),
         prevBtnBottom: document.getElementById('prevBtnBottom'),
         nextBtnBottom: document.getElementById('nextBtnBottom'),
@@ -630,11 +633,14 @@
         document.body.setAttribute('data-font', settings.font);
         document.documentElement.style.setProperty('--reader-font-size', settings.fontSize + 'px');
         document.documentElement.style.setProperty('--reader-line-height', String(settings.lineHeight));
+        document.documentElement.style.setProperty('--reader-paragraph-spacing', settings.paragraphSpacing + 'em');
 
         if (elements.fontSizeRange) elements.fontSizeRange.value = settings.fontSize;
         if (elements.lineHeightRange) elements.lineHeightRange.value = settings.lineHeight;
+        if (elements.paragraphSpacingRange) elements.paragraphSpacingRange.value = settings.paragraphSpacing;
         if (elements.fontSizeVal) elements.fontSizeVal.textContent = settings.fontSize + 'px';
         if (elements.lineHeightVal) elements.lineHeightVal.textContent = settings.lineHeight;
+        if (elements.paragraphSpacingVal) elements.paragraphSpacingVal.textContent = settings.paragraphSpacing.toFixed(1) + 'em';
 
         if (elements.fontBtns) {
             elements.fontBtns.querySelectorAll('button').forEach((btn) => {
@@ -712,6 +718,15 @@
             elements.lineHeightRange.addEventListener('input', (e) => {
                 const s = loadSettings();
                 s.lineHeight = parseFloat(e.target.value);
+                saveSettings(s);
+                applySettings(s);
+            });
+        }
+
+        if (elements.paragraphSpacingRange) {
+            elements.paragraphSpacingRange.addEventListener('input', (e) => {
+                const s = loadSettings();
+                s.paragraphSpacing = parseFloat(e.target.value);
                 saveSettings(s);
                 applySettings(s);
             });
