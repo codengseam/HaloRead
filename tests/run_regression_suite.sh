@@ -60,7 +60,7 @@ else
     step "site/js/app.js 语法正确" 0
 fi
 
-# ---------- 3. 沉浸模式关键代码 + 防横屏（BUG-003） ----------
+# ---------- 3. 沉浸模式关键代码 + 防横屏/防强制全屏（BUG-003/BUG-020 回归） ----------
 echo "[3/9] 沉浸模式回归检查"
 APP_JS="site/js/app.js"
 HAS_TOGGLE=$(grep -c "toggleImmersiveMode" "$APP_JS" 2>/dev/null || true)
@@ -69,10 +69,14 @@ HAS_EXIT=$(grep -c "exitImmersiveMode" "$APP_JS" 2>/dev/null || true)
 HAS_INIT=$(grep -c "initImmersive" "$APP_JS" 2>/dev/null || true)
 NO_LOCK=$(grep -c "screen.orientation.lock\|lockOrientation" "$APP_JS" 2>/dev/null || true)
 NO_LOCK=${NO_LOCK:-0}
+NO_FULLSCREEN=$(grep -c "requestFullscreen\|webkitRequestFullscreen\|msRequestFullscreen\|exitFullscreen\|webkitExitFullscreen\|msExitFullscreen" "$APP_JS" 2>/dev/null || true)
+NO_FULLSCREEN=${NO_FULLSCREEN:-0}
 step "含 toggleImmersiveMode/enter/exit/initImmersive ($HAS_TOGGLE/$HAS_ENTER/$HAS_EXIT/$HAS_INIT)" \
     "$([ "$HAS_TOGGLE" -ge 1 ] && [ "$HAS_ENTER" -ge 1 ] && [ "$HAS_EXIT" -ge 1 ] && [ "$HAS_INIT" -ge 1 ] && echo 1 || echo 0)"
 step "不调用 screen.orientation.lock (防横屏, found=$NO_LOCK)" \
     "$([ "$NO_LOCK" = "0" ] && echo 1 || echo 0)"
+step "不调用 Fullscreen API (防部分浏览器强制横屏, found=$NO_FULLSCREEN)" \
+    "$([ "$NO_FULLSCREEN" = "0" ] && echo 1 || echo 0)"
 
 # ---------- 4. 构建站点（BUG-011/004） ----------
 echo "[4/9] 构建静态站点"

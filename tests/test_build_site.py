@@ -493,3 +493,5 @@ def test_build_site_css_has_reader_features():
         assert ".immersive-mode" in css
         assert ".immersive-btn" in css
         assert ".auto-scroll-btn" not in css
+        assert ".markdown-body pre code" in css
+        assert "white-space: pre-wrap" in css

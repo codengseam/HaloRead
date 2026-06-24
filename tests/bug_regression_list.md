@@ -251,3 +251,21 @@
 - **涉及文件**：`src/web/static-site/index.html`、`src/web/static-site/css/style.css`、`src/web/static-site/js/app.js`、`src/web/static-site/sw.js`
 - **回归测试**：`tests/test_reader_features.js` 测试1/5/6/7/9/13/14/15/16 + 浏览器移动端验收
 - **教训**：移动端交互问题（触控、缓存恢复、视口适配）必须真机或模拟器验收；Service Worker cache-first 策略下，每次前端关键修复都要升级 `CACHE_NAME`，否则手机端会持续看到幽灵旧版。
+
+## BUG-021：沉浸模式触发横屏 + 代码块仍需手动滑动
+
+- **首次出现**：2026-06-24（BUG-020 修复后的移动端验收中复现）
+- **频次**：1（已修复并补充回归测试）
+- **现象**：
+  1. 小米原生浏览器点击沉浸按钮后，页面被强制切换为横屏阅读，即便用户已锁定竖屏
+  2. Markdown 代码块虽已支持横向滑动，但用户期望在手机上自动换行，无需滑动即可看全
+- **根因**：
+  1. 之前修复只禁用了 `screen.orientation.lock`，但保留了 `requestFullscreen` 作为「可选增强」；在小米/部分国产浏览器中，`requestFullscreen(document.documentElement)` 会触发系统级全屏并强制横屏
+  2. 代码块 `white-space: pre` 阻止自动换行，依赖横向滚动查看长代码
+- **修复**：
+  1. 彻底移除 Fullscreen API 调用（`requestFullscreen`/`exitFullscreen` 及其 vendor 前缀），沉浸模式改为纯 CSS 实现，不再触发任何系统级方向变化
+  2. `.markdown-body pre code` 改为 `white-space: pre-wrap` + `word-wrap: break-word` + `overflow-wrap: break-word` + `word-break: break-word`，让代码根据屏幕宽度自动换行
+  3. 回归测试脚本 `run_regression_suite.sh` 增加「不调用 Fullscreen API」断言；`test_reader_features.js` 测试11/15 同步更新
+- **涉及文件**：`src/web/static-site/js/app.js`、`src/web/static-site/css/style.css`、`tests/test_reader_features.js`、`tests/test_build_site.py`、`tests/run_regression_suite.sh`
+- **回归测试**：`tests/test_reader_features.js` 测试11/15、`tests/run_regression_suite.sh` 第3步
+- **教训**：「可选增强」的 Fullscreen API 在国产浏览器上并不安全，任何可能触发方向变化或系统全屏的 API 都应在移动端阅读器中禁用；代码块体验应优先自动换行，其次才保留横向滚动作为兜底。

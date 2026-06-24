@@ -1022,8 +1022,10 @@ body[data-view="reader"] .brand-header {
     padding: 0;
     background: none;
     color: var(--ink-primary);
-    white-space: pre;
-    word-wrap: normal;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .markdown-body hr {

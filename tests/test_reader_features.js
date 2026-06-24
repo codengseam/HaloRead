@@ -446,12 +446,14 @@ async function runTest() {
         dom.window.close();
     }
 
-    console.log('\n=== 测试11：沉浸模式不锁定屏幕方向（防横屏回归） ===');
+    console.log('\n=== 测试11：沉浸模式不触发系统全屏/不锁定方向（防横屏回归） ===');
     {
         const appText = fs.readFileSync(path.join(SITE_DIR, 'js/app.js'), 'utf-8');
-        // 关键回归断言：不得调用 screen.orientation.lock，避免手机端被强制横屏
+        // 关键回归断言：不得调用任何可能触发方向变化或系统全屏的 API
         assert(!/screen\.orientation\.lock/.test(appText), '不调用 screen.orientation.lock');
         assert(!/lockOrientation/.test(appText), '不调用旧版 lockOrientation');
+        assert(!/requestFullscreen|webkitRequestFullscreen|msRequestFullscreen/.test(appText), '不调用 requestFullscreen 系列');
+        assert(!/exitFullscreen|webkitExitFullscreen|msExitFullscreen/.test(appText), '不调用 exitFullscreen 系列');
         assert(appText.includes('toggleImmersiveMode'), '含 toggleImmersiveMode 函数');
         assert(appText.includes('enterImmersiveMode'), '含 enterImmersiveMode 函数');
         assert(appText.includes('exitImmersiveMode'), '含 exitImmersiveMode 函数');
@@ -514,7 +516,7 @@ async function runTest() {
         dom.window.close();
     }
 
-    console.log('\n=== 测试15：点击代码块不触发阅读区翻页 ===');
+    console.log('\n=== 测试15：代码块移动端自动换行且点击不翻页 ===');
     {
         const { dom, window, document } = await buildDom();
         await enterReader(document, window);
@@ -532,14 +534,12 @@ async function runTest() {
         Object.defineProperty(clickEvent, 'target', { value: code, enumerable: true });
         code.dispatchEvent(clickEvent);
 
-        // 由于 handleReaderTap 依赖 event.target，这里通过 shouldExcludeTap 的单元方式验证
-        // 触发 reader 的 click，目标为 code
-        let tapFired = false;
-        const original = window.handleReaderTap;
-        // 简单验证：code 元素在 shouldExcludeTap 排除列表内
-        const { handleReaderTap } = window;
-        // 如果 handleReaderTap 不存在则通过代码存在性断言
+        // 验证 CSS 代码块自动换行
+        const cssText = fs.readFileSync(path.join(SITE_DIR, 'css/style.css'), 'utf-8');
         const appText = fs.readFileSync(path.join(SITE_DIR, 'js/app.js'), 'utf-8');
+        assert(cssText.includes('.markdown-body pre code'), '含 .markdown-body pre code 规则');
+        assert(cssText.includes('white-space: pre-wrap'), '代码块 white-space 为 pre-wrap');
+        assert(/word-wrap:\s*break-word|overflow-wrap:\s*break-word/.test(cssText), '代码块允许换行断词');
         assert(appText.includes("pre, code"), 'shouldExcludeTap 排除 pre/code');
 
         dom.window.close();

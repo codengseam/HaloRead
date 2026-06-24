@@ -1286,67 +1286,19 @@
     }
 
     /* ============ 沉浸阅读模式 ============ */
-    // 仅用 CSS .immersive-mode 隐藏 UI + 内容占满；不锁定 screen.orientation，避免手机端被强制横屏。
-    // Fullscreen API 作为可选增强（多 vendor 兼容），失败时回退到纯 CSS 沉浸状态。
-    function getFullscreenElement() {
-        return document.fullscreenElement ||
-            document.webkitFullscreenElement ||
-            document.msFullscreenElement ||
-            null;
-    }
-
-    function requestFullscreenSafe(el) {
-        const fn = el.requestFullscreen ||
-            el.webkitRequestFullscreen ||
-            el.msRequestFullscreen;
-        if (typeof fn === 'function') {
-            try {
-                const ret = fn.call(el);
-                if (ret && typeof ret.then === 'function') {
-                    ret.catch(function () { /* 安全策略拒绝时静默回退到 CSS 沉浸 */ });
-                }
-            } catch (e) { /* 静默回退 */ }
-        }
-    }
-
-    function exitFullscreenSafe() {
-        const fn = document.exitFullscreen ||
-            document.webkitExitFullscreen ||
-            document.msExitFullscreen;
-        if (typeof fn === 'function') {
-            try {
-                const ret = fn.call(document);
-                if (ret && typeof ret.then === 'function') {
-                    ret.catch(function () { /* 静默 */ });
-                }
-            } catch (e) { /* 静默 */ }
-        }
-    }
-
-    // 进入沉浸后的短暂保护期，避免某些环境（jsdom / 旧浏览器 / iframe）
-    // 在 requestFullscreen 调用后立即触发 fullscreenchange 且 fullscreenElement 为空，
-    // 导致状态被错误地同步回非沉浸。
-    let immersiveEnterLock = false;
-
+    // 纯 CSS 沉浸：仅用 .immersive-mode 隐藏 UI + 内容占满。
+    // 不调用任何系统全屏 API，避免小米/部分浏览器强制横屏。
     function enterImmersiveMode() {
         document.body.classList.add('immersive-mode');
         // 进入沉浸时隐藏 UI 工具栏，让正文占满
         document.body.classList.add('ui-hidden');
         updateImmersiveBtn(true);
-        // 尝试请求系统全屏作为增强（iframe 内可能被拒，不影响 CSS 沉浸）
-        immersiveEnterLock = true;
-        requestFullscreenSafe(document.documentElement);
-        // 100ms 后解除保护，正常响应 ESC 退出全屏的同步事件
-        setTimeout(() => { immersiveEnterLock = false; }, 100);
     }
 
     function exitImmersiveMode() {
         document.body.classList.remove('immersive-mode');
         document.body.classList.remove('ui-hidden');
         updateImmersiveBtn(false);
-        if (getFullscreenElement()) {
-            exitFullscreenSafe();
-        }
     }
 
     function toggleImmersiveMode() {
@@ -1369,18 +1321,6 @@
             elements.immersiveBtn.setAttribute('aria-pressed', 'false');
             elements.immersiveBtn.addEventListener('click', toggleImmersiveMode);
         }
-        // ESC 退出系统全屏时，浏览器会触发 fullscreenchange；同步 CSS 沉浸状态，避免界面不一致
-        function syncFullscreenState() {
-            if (immersiveEnterLock) return;
-            if (!getFullscreenElement() && document.body.classList.contains('immersive-mode')) {
-                document.body.classList.remove('immersive-mode');
-                document.body.classList.remove('ui-hidden');
-                updateImmersiveBtn(false);
-            }
-        }
-        document.addEventListener('fullscreenchange', syncFullscreenState);
-        document.addEventListener('webkitfullscreenchange', syncFullscreenState);
-        document.addEventListener('msfullscreenchange', syncFullscreenState);
     }
 
     /* ============ 弹窗（静态站点提示） ============ */

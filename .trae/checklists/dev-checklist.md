@@ -37,6 +37,7 @@
 - [ ] 边界场景有覆盖：空输入、超长输入、非法路径、并发等
 - [ ] Mock 模式（`DEEP_READING_MOCK=1`）下端到端流程能跑通
 - [ ] 修复了会复发的代码/数据 bug 时，已补充回归测试或更新 `tests/bug_regression_list.md`
+- [ ] 移动端阅读器改动已验收：不调用 `Fullscreen API` / `screen.orientation.lock`，代码块优先 `pre-wrap` 自动换行（BUG-021）
 
 ## 四、依赖与配置
 

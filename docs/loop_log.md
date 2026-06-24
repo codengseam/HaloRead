@@ -126,6 +126,27 @@
 - 在 CI workflow 中增加 `pip install -r requirements.txt` 与 `npm install` 步骤，确保回归测试可执行。
 - 前端关键改动后， checklist 强制提醒升级 `CACHE_NAME`。
 
+### 2026-06-24 沉浸模式横屏与代码块换行修复（BUG-021）
+
+**改动范围**
+- `src/web/static-site/js/app.js`：彻底移除 Fullscreen API 调用（requestFullscreen/exitFullscreen 及 vendor 前缀），沉浸模式改为纯 CSS 实现，避免小米等浏览器强制横屏。
+- `src/web/static-site/css/style.css`：`.markdown-body pre code` 改为 `white-space: pre-wrap` 与断词属性，让代码块在手机端自动换行。
+- `tests/test_reader_features.js`、`tests/test_build_site.py`、`tests/run_regression_suite.sh`：补充「不调用 Fullscreen API」与「代码块自动换行」回归断言。
+- `tests/bug_regression_list.md`、`docs/loop_log.md`：新增 BUG-021 记录与开发沉淀。
+
+**验证结果**
+- `python scripts/check_book_structure.py --output output --strict`：✅ 通过
+- `pytest -q`：✅ 通过
+- `node tests/test_reader_features.js`：✅ 通过
+- `bash tests/run_regression_suite.sh`：✅ 通过
+
+**暴露的共性问题**
+- 之前把 Fullscreen API 当作「可选增强」，实际在国产浏览器上并不安全，会强制横屏；移动端阅读器应彻底禁用任何可能影响方向的系统 API。
+- 代码块体验应优先自动换行，横向滚动仅作为兜底。
+
+**后续行动**
+- 在 `.trae/checklists/dev-checklist.md` 中增加移动端验收项：禁用 Fullscreen API / orientation.lock，代码块优先 pre-wrap。
+
 ### 第5章优化沉淀（已应用到项目文件）
 1. **RULES.md §三语言风格**：现代术语黑名单扩充（博弈/话术/智商掉线）；新增跨文化映照史实核验规则（禁用演义虚构情节/禁张冠李戴/禁因果错置）；模板过渡句黑名单扩充（还有一层背景须交代/另有一层史料背景须说明）。
 2. **quality.py**：AI_PATTERNS_SOFT 扩充（这事说明/还有一层背景须交代/另有一层.*须说明）；MODERN_JARGON 扩充（智商.*掉线/话术）。
