@@ -557,6 +557,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--report", default=None, help="输出 Markdown 报告的路径"
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="严格模式：任何 P0/P1/P2 问题都返回 1（合并/推送前使用）",
+    )
     args = parser.parse_args(argv)
 
     issues, _ = check_book_structure(args.output)
@@ -571,9 +576,15 @@ def main(argv: list[str] | None = None) -> int:
         write_report(args.report, issues)
         print(f"\n报告已写入: {args.report}")
 
-    # 存在 P0/P1 问题时返回 1，P2 不阻断
+    # 默认：存在 P0/P1 问题时返回 1，P2 不阻断
+    blocking_severities = {"P0", "P1"}
+    if args.strict:
+        blocking_severities = {"P0", "P1", "P2"}
+
     for issue in issues:
-        if issue.severity in ("P0", "P1"):
+        if issue.severity in blocking_severities:
+            if args.strict:
+                print("\n[ERROR] --strict 模式：存在 P0/P1/P2 问题，请在合并/推送前全部修复。")
             return 1
     return 0
 
