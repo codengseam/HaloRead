@@ -410,3 +410,84 @@ def test_stats_includes_categories():
         assert "categories" in data["stats"]
         assert isinstance(data["stats"]["categories"], int)
         assert data["stats"]["categories"] == 1
+
+
+def test_build_site_copies_static_assets():
+    """构建时从 src/web/static-site/ 同步 html/css/js/sw 到 site/。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+
+        assert (site_dir / "index.html").exists()
+        assert (site_dir / "css" / "style.css").exists()
+        assert (site_dir / "js" / "app.js").exists()
+        assert (site_dir / "sw.js").exists()
+
+
+def test_build_site_static_assets_match_source():
+    """site/ 下的静态产物与 src/web/static-site/ 源文件一致。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+
+        root = Path(__file__).parent.parent
+        source_dir = root / "src" / "web" / "static-site"
+        assert (site_dir / "index.html").read_text(encoding="utf-8") == (
+            source_dir / "index.html"
+        ).read_text(encoding="utf-8")
+        assert (site_dir / "css" / "style.css").read_text(encoding="utf-8") == (
+            source_dir / "css" / "style.css"
+        ).read_text(encoding="utf-8")
+        assert (site_dir / "js" / "app.js").read_text(encoding="utf-8") == (
+            source_dir / "js" / "app.js"
+        ).read_text(encoding="utf-8")
+
+
+def test_build_site_index_html_has_reader_features():
+    """index.html 包含阅读增强功能所需 DOM 元素。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+
+        html = (site_dir / "index.html").read_text(encoding="utf-8")
+        assert 'id="wallpaperBtns"' in html
+        assert 'id="autoScrollSpeedRange"' in html
+        assert 'id="immersiveBtn"' in html
+        assert 'id="autoScrollBtn"' in html
+
+
+def test_build_site_app_js_has_reader_features():
+    """app.js 包含自动阅读、沉浸模式、壁纸切换相关函数。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+
+        app_js = (site_dir / "js" / "app.js").read_text(encoding="utf-8")
+        assert "function initAutoScroll" in app_js
+        assert "function initImmersive" in app_js
+        assert "function toggleImmersiveMode" in app_js
+        assert "function applySettings" in app_js
+        assert "data-wallpaper" in app_js
+
+
+def test_build_site_css_has_reader_features():
+    """style.css 包含壁纸、自动阅读、沉浸模式相关样式。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_dir = Path(tmp) / "output"
+        site_dir = Path(tmp) / "site"
+        _create_sample_output(output_dir)
+        build_site(str(output_dir), str(site_dir))
+
+        css = (site_dir / "css" / "style.css").read_text(encoding="utf-8")
+        assert 'body[data-wallpaper="bamboo"]' in css
+        assert ".auto-scroll-btn" in css
+        assert ".immersive-mode" in css
+        assert ".immersive-btn" in css
