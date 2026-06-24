@@ -7,7 +7,12 @@
         font: 'serif',
         fontSize: 18,
         lineHeight: 1.9,
-        paragraphSpacing: 1.0
+        paragraphSpacing: 1.0,
+        wallpaper: 'none',
+        wallpaperOpacity: 0.6,
+        pageMode: 'tap',
+        autoScroll: false,
+        autoScrollSpeed: 50
     };
 
     const state = {
@@ -72,7 +77,15 @@
         bookInput: document.getElementById('bookInput'),
         chapterInput: document.getElementById('chapterInput'),
         eventInput: document.getElementById('eventInput'),
-        submitBtn: document.getElementById('submitBtn')
+        submitBtn: document.getElementById('submitBtn'),
+        immersiveBtn: document.getElementById('immersiveBtn'),
+        wallpaperBtns: document.getElementById('wallpaperBtns'),
+        wallpaperOpacityRange: document.getElementById('wallpaperOpacityRange'),
+        wallpaperOpacityVal: document.getElementById('wallpaperOpacityVal'),
+        pageModeBtns: document.getElementById('pageModeBtns'),
+        autoScrollBtn: document.getElementById('autoScrollBtn'),
+        autoScrollSpeedRange: document.getElementById('autoScrollSpeedRange'),
+        autoScrollSpeedVal: document.getElementById('autoScrollSpeedVal')
     };
 
     function escapeHtml(text) {
@@ -367,13 +380,23 @@
         state.currentView = view;
         document.body.dataset.view = view;
         if (view === 'home') {
+            pauseAutoScroll();
+            // 返回首页时退出沉浸模式，避免 immersive-mode 影响 home 视图布局
+            if (document.body.classList.contains('immersive-mode')) {
+                exitImmersiveMode();
+            }
             elements.homeView.hidden = false;
             elements.readerView.hidden = true;
             document.body.style.overflow = '';
+            if (elements.autoScrollBtn) elements.autoScrollBtn.hidden = true;
+            if (elements.immersiveBtn) elements.immersiveBtn.hidden = true;
         } else {
             elements.homeView.hidden = true;
             elements.readerView.hidden = false;
             document.body.style.overflow = 'hidden';
+            if (elements.autoScrollBtn) elements.autoScrollBtn.hidden = false;
+            // 沉浸按钮在阅读视图可见（所有环境，不限于魔搭嵌入）
+            if (elements.immersiveBtn) elements.immersiveBtn.hidden = false;
         }
     }
 
@@ -501,6 +524,7 @@
     function goPrevChapter() {
         const idx = state.flatNotes.findIndex((n) => n.path === state.activePath);
         if (idx > 0) {
+            pauseAutoScroll();
             loadNote(state.flatNotes[idx - 1].path);
         }
     }
@@ -508,12 +532,14 @@
     function goNextChapter() {
         const idx = state.flatNotes.findIndex((n) => n.path === state.activePath);
         if (idx >= 0 && idx < state.flatNotes.length - 1) {
+            pauseAutoScroll();
             loadNote(state.flatNotes[idx + 1].path);
         }
     }
 
     async function loadNote(path, targetElement) {
         if (!path) return;
+        pauseAutoScroll();
         state.activePath = path;
 
         const allLeaves = elements.treeNav.querySelectorAll('.tree-leaf');
@@ -645,9 +671,12 @@
     function applySettings(settings) {
         document.body.setAttribute('data-theme', settings.theme);
         document.body.setAttribute('data-font', settings.font);
+        document.body.setAttribute('data-wallpaper', settings.wallpaper);
+        document.body.setAttribute('data-page-mode', settings.pageMode);
         document.documentElement.style.setProperty('--reader-font-size', settings.fontSize + 'px');
         document.documentElement.style.setProperty('--reader-line-height', String(settings.lineHeight));
         document.documentElement.style.setProperty('--reader-paragraph-spacing', settings.paragraphSpacing + 'em');
+        document.documentElement.style.setProperty('--reader-wallpaper-opacity', String(settings.wallpaperOpacity));
 
         if (elements.fontSizeRange) elements.fontSizeRange.value = settings.fontSize;
         if (elements.lineHeightRange) elements.lineHeightRange.value = settings.lineHeight;
@@ -655,6 +684,10 @@
         if (elements.fontSizeVal) elements.fontSizeVal.textContent = settings.fontSize + 'px';
         if (elements.lineHeightVal) elements.lineHeightVal.textContent = settings.lineHeight;
         if (elements.paragraphSpacingVal) elements.paragraphSpacingVal.textContent = settings.paragraphSpacing.toFixed(1) + 'em';
+        if (elements.wallpaperOpacityRange) elements.wallpaperOpacityRange.value = settings.wallpaperOpacity;
+        if (elements.wallpaperOpacityVal) elements.wallpaperOpacityVal.textContent = settings.wallpaperOpacity.toFixed(1);
+        if (elements.autoScrollSpeedRange) elements.autoScrollSpeedRange.value = settings.autoScrollSpeed;
+        if (elements.autoScrollSpeedVal) elements.autoScrollSpeedVal.textContent = String(settings.autoScrollSpeed);
 
         if (elements.fontBtns) {
             elements.fontBtns.querySelectorAll('button').forEach((btn) => {
@@ -666,9 +699,20 @@
                 btn.classList.toggle('active', btn.dataset.theme === settings.theme);
             });
         }
+        if (elements.wallpaperBtns) {
+            elements.wallpaperBtns.querySelectorAll('button').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.wallpaper === settings.wallpaper);
+            });
+        }
+        if (elements.pageModeBtns) {
+            elements.pageModeBtns.querySelectorAll('button').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.pageMode === settings.pageMode);
+            });
+        }
     }
 
     function openSettings() {
+        pauseAutoScroll();
         elements.settingsPanel.classList.add('open');
         elements.settingsPanel.setAttribute('aria-hidden', 'false');
         elements.settingsOverlay.classList.add('open');
@@ -746,8 +790,49 @@
             });
         }
 
+        if (elements.wallpaperBtns) {
+            elements.wallpaperBtns.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-wallpaper]');
+                if (!btn) return;
+                const s = loadSettings();
+                s.wallpaper = btn.dataset.wallpaper;
+                saveSettings(s);
+                applySettings(s);
+            });
+        }
+
+        if (elements.wallpaperOpacityRange) {
+            elements.wallpaperOpacityRange.addEventListener('input', (e) => {
+                const s = loadSettings();
+                s.wallpaperOpacity = parseFloat(e.target.value);
+                saveSettings(s);
+                applySettings(s);
+            });
+        }
+
+        if (elements.pageModeBtns) {
+            elements.pageModeBtns.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-page-mode]');
+                if (!btn) return;
+                const s = loadSettings();
+                s.pageMode = btn.dataset.pageMode;
+                saveSettings(s);
+                applySettings(s);
+            });
+        }
+
+        if (elements.autoScrollSpeedRange) {
+            elements.autoScrollSpeedRange.addEventListener('input', (e) => {
+                const s = loadSettings();
+                s.autoScrollSpeed = parseInt(e.target.value, 10);
+                saveSettings(s);
+                applySettings(s);
+            });
+        }
+
         if (elements.resetSettingsBtn) {
             elements.resetSettingsBtn.addEventListener('click', () => {
+                pauseAutoScroll();
                 saveSettings(DEFAULT_SETTINGS);
                 applySettings(DEFAULT_SETTINGS);
             });
@@ -779,18 +864,334 @@
         }
     }
 
-    /* ============ 点击中央切换 UI（移动端） ============ */
-    function initTapToggle() {
+    /* ============ 翻页交互（点击分区 + 滑动） ============ */
+    // 模块级标志：touch 触发的轻点已处理时，阻止后续 click 重复触发
+    let tapHandledByTouch = false;
+    // touchstart 起点信息，用于 touchend 判断轻点 vs 滑动
+    let touchStartInfo = null;
+    const TAP_MOVE_THRESHOLD = 10; // 位移阈值（px）
+    const TAP_TIME_THRESHOLD = 300; // 时长阈值（ms）
+
+    // 是否应排除当前点击目标（链接/按钮/输入/弹层打开/文字选中）
+    function shouldExcludeTap(target) {
+        if (!target) return true;
+        const tag = target.tagName;
+        if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            return true;
+        }
+        // 排除书架卡片、目录叶子、章末导航按钮、搜索结果等可交互元素
+        if (target.closest('a, button, input, textarea, select, .book-card, .tree-leaf, .chapter-btn, .search-result-title')) {
+            return true;
+        }
+        // 弹层打开时不翻页
+        if (elements.settingsPanel && elements.settingsPanel.classList.contains('open')) return true;
+        if (elements.sidebar && elements.sidebar.classList.contains('open')) return true;
+        if (elements.modalOverlay && elements.modalOverlay.classList.contains('open')) return true;
+        // 文字选中时不翻页
+        try {
+            if (window.getSelection && window.getSelection().toString()) return true;
+        } catch (err) {
+            // 跨域 iframe 可能抛错，忽略
+        }
+        return false;
+    }
+
+    // 翻页：滚动一屏的 85%
+    function pageByDirection(direction) {
         if (!elements.reader) return;
-        elements.reader.addEventListener('click', (e) => {
-            if (window.innerWidth > 768) return;
+        const distance = elements.reader.clientHeight * 0.85;
+        const top = direction === 'prev' ? -distance : distance;
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        elements.reader.scrollBy({
+            top: top,
+            behavior: prefersReduced ? 'auto' : 'smooth'
+        });
+    }
+
+    // 统一点击处理入口
+    function handleReaderTap(e) {
+        if (!elements.reader) return;
+        // 仅阅读视图响应
+        if (state.currentView !== 'reader') return;
+        if (shouldExcludeTap(e.target)) return;
+
+        const isMobile = window.innerWidth <= 768;
+        const rect = elements.reader.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const width = rect.width;
+
+        if (isMobile) {
+            // 移动端：左 25% 上一屏、中 50% 切换 UI、右 25% 下一屏
+            if (x < width * 0.25) {
+                pauseAutoScroll();
+                pageByDirection('prev');
+            } else if (x > width * 0.75) {
+                pauseAutoScroll();
+                pageByDirection('next');
+            } else {
+                document.body.classList.toggle('ui-hidden');
+            }
+        } else {
+            // 桌面端：仅中央点击切换 UI（沿用原行为，避免破坏桌面阅读体验）
             const vh = window.innerHeight;
             const y = e.clientY;
             if (y < vh * 0.35 || y > vh * 0.65) return;
-            const tag = e.target.tagName;
-            if (tag === 'A' || tag === 'BUTTON' || e.target.closest('a, button')) return;
             document.body.classList.toggle('ui-hidden');
+        }
+    }
+
+    function initReaderTap() {
+        if (!elements.reader) return;
+
+        // click 统一入口（桌面端主要走这里）
+        elements.reader.addEventListener('click', (e) => {
+            if (tapHandledByTouch) {
+                // 本次点击已由 touchend 处理，跳过
+                tapHandledByTouch = false;
+                return;
+            }
+            handleReaderTap(e);
         });
+
+        // touch 区分轻点与滑动（移动端）
+        elements.reader.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) {
+                touchStartInfo = null;
+                return;
+            }
+            const t = e.touches[0];
+            touchStartInfo = {
+                x: t.clientX,
+                y: t.clientY,
+                time: Date.now()
+            };
+        }, { passive: true });
+
+        elements.reader.addEventListener('touchend', (e) => {
+            if (!touchStartInfo) return;
+            const start = touchStartInfo;
+            touchStartInfo = null;
+            const t = e.changedTouches[0];
+            if (!t) return;
+            const dx = t.clientX - start.x;
+            const dy = t.clientY - start.y;
+            const moved = Math.sqrt(dx * dx + dy * dy);
+            const elapsed = Date.now() - start.time;
+
+            // 位移小且时长短视为轻点
+            if (moved < TAP_MOVE_THRESHOLD && elapsed < TAP_TIME_THRESHOLD) {
+                // 排除可交互元素
+                if (shouldExcludeTap(e.target)) return;
+                // 标记已处理，阻止后续 click 重复触发
+                tapHandledByTouch = true;
+                handleReaderTap(e);
+            }
+            // 位移超阈值视为滑动，不触发翻页，让原生滚动
+        }, { passive: true });
+    }
+
+    /* ============ 番茄式自动阅读 ============ */
+    let autoScrollRafId = null;
+    let autoScrollLastTs = 0;
+
+    function getReaderLineHeightPx() {
+        // 取 .markdown-body 的计算行高（像素值），避免取 .reader 本身的继承值
+        const md = elements.reader && elements.reader.querySelector('.markdown-body');
+        if (md) {
+            const lh = parseFloat(getComputedStyle(md).lineHeight);
+            if (!isNaN(lh) && lh > 0) return lh;
+        }
+        // 回退：用 CSS 变量计算
+        const root = document.documentElement;
+        const cs = getComputedStyle(root);
+        const lhVar = parseFloat(cs.getPropertyValue('--reader-line-height'));
+        const fsVar = parseFloat(cs.getPropertyValue('--reader-font-size'));
+        if (!isNaN(lhVar) && !isNaN(fsVar) && lhVar > 0 && fsVar > 0) {
+            return lhVar * fsVar;
+        }
+        return 28; // 最终回退
+    }
+
+    function autoScrollLoop(ts) {
+        if (!autoScrollRafId) return;
+        if (!autoScrollLastTs) autoScrollLastTs = ts;
+        // clamp deltaTime，防止后台切回瞬移
+        const dt = Math.min(ts - autoScrollLastTs, 100);
+        autoScrollLastTs = ts;
+
+        const reader = elements.reader;
+        if (!reader) {
+            pauseAutoScroll();
+            return;
+        }
+
+        // 到达章节末尾自动暂停
+        if (reader.scrollHeight - reader.scrollTop - reader.clientHeight < 2) {
+            pauseAutoScroll();
+            return;
+        }
+
+        // 速度：行/分钟 → 像素/毫秒
+        const s = loadSettings();
+        let speed = s.autoScrollSpeed || 50;
+        // 遵守 prefers-reduced-motion：降速到最慢
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (prefersReduced) speed = Math.min(speed, 24);
+
+        const lineHeightPx = getReaderLineHeightPx();
+        const pxPerMs = (speed * lineHeightPx) / 60000;
+        const dy = pxPerMs * dt;
+        if (dy > 0) {
+            reader.scrollBy(0, dy);
+        }
+
+        autoScrollRafId = window.requestAnimationFrame(autoScrollLoop);
+    }
+
+    function startAutoScroll() {
+        if (autoScrollRafId) return;
+        if (!elements.reader) return;
+        if (state.currentView !== 'reader') return;
+        autoScrollLastTs = 0;
+        autoScrollRafId = window.requestAnimationFrame(autoScrollLoop);
+        updateAutoScrollBtn(true);
+    }
+
+    function pauseAutoScroll() {
+        if (autoScrollRafId) {
+            window.cancelAnimationFrame(autoScrollRafId);
+            autoScrollRafId = null;
+        }
+        autoScrollLastTs = 0;
+        updateAutoScrollBtn(false);
+    }
+
+    function toggleAutoScroll() {
+        if (autoScrollRafId) {
+            pauseAutoScroll();
+        } else {
+            startAutoScroll();
+        }
+    }
+
+    function updateAutoScrollBtn(isPlaying) {
+        if (!elements.autoScrollBtn) return;
+        elements.autoScrollBtn.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
+        elements.autoScrollBtn.textContent = isPlaying ? '⏸ 暂停' : '▶ 自动';
+    }
+
+    function initAutoScroll() {
+        // 浮动按钮
+        if (elements.autoScrollBtn) {
+            elements.autoScrollBtn.addEventListener('click', toggleAutoScroll);
+        }
+        // 手动滚动（wheel/touchmove）时暂停自动阅读
+        if (elements.reader) {
+            elements.reader.addEventListener('wheel', () => {
+                if (autoScrollRafId) pauseAutoScroll();
+            }, { passive: true });
+            elements.reader.addEventListener('touchmove', () => {
+                if (autoScrollRafId) pauseAutoScroll();
+            }, { passive: true });
+        }
+    }
+
+    /* ============ 沉浸阅读模式 ============ */
+    // 仅用 CSS .immersive-mode 隐藏 UI + 内容占满；不锁定 screen.orientation，避免手机端被强制横屏。
+    // Fullscreen API 作为可选增强（多 vendor 兼容），失败时回退到纯 CSS 沉浸状态。
+    function getFullscreenElement() {
+        return document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.msFullscreenElement ||
+            null;
+    }
+
+    function requestFullscreenSafe(el) {
+        const fn = el.requestFullscreen ||
+            el.webkitRequestFullscreen ||
+            el.msRequestFullscreen;
+        if (typeof fn === 'function') {
+            try {
+                const ret = fn.call(el);
+                if (ret && typeof ret.then === 'function') {
+                    ret.catch(function () { /* 安全策略拒绝时静默回退到 CSS 沉浸 */ });
+                }
+            } catch (e) { /* 静默回退 */ }
+        }
+    }
+
+    function exitFullscreenSafe() {
+        const fn = document.exitFullscreen ||
+            document.webkitExitFullscreen ||
+            document.msExitFullscreen;
+        if (typeof fn === 'function') {
+            try {
+                const ret = fn.call(document);
+                if (ret && typeof ret.then === 'function') {
+                    ret.catch(function () { /* 静默 */ });
+                }
+            } catch (e) { /* 静默 */ }
+        }
+    }
+
+    // 进入沉浸后的短暂保护期，避免某些环境（jsdom / 旧浏览器 / iframe）
+    // 在 requestFullscreen 调用后立即触发 fullscreenchange 且 fullscreenElement 为空，
+    // 导致状态被错误地同步回非沉浸。
+    let immersiveEnterLock = false;
+
+    function enterImmersiveMode() {
+        document.body.classList.add('immersive-mode');
+        // 进入沉浸时隐藏 UI 工具栏，让正文占满
+        document.body.classList.add('ui-hidden');
+        updateImmersiveBtn(true);
+        // 尝试请求系统全屏作为增强（iframe 内可能被拒，不影响 CSS 沉浸）
+        immersiveEnterLock = true;
+        requestFullscreenSafe(document.documentElement);
+        // 100ms 后解除保护，正常响应 ESC 退出全屏的同步事件
+        setTimeout(() => { immersiveEnterLock = false; }, 100);
+    }
+
+    function exitImmersiveMode() {
+        document.body.classList.remove('immersive-mode');
+        document.body.classList.remove('ui-hidden');
+        updateImmersiveBtn(false);
+        if (getFullscreenElement()) {
+            exitFullscreenSafe();
+        }
+    }
+
+    function toggleImmersiveMode() {
+        if (document.body.classList.contains('immersive-mode')) {
+            exitImmersiveMode();
+        } else {
+            enterImmersiveMode();
+        }
+    }
+
+    function updateImmersiveBtn(isActive) {
+        if (!elements.immersiveBtn) return;
+        elements.immersiveBtn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        elements.immersiveBtn.textContent = isActive ? '✕ 退出' : '⛶ 沉浸';
+    }
+
+    function initImmersive() {
+        if (elements.immersiveBtn) {
+            // 初始化 aria-pressed（HTML 未声明时 getAttribute 返回 null）
+            elements.immersiveBtn.setAttribute('aria-pressed', 'false');
+            elements.immersiveBtn.addEventListener('click', toggleImmersiveMode);
+        }
+        // ESC 退出系统全屏时，浏览器会触发 fullscreenchange；同步 CSS 沉浸状态，避免界面不一致
+        function syncFullscreenState() {
+            if (immersiveEnterLock) return;
+            if (!getFullscreenElement() && document.body.classList.contains('immersive-mode')) {
+                document.body.classList.remove('immersive-mode');
+                document.body.classList.remove('ui-hidden');
+                updateImmersiveBtn(false);
+            }
+        }
+        document.addEventListener('fullscreenchange', syncFullscreenState);
+        document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+        document.addEventListener('msfullscreenchange', syncFullscreenState);
     }
 
     /* ============ 弹窗（生成新笔记） ============ */
@@ -862,7 +1263,7 @@
         refreshTreeView();
     }
 
-    function handleTreeSearchEnter(event) {
+    async function handleTreeSearchEnter(event) {
         if (event.key !== 'Enter') return;
         event.preventDefault();
         const query = elements.searchInput.value.trim();
@@ -871,44 +1272,17 @@
             refreshTreeView();
             return;
         }
-        // 在 notesIndex 中做正文搜索
-        const results = [];
-        for (const [path, note] of Object.entries(state.notesIndex || {})) {
-            const title = note.title || note.event || '';
-            const content = note.content || '';
-            const titleLower = title.toLowerCase();
-            const contentLower = content.toLowerCase();
-            const queryLower = query.toLowerCase();
 
-            let matched = false;
-            let snippet = '';
-            if (titleLower.includes(queryLower)) {
-                matched = true;
-                snippet = content.slice(0, 100).replace(/\n/g, ' ');
-                if (content.length > 100) snippet += '…';
-            } else if (contentLower.includes(queryLower)) {
-                matched = true;
-                const idx = contentLower.indexOf(queryLower);
-                const start = Math.max(0, idx - 30);
-                const end = Math.min(content.length, idx + query.length + 60);
-                snippet = content.slice(start, end).replace(/\n/g, ' ');
-                if (start > 0) snippet = '…' + snippet;
-                if (end < content.length) snippet += '…';
-            }
-
-            if (matched) {
-                results.push({
-                    path: path,
-                    book: note.book,
-                    chapter: note.chapter,
-                    event: note.event,
-                    title: title,
-                    snippet: snippet
-                });
-            }
+        elements.treeNav.innerHTML = '<div class="empty-state">正在加载搜索结果…</div>';
+        try {
+            const data = await fetchJson(`/api/search?q=${encodeURIComponent(query)}`);
+            const results = data.results || [];
+            state.searchMode = true;
+            renderSearchResults(results, query);
+        } catch (err) {
+            elements.treeNav.innerHTML = '<div class="empty-state">搜索失败，请重试。</div>';
+            showError('无法执行搜索，请检查后端服务。', err);
         }
-        state.searchMode = true;
-        renderSearchResults(results, query);
     }
 
     function renderSearchResults(results, query) {
@@ -962,7 +1336,8 @@
 
     function handleKeyDown(event) {
         if (event.key === 'Escape') {
-            if (isImmersiveMode()) {
+            // 优先退出沉浸模式
+            if (document.body.classList.contains('immersive-mode')) {
                 exitImmersiveMode();
                 return;
             }
@@ -979,6 +1354,17 @@
                 goPrevChapter();
             } else if (event.key === 'ArrowRight' && elements.nextBtnBottom && !elements.nextBtnBottom.disabled) {
                 goNextChapter();
+            } else if (state.currentView === 'reader' && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+                // 桌面端键盘翻页（一屏 85%）
+                if (window.innerWidth > 768) {
+                    event.preventDefault();
+                    pauseAutoScroll();
+                    pageByDirection(event.key === 'ArrowUp' ? 'prev' : 'next');
+                }
+            } else if (state.currentView === 'reader' && event.key === ' ') {
+                // 空格键切换自动阅读播放/暂停
+                event.preventDefault();
+                toggleAutoScroll();
             }
         }
     }
@@ -991,9 +1377,9 @@
 
         initSettings();
         initSidebarDrawer();
-        initTapZones();
-        initFullscreenButtons();
-        initTapToggle();
+        initReaderTap();
+        initAutoScroll();
+        initImmersive();
 
         if (elements.bookshelfSearchInput) {
             elements.bookshelfSearchInput.addEventListener('input', handleBookshelfSearch);

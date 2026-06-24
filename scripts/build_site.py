@@ -193,6 +193,31 @@ def _category_sort_key(category: str) -> tuple[int, str]:
     return (50, category)
 
 
+def _copy_static_assets(site_path: Path) -> None:
+    """将 src/web/static-site/ 下的前端产物复制到 site/。
+
+    避免 site/ 下的 html/css/js 靠手动维护而与源文件不同步，
+    导致 GitHub Pages 部署后出现功能缺失。
+    """
+    root = Path(__file__).resolve().parent.parent
+    source_dir = root / "src" / "web" / "static-site"
+    if not source_dir.exists():
+        return
+
+    assets = [
+        ("index.html", site_path / "index.html"),
+        ("css/style.css", site_path / "css" / "style.css"),
+        ("js/app.js", site_path / "js" / "app.js"),
+        ("sw.js", site_path / "sw.js"),
+    ]
+    for src_rel, dest in assets:
+        src = source_dir / Path(src_rel)
+        if not src.exists():
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+
+
 def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
     """扫描 output/ 下的 Markdown 笔记，生成静态站点到 site/。
 
@@ -210,6 +235,9 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
     notes_dir = site_path / "notes"
     data_dir.mkdir(parents=True, exist_ok=True)
     notes_dir.mkdir(parents=True, exist_ok=True)
+
+    # 同步前端静态资源（html/css/js/sw），避免手动维护导致 GitHub Pages 版本滞后
+    _copy_static_assets(site_path)
 
     # 清空 notes 目录，保证幂等（处理笔记删除场景）
     for child in notes_dir.iterdir():

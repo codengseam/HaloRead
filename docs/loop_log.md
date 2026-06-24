@@ -149,6 +149,40 @@
 
 ---
 
+## 阅读器 UI/交互修复与浏览器验收沉淀（2026-06-24）
+
+### 触发问题
+用户反馈阅读器存在三类问题：
+1. 沉浸按钮在左侧章节名过长时被撑成竖排，样式崩坏。
+2. 进入沉浸模式后无法退出，也无法打开章节目录。
+3. master 分支 GitHub Pages 部署版本缺少自动阅读和壁纸切换功能。
+
+### 修复内容
+1. **沉浸按钮布局**：`.immersive-btn` 增加 `flex-shrink: 0; white-space: nowrap;`，防止在 `toolbar-brand` 占据空间后被挤压换行。
+2. **沉浸模式交互**：
+   - CSS 隐藏 UI 的条件从单一 `.immersive-mode` 改为 `.immersive-mode.ui-hidden`，让点击阅读区中央可唤出/隐藏工具栏与目录。
+   - JS 补全 `enterImmersiveMode`/`exitImmersiveMode`/`toggleImmersiveMode`，进入沉浸默认隐藏 UI，点击沉浸按钮或返回首页可退出。
+   - Fullscreen API 仅作为可选增强，失败时回退到纯 CSS 沉浸；新增 `immersiveEnterLock` 防止进入瞬间被同步事件错误移除沉浸类。
+3. **静态产物同步**：`scripts/build_site.py` 新增 `_copy_static_assets()`，构建时自动把 `src/web/static-site/` 的 `index.html/css/style.css/js/app.js/sw.js` 复制到 `site/`，避免 GitHub Pages 部署版本滞后于源码。
+4. **壁纸按钮文案**：设置面板中的「默认」改为「无」，与 `data-wallpaper="none"` 语义一致。
+
+### 测试与验证
+- `pytest` 全量 114 项通过（补装 `PyYAML`/`langgraph` 后）。
+- `node tests/test_reader_features.js` 12 组 76 项全部通过。
+- `bash tests/run_regression_suite.sh` 12 项全部通过。
+- 浏览器验收：进入沉浸、中央唤出 UI、打开章节目录、退出沉浸、壁纸切换、自动阅读均正常。
+
+### 暴露的共性问题
+1. **jsdom 测试双实例**：`site/index.html` 已自带 `<script src="js/app.js" defer>`，测试又手动注入 app.js，导致事件监听器双注册，沉浸按钮触发两次（进入后立即退出）。修复方式：测试 `buildDom()` 中先移除 HTML 里的外部脚本引用再注入单实例。
+2. **测试断言滞后于实现**：`test_reader_features.js` 测试11 仍断言 `.immersive-mode .toolbar`，但实现已改为 `.immersive-mode.ui-hidden .toolbar`，已同步更新测试。
+3. **环境依赖缺失**：`PyYAML` 与 `langgraph` 未安装时 pytest 部分测试失败；CI 中应确保 `requirements.txt` 完整安装。
+
+### 后续约束
+- 修改 `src/web/static-site/` 后必须运行 `python scripts/build_site.py` 验证 `site/` 产物同步。
+- 涉及沉浸/全屏的改动必须同时跑 jsdom 回归与浏览器验收。
+
+---
+
 ## 养生类课程目录重构与分类归并沉淀（2026-06-24）
 
 ### 改动范围

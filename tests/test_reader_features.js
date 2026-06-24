@@ -46,7 +46,10 @@ function waitFor(fn, timeout) {
 }
 
 async function buildDom() {
-    const html = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf-8');
+    let html = fs.readFileSync(path.join(SITE_DIR, 'index.html'), 'utf-8');
+    // index.html 已自带 <script src="js/app.js" defer>，测试时手动注入单实例，
+    // 避免 jsdom 把外部脚本也加载进来导致 app.js 双实例、事件监听器重复注册。
+    html = html.replace(/<script[^>]*src="js\/app\.js"[^>]*>\s*<\/script>/, '');
     const dom = new JSDOM(html, {
         url: 'http://localhost:8080/',
         runScripts: 'dangerously',
@@ -430,8 +433,10 @@ async function runTest() {
 
         const cssText = fs.readFileSync(path.join(SITE_DIR, 'css/style.css'), 'utf-8');
         assert(cssText.includes('body.immersive-mode'), 'CSS 含 body.immersive-mode 规则');
-        assert(cssText.includes('.immersive-mode .toolbar'), '沉浸模式隐藏 toolbar');
-        assert(cssText.includes('.immersive-mode .bottom-bar'), '沉浸模式隐藏 bottom-bar');
+        // 沉浸模式下 UI 隐藏需同时满足 .immersive-mode + .ui-hidden，
+        // 这样点击中央区域可唤出工具栏/目录，再点隐藏，仿番茄阅读交互。
+        assert(cssText.includes('.immersive-mode.ui-hidden .toolbar'), '沉浸+ui-hidden 时隐藏 toolbar');
+        assert(cssText.includes('.immersive-mode.ui-hidden .bottom-bar'), '沉浸+ui-hidden 时隐藏 bottom-bar');
     }
 
     console.log('\n=== 测试12：返回首页退出沉浸模式 ===');

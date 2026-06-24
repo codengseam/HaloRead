@@ -18,6 +18,14 @@
     --reader-font-size: 18px;
     --reader-line-height: 1.9;
     --reader-paragraph-spacing: 1em;
+
+    /* 阅读壁纸（默认无壁纸） */
+    --reader-wallpaper: none;
+    --reader-wallpaper-opacity: 0.6;
+
+    /* 魔搭 iframe 嵌入时的安全间距（预留平台顶栏/底栏空间） */
+    --modelscope-shell-top: 0px;
+    --modelscope-shell-bottom: 0px;
 }
 
 /* 主题：白天（默认） */
@@ -69,6 +77,68 @@ body[data-theme="night"] {
     --accent-hover: #d4ad77;
     --border: #333333;
     --shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* ============ 阅读壁纸预设 ============
+   壁纸只作用于 .reader 阅读区（通过 --reader-wallpaper 变量驱动 .reader::before）。
+   全部用 CSS 渐变 + 内联 SVG data URI 实现，无外部图片，避免版权/CORS/体积问题。
+   夜间主题下统一覆盖为暗色低饱和纹理，保护视力。
+======== */
+
+/* 竹简：竖向竹纹 + 暖黄底 */
+body[data-wallpaper="bamboo"] {
+    --reader-wallpaper:
+        repeating-linear-gradient(90deg, rgba(101, 67, 33, 0.08) 0 2px, transparent 2px 28px),
+        linear-gradient(135deg, #f5e6c8 0%, #ecd9b0 100%);
+}
+
+/* 宣纸：米白底 + 细微纤维纹理 */
+body[data-wallpaper="xuan"] {
+    --reader-wallpaper:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.85  0 0 0 0 0.8  0 0 0 0 0.7  0 0 0 0.08 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"),
+        linear-gradient(180deg, #faf6ed 0%, #f3ecd9 100%);
+}
+
+/* 水墨：青灰墨韵晕染 */
+body[data-wallpaper="ink"] {
+    --reader-wallpaper:
+        radial-gradient(ellipse at 20% 30%, rgba(70, 90, 110, 0.18) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(50, 70, 90, 0.15) 0%, transparent 55%),
+        linear-gradient(135deg, #eef2f5 0%, #e2e8ed 100%);
+}
+
+/* 山水：远山轮廓 + 浅青底 */
+body[data-wallpaper="landscape"] {
+    --reader-wallpaper:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'><path d='M0 150 Q60 110 120 130 T240 120 T400 140 L400 200 L0 200 Z' fill='%23a8c5b8' opacity='0.35'/><path d='M0 170 Q80 140 160 155 T320 150 T400 165 L400 200 L0 200 Z' fill='%238fb3a3' opacity='0.3'/></svg>"),
+        linear-gradient(180deg, #eaf2ee 0%, #dce8e0 100%);
+    --reader-wallpaper-opacity: 0.5;
+}
+
+/* 星空：深蓝底 + 星点 */
+body[data-wallpaper="starry"] {
+    --reader-wallpaper:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><circle cx='20' cy='30' r='1' fill='%23fff' opacity='0.8'/><circle cx='60' cy='80' r='0.8' fill='%23fff' opacity='0.6'/><circle cx='120' cy='40' r='1.2' fill='%23fff' opacity='0.9'/><circle cx='170' cy='110' r='0.7' fill='%23fff' opacity='0.5'/><circle cx='90' cy='150' r='1' fill='%23fff' opacity='0.7'/><circle cx='150' cy='170' r='0.9' fill='%23fff' opacity='0.6'/><circle cx='40' cy='120' r='0.6' fill='%23fff' opacity='0.4'/></svg>"),
+        radial-gradient(ellipse at 50% 100%, #2a3a5e 0%, #1a2540 60%, #0f1830 100%);
+    --reader-wallpaper-opacity: 0.45;
+}
+
+/* 夜间主题下：所有壁纸统一替换为暗色低饱和纹理，避免刺眼 */
+body[data-theme="night"][data-wallpaper="bamboo"],
+body[data-theme="night"][data-wallpaper="xuan"],
+body[data-theme="night"][data-wallpaper="ink"],
+body[data-theme="night"][data-wallpaper="landscape"] {
+    --reader-wallpaper:
+        repeating-linear-gradient(135deg, rgba(200, 160, 106, 0.04) 0 1px, transparent 1px 24px),
+        linear-gradient(135deg, #1f1f1f 0%, #262626 100%);
+    --reader-wallpaper-opacity: 0.5;
+}
+
+body[data-theme="night"][data-wallpaper="starry"] {
+    --reader-wallpaper:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><circle cx='20' cy='30' r='1' fill='%23ccc' opacity='0.5'/><circle cx='60' cy='80' r='0.8' fill='%23ccc' opacity='0.4'/><circle cx='120' cy='40' r='1.2' fill='%23ccc' opacity='0.6'/><circle cx='170' cy='110' r='0.7' fill='%23ccc' opacity='0.3'/><circle cx='90' cy='150' r='1' fill='%23ccc' opacity='0.5'/></svg>"),
+        radial-gradient(ellipse at 50% 100%, #161c2e 0%, #0f1422 60%, #0a0e18 100%);
+    --reader-wallpaper-opacity: 0.6;
 }
 
 /* 字体（设置面板可切换） */
@@ -453,11 +523,6 @@ body[data-view="reader"] .brand-header {
     letter-spacing: 0.04em;
 }
 
-.hero-cta .btn-primary {
-    padding: 11px 28px;
-    font-size: 15px;
-}
-
 /* ===== 书架区域 ===== */
 .bookshelf-section {
     max-width: 1200px;
@@ -827,13 +892,30 @@ body[data-view="reader"] .brand-header {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    position: relative;
     background-color: var(--bg-paper);
     transition: background-color 0.25s ease;
     -webkit-overflow-scrolling: touch;
 }
 
-.reader-content {
-    min-height: 100%;
+/* 阅读壁纸层：固定在阅读区视口（不随内容滚动），不拦截点击 */
+.reader::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: var(--reader-wallpaper);
+    background-size: cover;
+    background-position: center;
+    opacity: var(--reader-wallpaper-opacity);
+    transition: opacity 0.25s ease, background 0.25s ease;
+}
+
+/* 阅读区子元素置于壁纸之上 */
+.reader > * {
+    position: relative;
+    z-index: 1;
 }
 
 .reader-placeholder {
@@ -1260,113 +1342,70 @@ body[data-view="home"] .bottom-bar {
     display: none;
 }
 
-/* ============ 全屏沉浸式阅读 ============ */
-.reader-tap-zones {
-    display: none;
-    position: absolute;
-    inset: 0;
-    z-index: 25;
-    pointer-events: auto;
-}
-
-body[data-view="reader"] .reader-tap-zones {
-    display: flex;
-}
-
-.tap-zone {
-    height: 100%;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: background-color 0.15s ease;
-}
-
-.tap-zone:active {
-    background-color: rgba(139, 90, 43, 0.06);
-}
-
-.tap-zone.prev {
-    width: 33%;
-}
-
-.tap-zone.menu {
-    width: 34%;
-}
-
-.tap-zone.next {
-    width: 33%;
-}
-
-/* 全屏按钮：在 toolbar 与底栏中复用 */
-#fullscreenBtn,
-#fullscreenBtnBottom {
-    font-size: 1.1rem;
-}
-
-/* 沉浸式模式：隐藏顶栏、底栏、滚动条，扩展阅读区 */
-body.immersive-mode {
-    overflow: hidden;
-}
-
-/* 沉浸式模式下，仅在 ui-hidden 时隐藏顶栏/工具栏/底栏；
-   中间点击切换 ui-hidden 后可唤出 UI，仿番茄小说操作逻辑 */
-body.immersive-mode.ui-hidden .brand-header,
-body.immersive-mode.ui-hidden .toolbar,
-body.immersive-mode.ui-hidden .bottom-bar {
-    display: none;
-}
-
-body.immersive-mode:not(.ui-hidden) .toolbar,
-body.immersive-mode:not(.ui-hidden) .bottom-bar {
-    z-index: 70;
-}
-
-body.immersive-mode .reader-view {
+/* ============ 自动阅读浮动按钮 ============ */
+.auto-scroll-btn {
     position: fixed;
-    inset: 0;
-    z-index: 50;
-    background-color: var(--bg-paper);
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent);
+    background-color: var(--bg-modal);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    box-shadow: 0 4px 16px var(--shadow);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, opacity 0.2s ease;
+    opacity: 0.92;
 }
 
-body.immersive-mode .reader {
-    height: 100vh;
-    max-height: 100vh;
-    padding: 0;
-    scroll-behavior: smooth;
+.auto-scroll-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--accent-hover);
+    transform: translateY(-1px);
+    opacity: 1;
 }
 
-body.immersive-mode .markdown-body {
-    max-width: 760px;
-    padding: 3rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+.auto-scroll-btn:active {
+    transform: translateY(1px);
 }
 
-body.immersive-mode .reader-tap-zones {
-    display: flex;
-    z-index: 60;
+.auto-scroll-btn[aria-pressed="true"] {
+    color: #fff;
+    background-color: var(--accent);
+    border-color: var(--accent);
 }
 
-body.immersive-mode.ui-hidden .reader-tap-zones {
-    pointer-events: auto;
+/* 移动端避让底部工具栏 */
+@media (max-width: 768px) {
+    .auto-scroll-btn {
+        bottom: calc(66px + env(safe-area-inset-bottom));
+    }
 }
 
-/* 页面翻页动画：内容区轻微平移后复位，模拟番茄小说的翻页感 */
-.page-turn-next .markdown-body {
-    animation: pageTurnNext 0.25s ease;
+/* UI 隐藏时浮动按钮一并隐藏（与顶栏/底栏一致） */
+body.ui-hidden .auto-scroll-btn {
+    display: none;
 }
 
-.page-turn-prev .markdown-body {
-    animation: pageTurnPrev 0.25s ease;
+/* 首页视图不显示自动阅读按钮 */
+body[data-view="home"] .auto-scroll-btn {
+    display: none;
 }
 
-@keyframes pageTurnNext {
-    0% { transform: translateX(0); opacity: 1; }
-    40% { transform: translateX(-12px); opacity: 0.85; }
-    100% { transform: translateX(0); opacity: 1; }
+/* 壁纸按钮组允许换行（6 个选项） */
+.settings-wallpaper-btns {
+    flex-wrap: wrap;
 }
 
-@keyframes pageTurnPrev {
-    0% { transform: translateX(0); opacity: 1; }
-    40% { transform: translateX(12px); opacity: 0.85; }
-    100% { transform: translateX(0); opacity: 1; }
+.settings-wallpaper-btns button {
+    flex: 0 0 calc(33.333% - 0.35rem);
 }
 
 /* ============ 弹窗（生成新笔记 / 提示） ============ */
@@ -1728,4 +1767,121 @@ body.immersive-mode.ui-hidden .reader-tap-zones {
     .bookshelf-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* ============ 魔搭创空间嵌入优化 ============
+   说明：魔搭平台外壳（顶部标题条、左上角×、右上角⋮、右下角平台悬浮按钮）
+   位于 modelscope.cn 父页面，运行在我们的 iframe 之外，受同源策略保护，
+   无法通过本站 CSS/JS 直接隐藏。以下样式只作用于我们自己 iframe 内的元素，
+   避免在魔搭场景下出现双层导航/标题，并提供“沉浸阅读”入口。
+   参考规则：专家团评审结论 + 项目前端架构。
+======== */
+
+/* 检测处于 iframe/嵌入环境时，给 body 打上的标记类 */
+body.modelscope-embedded {
+    /* 隐藏与魔搭平台外壳重复或叠加的自有 UI */
+}
+
+body.modelscope-embedded .brand-header {
+    display: none !important;
+}
+
+body.modelscope-embedded .toolbar {
+    top: var(--modelscope-shell-top);
+}
+
+body.modelscope-embedded .bottom-bar {
+    display: none !important;
+}
+
+body.modelscope-embedded .page-main {
+    padding-top: calc(56px + var(--modelscope-shell-top));
+}
+
+body.modelscope-embedded .reader-view {
+    height: calc(100vh - var(--modelscope-shell-top) - var(--modelscope-shell-bottom));
+    max-height: calc(100vh - var(--modelscope-shell-top) - var(--modelscope-shell-bottom));
+}
+
+body.modelscope-embedded .reader {
+    padding-bottom: calc(1rem + var(--modelscope-shell-bottom));
+}
+
+/* 沉浸阅读按钮 */
+.immersive-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    color: var(--ink-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.immersive-btn:hover {
+    color: var(--ink-primary);
+    background-color: var(--bg-hover);
+    border-color: var(--accent-light);
+}
+
+.immersive-btn:active {
+    transform: translateY(1px);
+}
+
+/* 沉浸阅读模式：竖屏、无目录、内容占满 */
+body.modelscope-embedded:fullscreen,
+body.modelscope-embedded:-webkit-full-screen,
+body.immersive-mode {
+    overflow: hidden;
+}
+
+body.modelscope-embedded:fullscreen.ui-hidden .brand-header,
+body.modelscope-embedded:-webkit-full-screen.ui-hidden .brand-header,
+body.immersive-mode.ui-hidden .brand-header,
+body.modelscope-embedded:fullscreen.ui-hidden .toolbar,
+body.modelscope-embedded:-webkit-full-screen.ui-hidden .toolbar,
+body.immersive-mode.ui-hidden .toolbar,
+body.modelscope-embedded:fullscreen.ui-hidden .reader-view .sidebar,
+body.modelscope-embedded:-webkit-full-screen.ui-hidden .reader-view .sidebar,
+body.immersive-mode.ui-hidden .reader-view .sidebar,
+body.modelscope-embedded:fullscreen.ui-hidden .bottom-bar,
+body.modelscope-embedded:-webkit-full-screen.ui-hidden .bottom-bar,
+body.immersive-mode.ui-hidden .bottom-bar {
+    display: none !important;
+}
+
+body.modelscope-embedded:fullscreen .page-main,
+body.modelscope-embedded:-webkit-full-screen .page-main,
+body.immersive-mode .page-main {
+    padding-top: 0;
+    height: 100vh;
+}
+
+body.modelscope-embedded:fullscreen .reader-view,
+body.modelscope-embedded:-webkit-full-screen .reader-view,
+body.immersive-mode .reader-view {
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+}
+
+body.modelscope-embedded:fullscreen .reader,
+body.modelscope-embedded:-webkit-full-screen .reader,
+body.immersive-mode .reader {
+    width: 100%;
+}
+
+/* 保留正文在宽屏下居中 */
+body.modelscope-embedded:fullscreen .markdown-body,
+body.modelscope-embedded:-webkit-full-screen .markdown-body,
+body.immersive-mode .markdown-body {
+    max-width: 720px;
+    margin: 0 auto;
 }
