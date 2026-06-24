@@ -40,6 +40,9 @@ jobs:
       - name: Install Node dependencies for e2e
         run: npm install jsdom marked
 
+      - name: Check book structure (strict)
+        run: python scripts/check_book_structure.py --output output --strict
+
       - name: Run regression suite
         run: bash tests/run_regression_suite.sh
 

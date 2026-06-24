@@ -39,6 +39,9 @@ jobs:
       - name: Install dependencies
         run: pip install pyyaml
 
+      - name: Check book structure (strict)
+        run: python scripts/check_book_structure.py --output output --strict
+
       - name: Check duplicate notes
         run: python scripts/check_duplicates.py
 
