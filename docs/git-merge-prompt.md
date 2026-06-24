@@ -1,5 +1,22 @@
 # 通用无冲突 Git 合并提示词（HaloRead 项目）
 
+本项目已提供两种自动化方式来守护合并质量，推荐组合使用：
+
+1. **Trae Skill**：`.trae/skills/git-merge-guardian/SKILL.md`
+   - 触发词："合并"、"发 PR"、"push"、"rebase"、"同步主干" 等
+   - AI 会自动按本流程执行：检查状态、rebase master、本地验证、推送、PR
+
+2. **Git pre-push hook**：`githooks/pre-push`
+   - 安装：`bash scripts/install-git-hooks.sh`
+   - 每次 `git push` 时自动运行：
+     - 阻止直接 push 到 `master`/`main`
+     - 运行 `scripts/check_book_structure.py`
+     - 运行 `pytest` 相关测试
+     - 运行 `scripts/build_site.py`
+   - 任一校验失败即阻止 push
+
+---
+
 复制以下内容直接发给 AI，让它按这个流程执行。
 
 ```markdown
