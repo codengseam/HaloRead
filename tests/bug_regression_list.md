@@ -191,3 +191,21 @@
   - `tests/test_book_structure.py::test_output_has_no_structure_issues`
   - `tests/test_sorting.py::test_wellness_book_sort_values_are_continuous_per_chapter`
 - **教训**：P2 问题也是 AI 引入的项目债务，不能在合并时默认放行；必须阻断并沉淀到测试集，才能维持项目长期稳定。
+
+## BUG-018：Service Worker 缓存导致手机端看到旧版本（幽灵旧版）
+
+- **首次出现**：2026-06-24
+- **现象**：PC 浏览器访问 GitHub Pages / ModelScope 均正常（无蒙层、有自动阅读按钮），但部分手机端用户仍看到旧版本表现：返回书架后蒙层残留、无自动阅读按钮
+- **根因**：`site/sw.js` 对核心资源（`index.html` / `style.css` / `app.js`）使用 `cacheFirst` 策略，且缓存名固定为 `halo-read-v1`。手机浏览器/PWA 一旦缓存过旧 `app.js`，即使服务器已部署 BUG-013 修复，仍会优先读取本地旧缓存，造成"代码已更新、用户端仍旧"的幽灵旧版现象
+- **复现**：
+  1. 在旧版本上线后，用手机浏览器访问站点并缓存资源
+  2. 服务器部署新版本 `app.js`（含 BUG-013 修复）
+  3. 同一手机再次访问，观察是否仍加载旧 `app.js`（可从控制台 `navigator.serviceWorker.controller.scriptURL` 或缓存内容判断）
+- **修复**：将 `CACHE_NAME` 从 `halo-read-v1` 升级为 `halo-read-v2`。新的 Service Worker 安装后会创建 `v2` 缓存并重新预缓存最新核心资源；activate 阶段清理旧 `v1` 缓存，并通过 `clients.claim()` 立即接管所有客户端
+- **涉及文件**：`site/sw.js`
+- **回归测试**：无专门自动测试；依赖浏览器验收 + 每次关键前端修复后人工升级 `CACHE_NAME`
+- **避免措施**：
+  1. 每次对 `app.js` / `style.css` / `index.html` 做不兼容或关键修复后，**同步升级 `CACHE_NAME` 版本号**
+  2. 在 CI 或回归测试集中增加对 `CACHE_NAME` 变更的提醒（例如对比当前 `site/sw.js` 中版本号与上次发布是否一致）
+  3. 长期考虑：构建脚本自动将 `CACHE_NAME` 与 `app.js` 内容哈希绑定，或改用 `staleWhileRevalidate`/`networkFirst` 策略，避免手动维护版本号
+- **教训**：`cacheFirst` 策略的 PWA/Service Worker 会把"已部署"和"用户实际看到"分成两个时间线；前端修复必须同时考虑缓存失效策略，否则 PC 端正常、手机端仍旧的 bug 会反复出现。

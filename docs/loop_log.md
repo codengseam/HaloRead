@@ -652,6 +652,43 @@
 - `tests/test_reader_features.js` 中的回归测试模式：先写失败断言 → 改实现 → 全量回归，适用于所有"曾修复后回归"的 UI bug。
 - 双源同步检查建议：未来涉及 `site/js/app.js` 或 `src/web/static/js/app.js` 的改动，diff 两者差异应成为默认检查项。
 
+## 开发沉淀：Service Worker 缓存导致手机端"幽灵旧版"（2026-06-24）
+
+### 触发问题
+BUG-013 修复并部署后，PC 浏览器访问 GitHub Pages / ModelScope 均正常，但部分手机端用户反馈：返回书架后蒙层仍残留、且无自动阅读按钮。多 Agent 排查后确认不是两套代码，而是 Service Worker 缓存未刷新。
+
+### 根因定位
+- `site/sw.js` 对核心静态资源（`index.html` / `style.css` / `app.js`）使用 `cacheFirst` 策略。
+- 缓存名固定为 `halo-read-v1`，只要手机浏览器/PWA 曾经缓存过旧 `app.js`，后续访问会优先读取本地缓存。
+- 服务器端虽已部署新版，但用户设备上的 SW 仍服务旧缓存，形成"代码已更新、用户端仍旧"的幽灵旧版。
+
+### 修复方案
+将 `CACHE_NAME` 从 `halo-read-v1` 升级为 `halo-read-v2`：
+- 新的 SW install 阶段创建 `v2` 缓存并重新预缓存最新核心资源。
+- activate 阶段清理所有非当前名的旧缓存（包括 `v1`）。
+- `clients.claim()` 立即接管所有已打开页面，强制刷新。
+
+### 验证结果
+- GitHub Pages 与 ModelScope 桌面/移动视口浏览器验收：返回书架无蒙层、自动阅读按钮存在。
+- 本地回归套件 `bash tests/run_regression_suite.sh` 通过。
+- 已记录为 `tests/bug_regression_list.md` BUG-018。
+
+### 新共性问题
+1. **Service Worker 缓存版本需要人工维护**：目前靠注释和开发者记忆来升级 `CACHE_NAME`，容易遗漏。
+2. **回归测试集未覆盖 SW 缓存失效**：自动测试难以模拟真实手机 SW 生命周期，目前依赖浏览器验收。
+3. **前端产物同步问题**：`site/sw.js` 与 `src/web/static/js/app.js` 等前端文件是否为双源？实际上当前 `site/` 是手工维护的部署产物（BUG-016 已部分解决），SW 也属于其中一员；若构建脚本不能自动同步 SW，则版本号管理更容易出错。
+
+### 规则/checklist/quality.py 更新
+- 无需更新讲书规则。
+- 建议后续在 `.trae/checklists/dev-checklist.md` 增加"前端关键修复时是否同步升级 SW 缓存版本"检查项；若再次出现同类问题，应补充。
+- 可考虑在回归测试集中增加简单检查：对比 `site/sw.js` 中 `CACHE_NAME` 与最近一次 tag/release 是否变化，提醒开发者。
+
+### 可复用资产
+- BUG-018 记录了一套"PC 正常、手机异常"的排查路径：先确认是否多套代码 → 再确认部署产物是否同步 → 再确认浏览器/Service Worker 缓存。
+- 升级 `CACHE_NAME` 是处理 `cacheFirst` PWA 缓存的最快修复；长期更优方案是构建时自动注入内容哈希，或改用 `staleWhileRevalidate`/`networkFirst`。
+
+---
+
 ## 开发沉淀：合并前必须清零所有校验问题（2026-06-24）
 
 ### 触发问题
