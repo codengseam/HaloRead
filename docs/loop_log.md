@@ -572,3 +572,48 @@
 - 新增 30 个 Markdown 文件于 `output/资治通鉴/`
 - 专栏总计 50 章，覆盖三家分晋（前403）→隋亡唐兴（618），跨千余年编年
 - 30 篇质检全部合格，可直接发布
+
+---
+
+## 开发沉淀：返回书架蒙层残留回归修复（2026-06-24）
+
+### 触发问题
+用户反馈：在阅读视图中打开目录抽屉后点击"返回书架"，回到首页时页面被半透明蒙层覆盖，必须再点击一次蒙层才会消失。该问题此前修复过，后被重新引入。
+
+### 根因定位
+- `backToHome()` 只重置了阅读状态（currentBook/currentBookTree/activePath/searchQuery）并切换视图，**没有关闭 `sidebarOverlay`**。
+- `sidebarOverlay` 位于 `#readerView` 之外，即使阅读视图隐藏，只要仍带 `open` class，就会继续覆盖在首页之上。
+- 同类的 `settingsOverlay`/`modalOverlay` 也存在同样隐患（设置面板、生成笔记弹窗打开时返回书架同样会留下蒙层）。
+
+### 修复方案
+在 `site/js/app.js` 和 `src/web/static/js/app.js` 的 `backToHome()` 返回首页前，统一调用：
+- `closeSidebar()`
+- `closeSettings()`
+- `closeModal()`
+
+确保所有遮罩层随视图切换一并关闭。
+
+### 测试驱动（TDD）
+1. 先在 `tests/test_reader_features.js` 新增测试13：打开目录抽屉 → 点击返回书架 → 断言 `sidebarOverlay` 不再含 `open` class 且回到 `home` 视图。
+2. 运行测试，确认失败（复现 bug）。
+3. 修改实现后再次运行，测试通过。
+4. 运行完整回归套件 `bash tests/run_regression_suite.sh`，全部通过。
+
+### 验证结果
+- `node tests/test_reader_features.js`：79 项全部通过。
+- `bash tests/run_regression_suite.sh`：12 项全部通过。
+- `pytest tests/`：114 passed, 15 skipped。
+- `node --check site/js/app.js && node --check src/web/static/js/app.js`：语法 OK。
+- 已将此 bug 记录进 `tests/bug_regression_list.md`（BUG-013）。
+
+### 新共性问题
+1. **`src/web/static/js/app.js` 与 `site/js/app.js` 已分叉**：diff 显示两者差异显著（site 版包含自动阅读、沉浸模式、搜索索引拆分等功能，src/web 版为旧版）。本次 bug 修复必须同步修改两处，未来任何前端改动都容易漏改。建议后续明确 `site/` 为唯一部署源，或将 `src/web/static/` 作为源通过构建脚本同步到 `site/`，避免双源维护。
+2. **视图切换时清理 overlay 是反复出现的模式问题**：此前沉浸模式也专门在 `switchView('home')` 中退出沉浸。未来若再新增遮罩层，应考虑统一在 `switchView('home')` 中关闭所有 overlay，而不是依赖每个返回入口（backToHome / brandLockup / 键盘 ESC 等）各自处理。
+
+### 规则/checklist/quality.py 更新
+- 本次为前端 bug 修复，未涉及讲书笔记写作规则，无需更新 `.trae/rules/rules.md`、`content-quality.md`、`quality.py`。
+- `.trae/checklists/dev-checklist.md` 暂无"视图切换清理 overlay"专项，可在后续若再出现同类问题时考虑补充。
+
+### 可复用资产
+- `tests/test_reader_features.js` 中的回归测试模式：先写失败断言 → 改实现 → 全量回归，适用于所有"曾修复后回归"的 UI bug。
+- 双源同步检查建议：未来涉及 `site/js/app.js` 或 `src/web/static/js/app.js` 的改动，diff 两者差异应成为默认检查项。
