@@ -51,8 +51,8 @@ version: 1.0.0
 
 ### 项目规范检查
 - 确认改动文件放在正确的目录（见 README §七）
-- 确认未破坏 `.trae/skills/deep-reading/SKILL.md`、`.trae/rules/rules.md`、`prompts/`、`src/utils/quality.py`
-- 若改了 `.trae/rules/rules.md`，确认已运行 `python scripts/sync_rules.py`
+- 确认未破坏 `.trae/skills/deep-reading/SKILL.md`、`.trae/skills/deep-reading/rules.md`、`prompts/`、`src/utils/quality.py`
+- 若改了 `.trae/skills/deep-reading/rules.md`，确认已运行 `python scripts/sync_rules.py`
 
 ### 测试检查
 - 运行 `python scripts/check_book_structure.py --output output --strict`，必须 P0/P1/P2 全部清零。

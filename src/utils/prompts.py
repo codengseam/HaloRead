@@ -3,9 +3,9 @@ from typing import Any, Dict, Optional
 
 
 # 规则文件主从配置：
-# - 主库：.trae/rules/rules.md（Trae 自动加载）
+# - 主库：.trae/skills/deep-reading/rules.md（按需加载，不污染开发对话上下文）
 # - 从库：RULES.md（根目录，兼容其他 IDE/工具）
-RULES_PRIMARY = Path(".trae/rules/rules.md")
+RULES_PRIMARY = Path(".trae/skills/deep-reading/rules.md")
 RULES_FALLBACK = Path("RULES.md")
 
 

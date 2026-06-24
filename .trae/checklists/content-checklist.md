@@ -1,6 +1,6 @@
 # 内容质检 Checklist
 
-本 checklist 用于对生成的 Markdown 专栏内容进行质检与打分。配合 `.trae/rules/content-quality.md` 使用。
+本 checklist 用于对生成的 Markdown 专栏内容进行质检与打分。配合 `.trae/skills/deep-reading/content-quality.md` 使用。
 
 **使用方式**：逐项检查，标注 ✅ 通过 / ❌ 未通过 / ➖ 不适用。未通过项必须修复或说明原因。
 

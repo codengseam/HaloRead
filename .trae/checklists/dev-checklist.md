@@ -21,10 +21,10 @@
 - [ ] 遵循现有目录结构（见 README §七），未在根目录乱放文件
 - [ ] 文件命名遵循规范：Python 用 `snake_case`，Markdown 用中文或下划线
 - [ ] 未破坏 `.trae/skills/deep-reading/SKILL.md` 的行为
-- [ ] 未破坏 `.trae/rules/rules.md`（讲书笔记写作规则）
+- [ ] 未破坏 `.trae/skills/deep-reading/rules.md`（讲书笔记写作规则）
 - [ ] 未破坏 `prompts/` 下 7 份讲书提示词
 - [ ] 未破坏 `src/utils/quality.py` 的检测逻辑
-- [ ] 若修改了 `.trae/rules/rules.md`，已运行 `python scripts/sync_rules.py` 同步到 `RULES.md`
+- [ ] 若修改了 `.trae/skills/deep-reading/rules.md`，已运行 `python scripts/sync_rules.py` 同步到 `RULES.md`
 - [ ] 提交前已运行 `python scripts/check_duplicates.py`，`output/` 目录无重复 Markdown 文件
 - [ ] `output/` 下章节名与文件名无「模块N」前缀（由 `check_book_structure.py --strict` 自动拦截，历史问题 BUG-019）
 

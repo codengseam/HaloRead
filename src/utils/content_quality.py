@@ -343,6 +343,6 @@ def format_report(report: ContentQualityReport) -> str:
             "",
             "### 修复建议",
             "",
-            "请按 `.trae/rules/content-quality.md` 中的修复优先级逐项处理。",
+            "请按 `.trae/skills/deep-reading/content-quality.md` 中的修复优先级逐项处理。",
         ])
     return "\n".join(lines)

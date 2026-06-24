@@ -58,17 +58,17 @@ Specialist Agents 并行工作：
 
 1. 用户输入书名、章节、事件（可选个人感悟）。
 2. Orchestrator 确认事件范围，规划各 Specialist Agent 任务。
-3. Specialist Agents 并行工作，各自按 `.trae/rules/rules.md` 中对应模块要求产出内容。
+3. Specialist Agents 并行工作，各自按 `.trae/skills/deep-reading/rules.md` 中对应模块要求产出内容。
 4. 编辑专家汇总五段内容，统一语气，补齐引用，生成结语。
 5. 保存到 `output/{书名}/{章节}_{事件}.md`。
-6. **自动触发内容质检**：调用 `scripts/review_content.py`，按 `.trae/rules/content-quality.md` 四维度（真实性/可读性/顺序/引用克制）评分，≥85 分合格。
+6. **自动触发内容质检**：调用 `scripts/review_content.py`，按 `.trae/skills/deep-reading/content-quality.md` 四维度（真实性/可读性/顺序/引用克制）评分，≥85 分合格。
 7. HTML 管理界面读取目录结构，按书分类、章节排序展示。
 
 ## 六、输出规范
 
-详见 [`.trae/rules/rules.md`](./.trae/rules/rules.md)。根目录 [`RULES.md`](./RULES.md) 是从库副本，用于兼容其他 IDE/工具。
+详见 [`.trae/skills/deep-reading/rules.md`](./.trae/skills/deep-reading/rules.md)。根目录 [`RULES.md`](./RULES.md) 是从库副本，用于兼容其他 IDE/工具。
 
-> 修改规则时只编辑 `.trae/rules/rules.md`，然后运行 `python scripts/sync_rules.py` 同步到根目录 `RULES.md`。
+> 修改规则时只编辑 `.trae/skills/deep-reading/rules.md`，然后运行 `python scripts/sync_rules.py` 同步到根目录 `RULES.md`。
 
 固定结构：
 
@@ -87,10 +87,13 @@ Specialist Agents 并行工作：
 ├── .trae/
 │   ├── skills/
 │   │   ├── deep-reading/   # Trae Skill 交互入口（生成讲书笔记）
+│   │   │   ├── SKILL.md    # Skill 定义
+│   │   │   ├── rules.md    # 内容生成规则（按需加载）
+│   │   │   └── content-quality.md  # 内容质检规则（按需加载）
 │   │   └── content-review/ # Trae Skill 交互入口（内容质检）
 │   ├── rules/
-│   │   ├── rules.md        # 内容生成规则
-│   │   └── content-quality.md  # 内容质检规则
+│   │   ├── dev-workflow.md     # 开发协作流程规则（自动加载）
+│   │   └── bug-reporting.md    # Bug 记录与回归规范（自动加载）
 │   └── checklists/
 │       └── content-checklist.md  # 内容质检 checklist
 ├── .env.example           # 环境变量示例（API Key 等）
@@ -209,7 +212,7 @@ Specialist Agents 并行工作：
 ┌─────────────────────────────────────────┐
 │  Trae Skill（深度阅读助手）              │
 │  - 识别用户意图                          │
-│  - 加载 `.trae/rules/rules.md` 规范      │
+│  - 加载 `.trae/skills/deep-reading/rules.md` 规范  │
 │  - 触发 Python 编排引擎或 SOLO Agent     │
 └──────────────┬──────────────────────────┘
                │
@@ -254,7 +257,7 @@ Specialist Agents 并行工作：
 
 1. **Agent 工作流工程化**
    - 实现 Orchestrator + Specialist Agents 的调用逻辑；
-   - 每个 Agent 对应 `.trae/rules/rules.md` 中的一个模块；
+   - 每个 Agent 对应 `.trae/skills/deep-reading/rules.md` 中的一个模块；
    - 支持用户输入 → 自动生成 → 保存 Markdown 的完整流程。
 2. **HTML 管理界面**
    - 按书籍/卷/章分类浏览笔记；

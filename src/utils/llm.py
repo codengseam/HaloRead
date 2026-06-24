@@ -117,7 +117,7 @@ class MockLLMClient:
                     "### 详细意见\n"
                     "- 符合 dev-workflow.md：计划结构完整，有核心目标和步骤\n"
                     "- 符合 rules.md：不涉及讲书笔记规则\n"
-                    "- 未破坏现有体系：deep-reading Skill、rules.md、prompts/ 不受影响\n"
+                    "- 未破坏现有体系：deep-reading Skill、rules.md（deep-reading/rules.md）、prompts/ 不受影响\n"
                     "- Skill 边界：不涉及 Skill 改动\n"
                     "- 目录规范：文件放在正确位置\n"
                     "- 未过度工程化：改动范围合理\n\n"

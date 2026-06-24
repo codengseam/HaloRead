@@ -1,6 +1,6 @@
 # 内容质检规则
 
-本规则用于指导 Agent 对生成的 Markdown 专栏内容进行质检与修复。与 `.trae/rules/rules.md` 的关系：
+本规则用于指导 Agent 对生成的 Markdown 专栏内容进行质检与修复。与 `rules.md` 的关系：
 
 - `rules.md` 管「怎么写」——写作风格、结构、引用格式。
 - `content-quality.md` 管「怎么查、怎么修」——以读者顺畅阅读为目标，逐项核验并打分。

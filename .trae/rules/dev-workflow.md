@@ -9,7 +9,7 @@
 
 本规则**仅适用于项目开发协作对话**——即用户在 Trae 中讨论代码改动、功能实现、Bug 修复、流程优化、方案评审等开发类任务时。
 
-**不适用于**：生成古籍讲书笔记。讲书笔记生成由 `.trae/rules/rules.md` 和 `.trae/skills/deep-reading/SKILL.md` 负责，本规则不干预。
+**不适用于**：生成古籍讲书笔记。讲书笔记生成由 `.trae/skills/deep-reading/rules.md` 和 `.trae/skills/deep-reading/SKILL.md` 负责，本规则不干预。
 
 ### 2. Trae Skill 能力边界（必须如实遵守）
 
@@ -117,7 +117,7 @@
 
 - **不在用户确认前改代码**。
 - **不假装 Skill 可以调度 sub-agents**——做不到就如实说明，给出路径 A 或路径 B 的替代方案。
-- **不破坏现有体系**：`.trae/skills/deep-reading/`、`.trae/rules/rules.md`、`prompts/` 下 7 份讲书提示词、`src/utils/quality.py` 不在本规则的修改范围内。
+- **不破坏现有体系**：`.trae/skills/deep-reading/`（含 rules.md、content-quality.md）、`prompts/` 下 7 份讲书提示词、`src/utils/quality.py` 不在本规则的修改范围内。
 - **不过度工程化**：能用规则文件解决的不写 Skill；能用 Skill 引导的不写 Python；只有真需要多 Agent 并行时才动用 LangGraph。
 - **不跳过沉淀**：每次开发完成后都要做第五步沉淀复盘，哪怕只是"本次无新沉淀"也要说明。
 - **禁止以「问题非本次引入」为由跳过修复**：合并/推送前 `check_book_structure.py --strict`、`pytest`、回归测试集必须全部通过。

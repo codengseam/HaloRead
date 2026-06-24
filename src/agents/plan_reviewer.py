@@ -23,7 +23,7 @@ ROLE_DIMENSIONS: Dict[str, str] = {
 4. Mock 模式：是否能在 DEEP_READING_MOCK=1 下端到端跑通？
 5. 回归风险：改动是否可能破坏现有 20 章讲书笔记的生成流程？""",
     "规则": """1. 是否符合 .trae/rules/dev-workflow.md 的开发协作流程规范？
-2. 是否符合 .trae/rules/rules.md 的讲书笔记写作规则（若涉及）？
+2. 是否符合 .trae/skills/deep-reading/rules.md 的讲书笔记写作规则（若涉及）？
 3. 是否破坏现有体系：deep-reading Skill、rules.md、prompts/、quality.py？
 4. Trae Skill 边界：若涉及 Skill，是否声称能调度 sub-agents 或直接调用 MCP tools（这两项 Skill 做不到）？
 5. 是否遵循项目目录结构与命名规范（见 README §七、§八）？
@@ -83,7 +83,7 @@ def _default_project_context() -> str:
         "项目：个人 AI 深度阅读助手（/workspace）。\n"
         "架构：LangGraph 编排 + 7 个 Agent（Orchestrator + 5 Specialist + Editor）+ Quality Check。\n"
         "入口：Trae Skill（.trae/skills/deep-reading/）触发 Python 引擎（src/main.py）。\n"
-        "规则：.trae/rules/rules.md（讲书笔记写作规则）、.trae/rules/dev-workflow.md（开发协作流程）。\n"
+        "规则：.trae/skills/deep-reading/rules.md（讲书笔记写作规则）、.trae/rules/dev-workflow.md（开发协作流程）。\n"
         "提示词：prompts/ 下 7 份讲书 Agent 提示词 + plan_reviewer.md（计划评审）。\n"
         "质量检查：src/utils/quality.py（AI 套路句/现代术语/升华配额等）。\n"
         "已有产出：20 章资治通鉴讲书笔记，平均分 94.3。\n"

@@ -25,7 +25,7 @@
 
 ## 写作要求
 
-必须严格遵守以下项目规则（`.trae/rules/rules.md`）：
+必须严格遵守以下项目规则（`.trae/skills/deep-reading/rules.md`）：
 
 {rules}
 

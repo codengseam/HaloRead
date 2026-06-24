@@ -1,23 +1,23 @@
 """同步项目写作规则文件。
 
-主库：.trae/rules/rules.md（Trae 自动加载）
+主库：.trae/skills/deep-reading/rules.md（按需加载）
 从库：RULES.md（根目录，兼容其他 IDE/工具）
 
 用法：
     python scripts/sync_rules.py
 
-修改规则时请编辑 .trae/rules/rules.md，然后运行此脚本同步到 RULES.md。
+修改规则时请编辑 .trae/skills/deep-reading/rules.md，然后运行此脚本同步到 RULES.md。
 """
 
 from pathlib import Path
 
 
-PRIMARY = Path(".trae/rules/rules.md")
+PRIMARY = Path(".trae/skills/deep-reading/rules.md")
 REPLICA = Path("RULES.md")
 REPLICA_HEADER = (
-    "> **注意**：本文件是 `.trae/rules/rules.md` 的从库副本。"
-    "Trae 优先读取 `.trae/rules/rules.md`，其他 IDE/工具可读取本文件。"
-    "修改规则时请编辑 `.trae/rules/rules.md`，然后运行 "
+    "> **注意**：本文件是 `.trae/skills/deep-reading/rules.md` 的从库副本。"
+    "Trae 优先读取 `.trae/skills/deep-reading/rules.md`，其他 IDE/工具可读取本文件。"
+    "修改规则时请编辑 `.trae/skills/deep-reading/rules.md`，然后运行 "
     "`python scripts/sync_rules.py` 同步到本文件。\n\n"
 )
 
