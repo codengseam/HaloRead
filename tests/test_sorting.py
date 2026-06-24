@@ -231,6 +231,31 @@ def test_sort_notes_tree_chapter_order_zizhi():
     ]
 
 
+def test_sort_notes_tree_zizhi_stage_mode_orders_by_ordinal():
+    """阶段模式：同一 chapter_sort 下按章节名中文序号排序，避免字符串序。"""
+    tree = [
+        _make_book(
+            "资治通鉴",
+            [
+                _make_chapter("汉纪十五", [], chapter_sort=3),
+                _make_chapter("汉纪三", [], chapter_sort=3),
+                _make_chapter("汉纪十七", [], chapter_sort=3),
+                _make_chapter("汉纪二", [], chapter_sort=3),
+                _make_chapter("周纪四", [], chapter_sort=1),
+            ],
+        )
+    ]
+    sort_notes_tree(tree)
+    chapters = tree[0]["children"]
+    assert [c["title"] for c in chapters] == [
+        "周纪四",
+        "汉纪二",
+        "汉纪三",
+        "汉纪十五",
+        "汉纪十七",
+    ]
+
+
 def test_sort_notes_tree_event_sort_field_priority():
     """event 优先按 sort 字段排序（章内事件历史时间顺序）。"""
     # 故意把 path 顺序打乱，验证 sort 字段优先

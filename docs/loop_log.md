@@ -80,6 +80,31 @@
 
 ## 三、开发沉淀记录
 
+### 2026-06-24 资治通鉴大章节顺序错乱修复（BUG-022）
+
+**改动范围**
+- `src/utils/sorting.py`：引入「阶段模式」`STAGE_MODE_BOOKS = {"资治通鉴"}`，阶段模式书籍按 `(chapter_sort, 章节名序号)` 排序，避免中文字符串序；其他书籍保持 `(chapter_sort, event sort)` 不变。
+- `scripts/check_book_structure.py`：新增 `_check_stage_mode_order`，对阶段模式书籍校验同一朝代/纪的 `chapter_sort` 必须等于 `BOOK_CATEGORY_ORDER` 配置的阶段序号。
+- `scripts/build_site.py`：跳过下划线开头的辅助文件（如 `_目录.md`），避免目录中出现空章节。
+- `scripts/fix_zizhi_chapter_sort.py`：新增一次性修复脚本，把 `output/资治通鉴/` 下所有文件的 `chapter_sort` 统一为朝代阶段序号。
+- `tests/test_sorting.py`、`tests/test_book_structure.py`、`tests/bug_regression_list.md`：补充回归测试与 BUG-022 记录。
+
+**验证结果**
+- `python scripts/check_book_structure.py --output output --strict`：0 问题，退出码 0。
+- `pytest -q`：127 passed, 15 skipped。
+- `bash tests/run_regression_suite.sh`：12/12 通过（jsdom 未安装跳过 1 项，不阻塞）。
+- 构建后 `site/data/index.json` 中「资治通鉴」顺序：周纪一→周纪五→秦纪一→秦纪三→汉纪一→汉纪五十七→魏纪三→隋纪八，符合编年顺序。
+
+**暴露的共性问题**
+1. **排序语义只靠 frontmatter 字段约定不够**：`chapter_sort` 在不同书里被当成阶段序号或绝对顺序，缺乏代码层显式声明，导致数据迁移/重新生成时容易写错。
+2. **校验脚本未覆盖大章节顺序**：`check_book_structure.py` 原本只校验章内 `sort` 和单章 `chapter_sort` 一致性，不校验跨章的大章节顺序，导致排序 bug 能穿过 CI/pre-push。
+3. **下划线辅助文件被误纳入站点构建**：`_目录.md` 无 frontmatter，被 `build_site.py` 解析为空章节，与 `check_book_structure.py` 的跳过逻辑不一致。
+
+**后续行动**
+- 阶段模式语义已通过 `STAGE_MODE_BOOKS` 和 `_check_stage_mode_order` 固化，未来新增「阶段模式」书籍只需加入集合并配置 `BOOK_CATEGORY_ORDER`。
+- `--strict` 模式下大章节顺序错误会被 P1 阻断，需在 CI/pre-push 中保持启用。
+- 建议后续所有下划线开头的 `output/` 辅助文件统一由构建脚本跳过，与校验脚本行为一致。
+
 ### 2026-06-24 养生类课程目录重构与排序修复
 
 **改动范围**

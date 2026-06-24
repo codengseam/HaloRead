@@ -251,6 +251,10 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
 
     if output_path.exists():
         for md_path in sorted(output_path.rglob("*.md")):
+            # 跳过下划线开头的辅助文件（如 _目录.md、_meta.yaml 等），
+            # 与 check_book_structure.py 保持一致，避免目录中出现空章节。
+            if md_path.name.startswith("_"):
+                continue
             rel = md_path.relative_to(output_path)
             rel_str = str(rel).replace("\\", "/")
             parsed = _parse_note_path(rel_str)
