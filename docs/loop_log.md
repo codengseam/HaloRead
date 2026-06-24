@@ -737,3 +737,42 @@ BUG-013 修复并部署后，PC 浏览器访问 GitHub Pages / ModelScope 均正
 ### 可复用资产
 - `--strict` 模式可复用到所有需要"默认告警、合并门禁"的校验脚本。
 - "问题修复 + 回归测试 + bug 回归记录"三段式沉淀方法，可复用于所有 AI 引入的数据/代码缺陷。
+
+## 开发沉淀：章节标题禁止「模块N」前缀（2026-06-24）
+
+### 触发问题
+用户发现多本书籍的目录大标题里出现「模块0」「模块1」等前缀，影响目录展示。此前虽清理过一次，但只改了一本书，问题在其他书中反复出现。
+
+### 根因定位
+1. **`scripts/rename_modules_with_prefix.py` 脚本自动添加前缀**：该脚本把养生类课程文件名统一为「模块N模块名_章节名.md」，并同步把 frontmatter `chapter` 也改成带前缀的形式。
+2. **规范未禁止、校验未拦截**：README 命名规范、写作规则、校验脚本均未将「模块N」前缀列为禁止项，导致问题可以持续产生并合入。
+
+### 修复方案
+1. **全面清理**：新增 `scripts/remove_module_prefixes.py`，遍历所有书籍，移除 frontmatter `chapter` 字段与文件名中的「模块N」前缀，保持 `sort`/`chapter_sort` 不变，共处理 146 个文件。
+2. **删除根因脚本**：删除 `scripts/rename_modules_with_prefix.py`，避免再次被执行。
+3. **校验拦截**：`scripts/check_book_structure.py` 新增 P1 规则，文件名章节部分或 frontmatter.chapter 含「模块N」前缀即报 P1 错误，`--strict` 模式下会阻断合并。
+4. **回归测试**：`tests/test_book_structure.py` 新增 `test_check_file_rejects_module_prefix_in_chapter`，确保检测规则长期有效。
+5. **规范固化**：
+   - `README.md` §八命名规范明确禁止「模块N」前缀
+   - `.trae/rules/dev-workflow.md` 新增命名约束
+   - `.trae/checklists/dev-checklist.md` 新增对应检查项
+   - `tests/bug_regression_list.md` 新增 BUG-019
+
+### 验证结果
+- `python scripts/check_book_structure.py --output output --strict`：0 问题，退出码 0
+- `grep -r "模块[0-9]" output/`：无匹配
+- `pytest tests/test_book_structure.py::test_check_file_rejects_module_prefix_in_chapter`：通过
+
+### 新共性问题
+1. **一次性清理脚本无法防止复发**：如果没有校验脚本和测试集兜底，类似的 UI 文案问题会在新的生成/迁移中重新出现。
+2. **根因脚本长期留在仓库是隐患**：即使已经修复，只要 `rename_modules_with_prefix.py` 还存在，就可能被误执行或复制到别处使用。
+
+### 规则/checklist/Skill 更新
+- `.trae/rules/dev-workflow.md`
+- `.trae/checklists/dev-checklist.md`
+- `README.md`
+- `tests/bug_regression_list.md`
+
+### 可复用资产
+- `scripts/remove_module_prefixes.py` 可作为批量重命名/清理 frontmatter 的模板。
+- "发现 UI 文案问题 → 一次性清理 → 校验脚本拦截 → 回归测试兜底 → 规范固化"的流程可复用于其他文案/命名类问题。

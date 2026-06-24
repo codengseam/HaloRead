@@ -143,6 +143,7 @@ Specialist Agents 并行工作：
 - 文件夹：`output/{书名}/`
 - 文件名：`{章节}_{事件}.md`，纯中文
 - 示例：`output/资治通鉴/周纪二_商鞅变法.md`
+- **禁止**：章节名和文件名中不得出现「模块0」「模块1」等「模块N」前缀（历史问题 BUG-019，已由 `scripts/check_book_structure.py` P1 规则拦截）
 
 ## 九、技术栈
 

@@ -26,6 +26,7 @@
 - [ ] 未破坏 `src/utils/quality.py` 的检测逻辑
 - [ ] 若修改了 `.trae/rules/rules.md`，已运行 `python scripts/sync_rules.py` 同步到 `RULES.md`
 - [ ] 提交前已运行 `python scripts/check_duplicates.py`，`output/` 目录无重复 Markdown 文件
+- [ ] `output/` 下章节名与文件名无「模块N」前缀（由 `check_book_structure.py --strict` 自动拦截，历史问题 BUG-019）
 
 ## 三、测试
 

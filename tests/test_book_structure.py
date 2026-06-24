@@ -142,3 +142,20 @@ def test_output_has_no_structure_issues():
         f"{issue.book}/{issue.file}: [{issue.severity}] {issue.message}"
         for issue in issues
     )
+
+
+def test_check_file_rejects_module_prefix_in_chapter(tmp_path: Path):
+    """回归测试：frontmatter.chapter 和文件名章节部分禁止「模块N」前缀（BUG-019）。"""
+    output = tmp_path / "output"
+    book_dir = output / "测试书"
+    book_dir.mkdir(parents=True)
+    f = book_dir / "模块0第一章_事件.md"
+    f.write_text(
+        "---\ntitle: 标题\nbook: 测试书\nchapter: 模块0第一章\nevent: 事件\nsort: 1\nchapter_sort: 1\n---\n正文",
+        encoding="utf-8",
+    )
+
+    issues, _ = _check_file(f, output)
+    messages = [i.message for i in issues]
+    assert any("frontmatter.chapter 含「模块N」前缀" in m for m in messages)
+    assert any("文件名章节部分含「模块N」前缀" in m for m in messages)

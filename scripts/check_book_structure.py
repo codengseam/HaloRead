@@ -32,6 +32,7 @@ except ImportError:
 FRONTMATTER_PATTERN = r"^---\s*\n(.*?)\n---\s*\n?"
 REQUIRED_FIELDS = ["title", "book", "chapter", "event", "sort", "chapter_sort"]
 SEVERITY_ORDER = {"P0": 0, "P1": 1, "P2": 2}
+MODULE_PREFIX_RE = re.compile(r"^模块\d+")
 
 
 @dataclass
@@ -252,6 +253,34 @@ def _check_file(md_path: Path, output_path: Path) -> tuple[list[Issue], dict[str
                     fix_suggestion=f"将 `event` 改为 `{path_event}`，或将文件名事件部分改为 `{fm_event}`",
                 )
             )
+
+        # P1: 章节名或文件名含「模块N」前缀（历史问题，影响目录展示）
+        if MODULE_PREFIX_RE.match(path_chapter):
+            clean_chapter = MODULE_PREFIX_RE.sub("", path_chapter)
+            issues.append(
+                Issue(
+                    severity="P1",
+                    book=path_book,
+                    chapter=path_chapter,
+                    file=rel_str,
+                    message=f"文件名章节部分含「模块N」前缀: {path_chapter!r}",
+                    fix_suggestion=f"将文件章节部分改为 `{clean_chapter}`，并同步更新 frontmatter.chapter",
+                )
+            )
+
+    fm_chapter = frontmatter.get("chapter")
+    if isinstance(fm_chapter, str) and MODULE_PREFIX_RE.match(fm_chapter):
+        clean_chapter = MODULE_PREFIX_RE.sub("", fm_chapter)
+        issues.append(
+            Issue(
+                severity="P1",
+                book=path_book or dir_book,
+                chapter=path_chapter,
+                file=rel_str,
+                message=f"frontmatter.chapter 含「模块N」前缀: {fm_chapter!r}",
+                fix_suggestion=f"将 `chapter` 改为 `{clean_chapter}`",
+            )
+        )
 
     metadata = {
         "rel": rel_str,

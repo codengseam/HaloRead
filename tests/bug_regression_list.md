@@ -209,3 +209,19 @@
   2. 在 CI 或回归测试集中增加对 `CACHE_NAME` 变更的提醒（例如对比当前 `site/sw.js` 中版本号与上次发布是否一致）
   3. 长期考虑：构建脚本自动将 `CACHE_NAME` 与 `app.js` 内容哈希绑定，或改用 `staleWhileRevalidate`/`networkFirst` 策略，避免手动维护版本号
 - **教训**：`cacheFirst` 策略的 PWA/Service Worker 会把"已部署"和"用户实际看到"分成两个时间线；前端修复必须同时考虑缓存失效策略，否则 PC 端正常、手机端仍旧的 bug 会反复出现。
+
+## BUG-019：章节标题和文件名含「模块N」前缀
+
+- **首次出现**：2026-06-24
+- **频次**：1（已修复并补充回归测试）
+- **现象**：多本书籍的章节标题（frontmatter `chapter`）和文件名中出现「模块0」「模块1」等前缀，导致目录展示混乱，影响阅读体验
+- **根因**：`scripts/rename_modules_with_prefix.py` 脚本为养生类课程批量添加「模块N」前缀；同时提示词与规则未明确禁止该前缀，生成/迁移时未做校验
+- **复现**：运行 `python scripts/rename_modules_with_prefix.py` 后，检查 `output/饮食养生课/`、`output/睡眠与精力修复课/` 等目录下的文件名和 frontmatter `chapter` 字段
+- **修复**：
+  1. 新增 `scripts/remove_module_prefixes.py` 批量清理 frontmatter `chapter` 字段与文件名中的「模块N」前缀，保持 `sort`/`chapter_sort` 不变
+  2. `scripts/check_book_structure.py` 新增 P1 级检测规则：文件名章节部分或 frontmatter.chapter 含「模块N」前缀即报 P1 错误
+  3. 删除根因脚本 `scripts/rename_modules_with_prefix.py`，防止后续误执行
+  4. `README.md` 命名规范、`dev-checklist.md`、`dev-workflow.md` 明确禁止章节名/文件名使用「模块N」前缀
+- **涉及文件**：`scripts/remove_module_prefixes.py`、`scripts/check_book_structure.py`、`scripts/rename_modules_with_prefix.py`（已删除）、`tests/test_book_structure.py`、`.trae/rules/dev-workflow.md`、`.trae/checklists/dev-checklist.md`、`README.md`
+- **回归测试**：`tests/test_book_structure.py::test_check_file_rejects_module_prefix_in_chapter`
+- **教训**：UI 文案类问题同样会反复出现，不能只靠一次性清理；必须把「不准出现」的样式规则落到校验脚本、测试集和开发规范里，才能根除。
