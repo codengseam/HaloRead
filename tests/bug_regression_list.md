@@ -126,3 +126,17 @@
   2. 魔搭 workflow 第53行改用 `stats.notes`（`index.json['stats']['notes']`）
 - **回归测试**：`tests/run_regression_suite.sh` 第6步（check_duplicates）+ 新增"index.json 结构校验"（stats.notes 存在且 >0）
 - **教训**：合并冲突解决后，必须本地完整复现 CI 流程（不只是 build_site.py 成功），尤其要跑 workflow 里每个 `run:` 步骤的等价命令。数据结构变更（如 index.json 拆分）必须同步所有消费方（workflow 校验脚本、app.js、测试）。
+
+## BUG-013：目录中点击返回书架后首页出现蒙层（回归）
+
+- **首次出现**：2026-06-24（此前修复过，后被重新引入）
+- **现象**：在阅读视图中打开目录抽屉（sidebar）后点击"返回书架"，回到首页时 `sidebarOverlay` 蒙层仍覆盖页面，需再点击一次才会消失
+- **根因**：`backToHome()` 仅重置 state 并切换视图，未关闭 `sidebarOverlay`；该遮罩元素位于 `readerView` 之外，即使阅读视图隐藏仍保持 `open` 状态，从而遮挡首页
+- **复现**：
+  1. 打开任意书籍进入阅读视图
+  2. 点击底部"目录"按钮（或顶部 ☰）打开目录抽屉
+  3. 点击"返回书架"
+  4. 观察首页是否被半透明蒙层覆盖，且点击蒙层后才消失
+- **修复**：在 `backToHome()` 返回首页前统一调用 `closeSidebar()`、`closeSettings()`、`closeModal()`，确保所有遮罩层随视图切换一并关闭
+- **涉及文件**：`site/js/app.js`、`src/web/static/js/app.js`
+- **回归测试**：`tests/test_reader_features.js` 测试13（返回书架时关闭目录蒙层）

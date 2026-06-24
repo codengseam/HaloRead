@@ -452,6 +452,23 @@ async function runTest() {
         dom.window.close();
     }
 
+    console.log('\n=== 测试13：返回书架时关闭目录蒙层（回归测试） ===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        // 打开目录抽屉（移动端目录按钮同样会触发 openSidebar）
+        document.getElementById('tocBtnBottom').click();
+        assert(document.getElementById('sidebarOverlay').classList.contains('open'), '点击目录按钮后 sidebarOverlay 打开');
+
+        // 点击返回书架
+        document.getElementById('backBtn').click();
+        assert(!document.getElementById('sidebarOverlay').classList.contains('open'), '返回书架后 sidebarOverlay 关闭');
+        assert(document.body.dataset.view === 'home', '返回书架后回到 home 视图');
+
+        dom.window.close();
+    }
+
     console.log(`\n=== 测试结果：通过 ${passCount}，失败 ${failCount} ===`);
     if (failCount > 0) {
         process.exit(1);
