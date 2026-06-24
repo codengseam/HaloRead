@@ -78,6 +78,30 @@
 4. **讲道理规范强化**：不得用「司马迁/司马光没有发长篇议论」凑数，须引真正有评语的名家（梁启超/王夫之）。
 5. **问道悟道规范强化**：段尾升华配额严格执行，4个小节不得每节都来对仗金句收尾，须让道理通过事例呈现。
 
+## 三、开发沉淀记录
+
+### 2026-06-24 养生类课程目录重构与排序修复
+
+**改动范围**
+- 将《饮食养生课》《饮食养生课第二版》《睡眠与精力修复课》统一归入 `category: 养生`。
+- 按「模块N模块名_章节名.md」结构重命名全部养生类笔记，与远端 master 上其他专栏保持一致。
+- 将《饮食养生课》两套模块拆分为两本书，其中一套命名为《饮食养生课第二版》。
+- 修复 `scripts/build_site.py`：当环境缺少 PyYAML 时，`_load_book_meta` 也能正确解析 `_meta.yaml`，避免分类被误判为「未分类」。
+- 新增 `scripts/migrate_wellness_books.py` 迁移脚本与 `scripts/rename_modules_with_prefix.py` 统一命名脚本。
+- 新增 `tests/test_migrate_wellness_books.py` 覆盖模块映射逻辑。
+
+**验证结果**
+- `python scripts/check_chapter_order.py --output output`：✅ 通过
+- `python scripts/build_site.py --output output --site site`：✅ 通过
+- `python scripts/check_duplicates.py`：✅ 无重复
+- 构建后 `index.json` 中「养生」分类包含：睡眠与精力修复课、饮食养生课、锻炼养生课、饮食养生课第二版
+
+**暴露的共性问题**
+- 测试环境依赖不完整：`yaml`/`langgraph` 未安装导致部分既有测试失败；`tests/conftest.py` 已做导入容错，但仍有 9 个既有测试因实现与期望不匹配而失败（史记/唐纪/宋纪/明纪排序配置、build_site 测试期望旧版 `index.json` 结构）。
+
+**后续行动**
+- 建议后续统一修复既有测试与实现的偏差，并在 CI 中安装完整依赖确保回归测试有效。
+
 ### 第5章优化沉淀（已应用到项目文件）
 1. **RULES.md §三语言风格**：现代术语黑名单扩充（博弈/话术/智商掉线）；新增跨文化映照史实核验规则（禁用演义虚构情节/禁张冠李戴/禁因果错置）；模板过渡句黑名单扩充（还有一层背景须交代/另有一层史料背景须说明）。
 2. **quality.py**：AI_PATTERNS_SOFT 扩充（这事说明/还有一层背景须交代/另有一层.*须说明）；MODERN_JARGON 扩充（智商.*掉线/话术）。

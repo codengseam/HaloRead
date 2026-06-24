@@ -148,10 +148,14 @@ def _load_book_meta(book_dir: Path, book_name: str) -> dict[str, Any]:
         "sort": 99,
     }
     meta_path = book_dir / "_meta.yaml"
-    if not meta_path.exists() or yaml is None:
+    if not meta_path.exists():
         return defaults
     try:
-        data = yaml.safe_load(meta_path.read_text(encoding="utf-8"))
+        raw = meta_path.read_text(encoding="utf-8")
+        if yaml is not None:
+            data = yaml.safe_load(raw)
+        else:
+            data = _parse_simple_frontmatter(raw)
     except Exception:
         return defaults
     if not isinstance(data, dict):
