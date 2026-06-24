@@ -57,6 +57,10 @@ BOOK_CATEGORY_ORDER: dict[str, dict[str, int]] = {
 # 未配置/无法匹配时的回退大数，保证排在已配置章节之后
 _FALLBACK_ORDER = 9999
 
+# 「阶段模式」书籍：chapter_sort 表示大阶段顺序（如朝代/纪），
+# 同一阶段下的章节再按章节名中的序号排序。
+STAGE_MODE_BOOKS: set[str] = {"资治通鉴"}
+
 
 def parse_chinese_number(text: str) -> int:
     """解析中文数字（一至九十九）或纯阿拉伯数字。
@@ -133,8 +137,11 @@ def sort_notes_tree(tree: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """对 tree 结构就地按规则排序并返回。
 
     - book 节点按书名排序
-    - chapter 节点优先按 frontmatter 中的 chapter_sort 排序；
-      无 chapter_sort 时回退到 chapter_sort_key（朝代/纪序号等）
+    - chapter 节点：
+      - 「阶段模式」书籍（如资治通鉴）：chapter_sort 表示朝代/纪阶段顺序，
+        同一阶段内按章节名序号排序；无 chapter_sort 时回退到 chapter_sort_key。
+      - 其他书籍：优先按 frontmatter 中的 chapter_sort 排序；
+        无 chapter_sort 时回退到 chapter_sort_key（朝代/纪序号等）。
     - event 节点优先按 frontmatter 中的 sort 排序；
       无 sort 时回退到 path 排序（保持稳定）
     """
@@ -142,19 +149,27 @@ def sort_notes_tree(tree: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for book_node in tree:
         book_name = book_node.get("title", "")
         children = book_node.get("children") or []
+        stage_mode = book_name in STAGE_MODE_BOOKS
 
-        def chapter_key(ch: dict[str, Any]) -> tuple[int, int, int, str]:
+        def chapter_key(ch: dict[str, Any]) -> tuple[int, int, str]:
+            title = str(ch.get("title", ""))
             explicit = _to_int(ch.get("chapter_sort"))
+            canonical = chapter_sort_key(book_name, title)
+
+            if stage_mode:
+                # chapter_sort 是阶段顺序；章节名序号作为阶段内二次排序
+                primary = explicit if explicit is not None else canonical[0]
+                return (primary, canonical[1], title)
+
+            # 非阶段模式：chapter_sort 是绝对顺序，内部按 event sort 稳定
             events = ch.get("children") or []
             event_sorts = [_to_int(e.get("sort")) for e in events]
             min_event_sort = min(
                 [s for s in event_sorts if s is not None], default=0
             )
             if explicit is not None:
-                # 显式 chapter_sort 优先；同组 chapter 按内部 event 的 sort 排序
-                return (0, explicit, min_event_sort, str(ch.get("title", "")))
-            fallback = chapter_sort_key(book_name, ch.get("title", ""))
-            return (1, fallback[0], fallback[1], fallback[2])
+                return (explicit, min_event_sort, title)
+            return (canonical[0], canonical[1], title)
 
         children.sort(key=chapter_key)
 

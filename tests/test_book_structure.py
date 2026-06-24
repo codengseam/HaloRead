@@ -135,6 +135,43 @@ def test_check_book_structure_missing_sort(tmp_path: Path):
     assert any("缺少必填字段: chapter_sort" in i.message for i in issues)
 
 
+def test_check_book_structure_accepts_zizhi_consistent_stage_sort(tmp_path: Path):
+    """阶段模式：同一朝代/纪的 chapter_sort 一致，校验通过。"""
+    output = tmp_path / "output"
+    book_dir = output / "资治通鉴"
+    book_dir.mkdir(parents=True)
+    (book_dir / "汉纪一_鸿门宴.md").write_text(
+        "---\ntitle: 鸿门宴\nbook: 资治通鉴\nchapter: 汉纪一\nevent: 鸿门宴\nsort: 1\nchapter_sort: 3\n---\n正文",
+        encoding="utf-8",
+    )
+    (book_dir / "汉纪二_垓下之围.md").write_text(
+        "---\ntitle: 垓下之围\nbook: 资治通鉴\nchapter: 汉纪二\nevent: 垓下之围\nsort: 1\nchapter_sort: 3\n---\n正文",
+        encoding="utf-8",
+    )
+
+    issues, _ = check_book_structure(str(output))
+    assert not issues
+
+
+def test_check_book_structure_detects_zizhi_inconsistent_chapter_sort(tmp_path: Path):
+    """阶段模式：同一朝代/纪的 chapter_sort 不一致，报 P1。"""
+    output = tmp_path / "output"
+    book_dir = output / "资治通鉴"
+    book_dir.mkdir(parents=True)
+    (book_dir / "汉纪一_鸿门宴.md").write_text(
+        "---\ntitle: 鸿门宴\nbook: 资治通鉴\nchapter: 汉纪一\nevent: 鸿门宴\nsort: 1\nchapter_sort: 3\n---\n正文",
+        encoding="utf-8",
+    )
+    (book_dir / "汉纪二_垓下之围.md").write_text(
+        "---\ntitle: 垓下之围\nbook: 资治通鉴\nchapter: 汉纪二\nevent: 垓下之围\nsort: 1\nchapter_sort: 4\n---\n正文",
+        encoding="utf-8",
+    )
+
+    issues, _ = check_book_structure(str(output))
+    assert any("汉纪 的 chapter_sort 与阶段序号 3 不符" in i.message for i in issues)
+    assert any(i.severity == "P1" for i in issues)
+
+
 def test_output_has_no_structure_issues():
     """回归测试：真实 output/ 目录必须零问题（BUG-017 等历史问题不复发）。"""
     issues, _ = check_book_structure("output")

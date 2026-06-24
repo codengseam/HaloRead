@@ -226,6 +226,27 @@
 - **回归测试**：`tests/test_book_structure.py::test_check_file_rejects_module_prefix_in_chapter`
 - **教训**：UI 文案类问题同样会反复出现，不能只靠一次性清理；必须把「不准出现」的样式规则落到校验脚本、测试集和开发规范里，才能根除。
 
+## 资治通鉴大章节顺序错乱（汉纪跑到周纪前面）
+
+- **编号**：BUG-022
+- **首次出现**：2026-06-24
+- **频次**：多次修复后复发
+- **现象**：`site/data/index.json` 里「资治通鉴」的章节顺序变成 `周纪一、周纪二、秦纪一、周纪三、汉纪一、汉纪七、汉纪三、汉纪三十…秦纪二、周纪四…`，汉纪插入到周纪前面；手机端书架目录混乱
+- **根因**：`sort_notes_tree` 优先使用 frontmatter `chapter_sort` 作为绝对排序，但 `output/资治通鉴/` 各文件的 `chapter_sort` 写得很乱：有的按朝代阶段写（汉纪=3）、有的按绝对顺序写（周纪四=4、秦纪二=3）、有的甚至缺失；结果写了 `chapter_sort` 的章节被当作显式组排在没写的回退组前面，同组内再按中文字符串序排，导致「汉纪十七」排在「汉纪十二」前面。`check_book_structure.py` 只校验章内 `sort`，不校验大章节顺序，所以 CI/pre-push 全部漏掉
+- **复现**：运行 `python scripts/build_site.py` 后检查 `site/data/index.json` 中 `books[?id=="资治通鉴"].tree` 的章节顺序
+- **修复**：
+  1. 新增 `scripts/fix_zizhi_chapter_sort.py`，把资治通鉴所有文件的 `chapter_sort` 统一为朝代/纪阶段序号（周纪=1、秦纪=2、汉纪=3…）
+  2. `src/utils/sorting.py` 引入「阶段模式」概念：`STAGE_MODE_BOOKS = {"资治通鉴"}`，阶段模式书籍按 `(chapter_sort, 章节名序号)` 排序，避免字符串序；其他书籍仍按 `(chapter_sort, event sort)` 排序，保持三国、史记、唐纪/宋纪/明纪等现有顺序不变
+  3. `scripts/check_book_structure.py` 新增 `_check_stage_mode_order`：阶段模式书籍中，同一朝代/纪的所有文件 `chapter_sort` 必须等于 `BOOK_CATEGORY_ORDER` 配置的阶段序号，否则报 P1
+  4. `scripts/build_site.py` 跳过下划线开头的辅助文件（如 `_目录.md`），避免目录中出现空章节
+- **涉及文件**：`scripts/fix_zizhi_chapter_sort.py`、`src/utils/sorting.py`、`scripts/check_book_structure.py`、`scripts/build_site.py`、`output/资治通鉴/*.md`
+- **回归测试**：
+  - `tests/test_sorting.py::test_sort_notes_tree_zizhi_stage_mode_orders_by_ordinal`
+  - `tests/test_book_structure.py::test_check_book_structure_detects_zizhi_inconsistent_chapter_sort`
+  - `tests/test_book_structure.py::test_output_has_no_structure_issues`
+  - `python scripts/check_book_structure.py --output output --strict` 退出码 0
+- **教训**：大章节顺序不能仅靠 frontmatter 字段的「约定」来维持；必须给特殊书籍定义明确的排序语义，并用校验脚本把语义固化为 P1 规则，否则数据迁移/重新生成时很容易再次写错。合并前 `--strict` 必须全部通过，包括历史遗留问题。
+
 ## 移动端阅读器多项体验问题（壁纸、自动阅读、代码块、沉浸模式白屏、滑条拖拽）
 
 - **编号**：BUG-020

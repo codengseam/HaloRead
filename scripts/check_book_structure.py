@@ -24,6 +24,8 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from src.utils.sorting import BOOK_CATEGORY_ORDER, STAGE_MODE_BOOKS, parse_chinese_number
+
 try:
     import yaml  # type: ignore
 except ImportError:
@@ -427,6 +429,115 @@ def _check_chapter_sorts(
     return issues
 
 
+def _check_stage_mode_order(file_metadata: list[dict[str, Any]]) -> list[Issue]:
+    """校验「阶段模式」书籍的大章节顺序。
+
+    阶段模式书籍（如资治通鉴）的 chapter_sort 必须等于该朝代/纪在
+    BOOK_CATEGORY_ORDER 中的阶段序号；同一阶段内的章节再按章节名序号排序。
+    任何与配置不符的 chapter_sort 都会破坏大章节顺序。
+    """
+    issues: list[Issue] = []
+
+    # book -> prefix -> {expected_stage_order, files: [(rel, chapter, chapter_sort, ordinal)]}
+    prefix_groups: dict[
+        str, dict[str, dict[str, Any]]
+    ] = defaultdict(lambda: defaultdict(lambda: {"expected": None, "files": []}))
+
+    for meta in file_metadata:
+        book = meta.get("dir_book") or meta.get("frontmatter", {}).get("book")
+        if book not in STAGE_MODE_BOOKS:
+            continue
+
+        parsed = meta.get("parsed")
+        if parsed is not None:
+            _, chapter, _ = parsed
+        else:
+            chapter = meta.get("frontmatter", {}).get("chapter", "")
+
+        categories = BOOK_CATEGORY_ORDER.get(book)
+        if not categories:
+            continue
+
+        matched_prefix = None
+        for prefix in sorted(categories.keys(), key=len, reverse=True):
+            if str(chapter).startswith(prefix):
+                matched_prefix = prefix
+                break
+
+        cs = meta.get("chapter_sort")
+        ordinal = parse_chinese_number(str(chapter)[len(matched_prefix):]) if matched_prefix else 0
+
+        if matched_prefix is None:
+            issues.append(
+                Issue(
+                    severity="P1",
+                    book=book,
+                    chapter=str(chapter),
+                    file=meta.get("rel", ""),
+                    message=f"阶段模式书籍出现未配置的章节前缀: {chapter!r}",
+                    fix_suggestion="在 BOOK_CATEGORY_ORDER 中补充该章节前缀，或确认章节名正确",
+                )
+            )
+            continue
+
+        group = prefix_groups[book][matched_prefix]
+        group["expected"] = categories[matched_prefix]
+        group["files"].append(
+            {
+                "rel": meta.get("rel", ""),
+                "chapter": str(chapter),
+                "chapter_sort": cs,
+                "ordinal": ordinal,
+            }
+        )
+
+    for book, prefixes in prefix_groups.items():
+        for prefix, group in prefixes.items():
+            expected = group["expected"]
+            files = group["files"]
+
+            # P1: chapter_sort 与阶段序号不符
+            mismatched = [
+                f for f in files
+                if f["chapter_sort"] is not None and f["chapter_sort"] != expected
+            ]
+            if mismatched:
+                issues.append(
+                    Issue(
+                        severity="P1",
+                        book=book,
+                        chapter=prefix,
+                        file=", ".join(f["rel"] for f in mismatched),
+                        message=(
+                            f"{prefix} 的 chapter_sort 与阶段序号 {expected} 不符: "
+                            f"{[(f['chapter'], f['chapter_sort']) for f in mismatched]}"
+                        ),
+                        fix_suggestion=f"将 {prefix} 下所有文件的 chapter_sort 统一改为 {expected}",
+                    )
+                )
+
+            # P1: 同一阶段内 chapter_sort 不一致
+            # 同一 chapter 下的多个事件共享同一 chapter_sort；
+            # 但不同 chapter 只要属于同一阶段，chapter_sort 也必须相同。
+            seen_sorts: dict[int, list[str]] = defaultdict(list)
+            for f in files:
+                if f["chapter_sort"] is not None:
+                    seen_sorts[f["chapter_sort"]].append(f["rel"])
+            if len(seen_sorts) > 1:
+                issues.append(
+                    Issue(
+                        severity="P1",
+                        book=book,
+                        chapter=prefix,
+                        file=", ".join(f"{rels} (chapter_sort={cs})" for cs, rels in sorted(seen_sorts.items())),
+                        message=f"{prefix} 阶段内 chapter_sort 不一致: {sorted(seen_sorts.keys())}",
+                        fix_suggestion=f"将 {prefix} 下所有文件的 chapter_sort 统一改为 {expected}",
+                    )
+                )
+
+    return issues
+
+
 def _group_by_chapter(file_metadata: list[dict[str, Any]]) -> dict[tuple[str, str], list[dict[str, Any]]]:
     """按（书，章）对文件元数据分组，用于章内排序校验。"""
     chapters: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -547,6 +658,7 @@ def check_book_structure(output_dir: str) -> tuple[list[Issue], list[dict[str, A
 
     chapters = _group_by_chapter(file_metadata)
     all_issues.extend(_check_chapter_sorts(chapters))
+    all_issues.extend(_check_stage_mode_order(file_metadata))
 
     return all_issues, file_metadata
 
