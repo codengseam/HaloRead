@@ -292,3 +292,39 @@
 - **涉及文件**：`src/web/static-site/js/app.js`、`src/web/static-site/css/style.css`、`tests/test_reader_features.js`、`tests/test_build_site.py`、`tests/run_regression_suite.sh`
 - **回归测试**：`tests/test_reader_features.js` 测试11/15、`tests/run_regression_suite.sh` 第3步
 - **教训**：「可选增强」的 Fullscreen API 在国产浏览器上并不安全，任何可能触发方向变化或系统全屏的 API 都应在移动端阅读器中禁用；代码块体验应优先自动换行，其次才保留横向滚动作为兜底。
+
+## agent 分支用完未清理导致远程分支堆积（不走 PR 使 merged 检测失效）
+
+- **编号**：BUG-023
+- **首次出现**：2026-06-25
+- **频次**：1（首次沉淀治理机制）
+- **类型**：构建 / 流程
+- **现象**：远程仓库堆积 22 个 `trae/agent-*` 残留分支，导致 `git clone` 体积膨胀。用户工作流为「AI 在 agent 分支工作 → 用户检查 → AI 调用 git-merge-guardian 模式 B 直接合入 master 并 push（不走 PR）」，因不走 PR，`git branch --merged` 显示这些分支「未合并」，但内容其实已等价进入 master，无人清理
+- **根因**（两层）：
+  1. `git-merge-guardian` SKILL.md 模式 B 合并后只删除**当前**功能分支，不巡检其他遗留 agent 分支
+  2. 用户不走 PR 直接合入 master（模式 B），rebase + merge 后分支独有提交不一定作为 ancestor 进入 master 历史，导致传统 `git branch --merged` / `git merge-base --is-ancestor` 失效，无法识别「等价合入」
+- **修复**（三组件长远方案，B+C）：
+  1. **治理脚本 `scripts/branch_governance.py`**：CI 与 skill 共用的判定引擎，支持 dry-run / execute 两种模式；用「patch-id 比对(0.3) + 文件 blob 内容比对(0.5) + commit message 匹配(0.2)」三方法综合判定「等价合入」，输出置信度；merge-base ancestor 命中直接 confidence=1.0；受保护分支白名单（master/main/gh-pages/release/*）永不删除；execute 必须带 `--yes`
+  2. **CI 主触发 `.github/workflows/branch-cleanup.yml`**：push to master 自动 dry-run 报告（只读权限）；workflow_dispatch 手动 execute（绑定 GitHub Environment `branch-cleanup-execute` 审批 + `contents: write` 权限）
+  3. **Skill 兜底扩展 `.trae/skills/git-merge-guardian/SKILL.md`**：模式 A/B 清理当前分支后，额外执行一次遗留分支巡检，dry-run 报告展示给用户，确认后才 execute
+- **涉及文件**：
+  - 新增：`scripts/branch_governance.py`、`.github/workflows/branch-cleanup.yml`、`tests/test_branch_governance.py`
+  - 修改：`.trae/skills/git-merge-guardian/SKILL.md`（新增「分支生命周期治理」段落）、`tests/run_regression_suite.sh`（新增第 10 步分支治理回归断言，原 `[1/9]~[9/9]` 同步改为 `[1/10]~[10/10]`）
+- **回归测试**：
+  - `tests/test_branch_governance.py`：
+    - `test_ancestor_fast_path_confidence_one`：merge-base ancestor 命中 → confidence=1.0
+    - `test_dry_run_identifies_equivalent_merged_branch`：分支独有提交的文件内容在 master 一致但非 ancestor → 标记删除候选
+    - `test_dry_run_keeps_branch_with_unique_changes`：分支含 master 未应用改动 → 标记保留
+    - `test_protected_branches_never_deleted`：master/gh-pages 即便匹配 pattern 也不被 execute 删除
+    - `test_execute_requires_yes_flag`：execute 无 `--yes` → 退出码非 0，无删除
+    - `test_pattern_filter_excludes_unrelated`：pattern=`trae/agent-*` 时 `feature/other` 不进报告
+  - `tests/run_regression_suite.sh` 第 10 步（脚本级冒烟）：
+    - `python scripts/branch_governance.py --help` 退出码 0
+    - `python scripts/branch_governance.py --mode dry-run --pattern "trae/agent-*"` 退出码 0
+    - dry-run 报告含「保护分支」段落，master 出现在保留列表
+    - execute 无 `--yes` 时拒绝执行（退出码非 0）
+- **复现步骤**：
+  1. 在远程创建若干 `trae/agent-test-*` 分支并合入 master（不走 PR，用 `git merge --no-ff` 后 `git push origin master --no-verify`）
+  2. 删除当前分支后，观察其他 agent 分支是否仍残留
+  3. 运行 `git branch --merged origin/master`，观察是否漏报这些已等价合入的分支
+- **教训/沉淀**：当工作流绕过 PR（直接合入 master）时，传统 git 合并检测（`--merged`、merge-base ancestor）会失效，所有依赖「分支是否已合入」的工具（分支清理、stale bot、覆盖率统计）都需要补一套「等价合入」判定逻辑。Skill 的分支清理不能只盯当前分支，必须做一次全局巡检；CI 与 skill 共用同一治理脚本，保证判定口径一致。

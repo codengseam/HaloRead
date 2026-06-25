@@ -264,6 +264,46 @@ git branch -d <功能分支名>
 git push origin --delete <功能分支名>
 ```
 
+## 分支生命周期治理（兜底巡检，BUG-023）
+
+模式 A/B 清理完**当前**功能分支后，**额外执行一次遗留 agent 分支巡检**，
+避免 trae/agent-* 分支堆积（参见 `tests/bug_regression_list.md` BUG-023）。
+
+### 触发时机
+- 模式 B：`git push origin --delete <当前功能分支>` 成功之后
+- 模式 A：用户告知 "PR 已合并" 并清理当前分支之后
+
+### 巡检流程
+1. 调用治理脚本 dry-run（只读，安全）：
+   ```bash
+   python scripts/branch_governance.py --mode dry-run --pattern "trae/agent-*"
+   ```
+2. 分类向用户汇报：
+   - **删除候选（confidence ≥ 0.6，等价合入）**：列分支名 + 置信度 + 命中方法，询问"是否批量删除？"
+   - **需人工确认（0.3 ≤ confidence < 0.6）**：列分支名 + 原因，提示逐个判断
+   - **保留（confidence < 0.3）**：仅报数量，不打扰
+   - **受保护分支**：跳过，仅说明已排除
+3. 用户确认后批量 execute：
+   ```bash
+   python scripts/branch_governance.py --mode execute --pattern "trae/agent-*" --yes
+   ```
+   或对单分支显式删除：
+   ```bash
+   python scripts/branch_governance.py --mode execute --branch trae/agent-xxx --yes
+   ```
+
+### 安全约束（必须遵守）
+- **绝不**跳过 dry-run 直接 execute
+- **绝不**删除受保护分支（master/main/gh-pages/release/*）
+- **绝不**删除 confidence < 0.6 的分支，除非用户对该具体分支明确说"删除"
+- 巡检报告必须先展示给用户，**用户未确认前不得 execute**
+- 治理脚本不存在或执行失败时**仅告警**，不阻断合并（治理是兜底，非合并必要条件）
+
+### 与 CI 的分工
+- **CI（branch-cleanup.yml）**：每次 push master 自动 dry-run 审计，workflow_dispatch 手动 execute
+- **Skill 兜底**：合并当下趁用户在场立刻巡检，避免遗忘
+- 两者共用 `scripts/branch_governance.py`，判定口径一致
+
 ## 最终验证
 
 无论哪种模式，合并完成后都要在 master 上运行：
