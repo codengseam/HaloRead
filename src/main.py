@@ -95,11 +95,43 @@ def _generate_stub(
     return output_path
 
 
+def _load_book_meta(book: str, output_dir: str) -> dict:
+    """读取 output/{book}/_meta.yaml，返回解析后的 dict。
+
+    用内置简易解析器（避免依赖 PyYAML），只支持单层 key:value。
+    文件不存在或解析失败时返回空 dict。
+    """
+    if not book:
+        return {}
+    safe_book = _sanitize_filename(book)
+    meta_path = Path(output_dir) / safe_book / "_meta.yaml"
+    if not meta_path.exists():
+        return {}
+    result: dict = {}
+    for line in meta_path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if value.startswith('"') and value.endswith('"'):
+            value = value[1:-1]
+        if key:
+            result[key] = value
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="个人 AI 深度阅读助手")
     parser.add_argument("--book", help="书名，例如：资治通鉴")
     parser.add_argument("--chapter", help="章节，例如：周纪二")
     parser.add_argument("--event", help="事件，例如：商鞅变法")
+    parser.add_argument(
+        "--archetype",
+        help="形态范式桶（narrative/modern/knowledge/fiction），"
+        "未传则按 category 默认映射",
+    )
     parser.add_argument("--input", dest="user_input", help="自然语言输入")
     parser.add_argument("--dry-run", action="store_true", help="只生成不保存")
     parser.add_argument("--stub", action="store_true", help="使用占位生成器（无需 API Key，用于测试 Web 界面）")
@@ -121,6 +153,20 @@ def main() -> int:
         parts = [p for p in [book, chapter, event] if p]
         user_input = " ".join(parts)
 
+    # 解析 archetype（design.md §5.6 信源优先级）：
+    #   CLI --archetype > _meta.yaml.archetype > category 默认映射 > narrative
+    # 阶段1 打通数据流：读 _meta.yaml 的 category 与 archetype，调 resolve_archetype 兜底。
+    # CLI 传非法值时视为未提供，回落到 _meta.yaml.archetype。
+    from src.utils.prompts import resolve_archetype, _VALID_ARCHETYPES
+
+    meta = _load_book_meta(book, args.output_dir)
+    cli_archetype = args.archetype or ""
+    meta_archetype = meta.get("archetype", "")
+    category = meta.get("category", "")
+    # CLI 合法时优先；CLI 非法或未传时用 _meta.yaml 的显式 archetype；都未传时走 category 默认映射
+    explicit = cli_archetype if cli_archetype in _VALID_ARCHETYPES else (meta_archetype or None)
+    archetype = resolve_archetype(category, explicit=explicit)
+
     if args.stub:
         output_path = _generate_stub(
             book, chapter, event, user_input, args.output_dir, dry_run=args.dry_run
@@ -137,6 +183,7 @@ def main() -> int:
         "book": book,
         "chapter": chapter,
         "event": event,
+        "archetype": archetype,
         "user_input": user_input,
         "output_path": "",
         "sections": {},

@@ -224,10 +224,13 @@ _meta.yaml (archetype 字段)
          └─→ content_quality.run_content_quality_checks：按 archetype 路由规则集
 ```
 
-archetype 信源优先级：
-1. `_meta.yaml` 的 `archetype` 字段（显式声明，最高优先）
-2. `category → archetype` 默认映射表（兜底）
-3. CLI `--archetype` 参数（手动覆盖，用于一次性生成）
+archetype 信源优先级（v2 修订，与附录A伪代码统一）：
+1. CLI `--archetype` 参数（手动覆盖，最高优先，用于一次性强制生成）
+2. `_meta.yaml` 的 `archetype` 字段（显式声明，专栏级默认）
+3. `category → archetype` 默认映射表（兜底）
+4. `narrative`（最终兜底，古籍基线）
+
+> 说明：CLI 优先是为了支持"一次性强制覆盖"场景（如临时用 modern 桶生成某个史类章节做对比）。`_meta.yaml` 是专栏级常态声明，覆盖 category 默认映射。附录A的 `resolve_archetype(category, explicit)` 中 `explicit` 参数在 main.py 实现里接收 `cli_archetype or meta_archetype`，即 CLI 与 _meta.yaml 显式声明合并为 explicit 信源，CLI 优先。
 
 ---
 

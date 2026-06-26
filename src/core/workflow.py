@@ -39,6 +39,10 @@ except ImportError as exc:  # 另一个 agent 尚未创建该文件时兜底
     _module_logger.warning("ChiefEditorAgent 未就绪（%s），chief_editor 节点将跳过", exc)
 
 # 仅当开关开启且两个 Agent 均可导入时，才真正接入新节点；否则走原管线。
+# TODO 阶段3（archetype 分桶）: 把 _USE_SOUL_INJECTION 升级为
+#   _soul_injection_for_archetype(state["archetype"])，按 archetype 决定
+#   narrative 启用现版 / modern·knowledge 跳过 / fiction 待设计。
+#   详见 docs/archetype-design/design.md §10.6
 _USE_SOUL_INJECTION = (
     SOUL_INJECTION_ENABLED and _TONE_SETTER_AVAILABLE and _CHIEF_EDITOR_AVAILABLE
 )

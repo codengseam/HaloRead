@@ -1004,3 +1004,41 @@ BUG-013 修复并部署后，PC 浏览器访问 GitHub Pages / ModelScope 均正
 3. 存量 686 篇按"总编 GO/REWORK"分级，REWORK 进重做队列
 4. 把 check_chapter_title_soul 接入 ChiefEditor Agent 终审（<3 分自动打回重写）
 5. 标题"灵魂"扩展到史记/资治通鉴（先扫描存量低分标题清单）
+
+---
+
+## Loop #N+1：archetype 分桶阶段1 - 打通数据流（2026-06-26）
+
+### 背景
+不同类型专栏（史/经/养生/财/技/职场）共用一套古籍方法论，理财课/AI课等被古籍规则误报、被 soul injection 强加"生死悲剧底色"。设计 archetype 分桶（narrative/modern/knowledge/fiction）解决一刀切，详见 `docs/archetype-design/design.md`。本 Loop 是五阶段迁移的阶段1。
+
+### 核心改动（TDD：先红测试→绿实现→重构）
+1. `src/core/state.py`：AgentState 新增 `archetype: str` 字段
+2. `src/utils/prompts.py`：新增 `resolve_archetype(category, explicit)` 函数，含 config 值合法性校验（防笔误脏值）
+3. `src/main.py`：CLI 新增 `--archetype`；新增 `_load_book_meta` 读 `_meta.yaml`；按优先级 `CLI > _meta.yaml.archetype > category 默认映射 > narrative` 解析 archetype 注入 initial_state
+4. `config.yaml`：新增 `archetype_defaults` 映射表（6 条 category→archetype）
+5. `output/易经课/_meta.yaml`：新增 `archetype: knowledge`（唯一需显式覆盖的专栏，经→knowledge）
+6. `src/core/workflow.py`：`_USE_SOUL_INJECTION` 处加 TODO 挂载点（阶段3 升级为按 archetype 路由）
+7. `tests/test_archetype.py`：41 个测试用例（契约 + 16 专栏归类 + main.py 集成验证 archetype 真透传到 initial_state）
+
+### 专家团打分与修复（LoopAgent 闭环）
+首轮三视角打分：架构师 5.5、测试 6.0、规则 7.5。三视角一致指出核心问题：`resolve_archetype` 是死代码，main.py 没调用它，"打通数据流"只通了一半，archetype 空串污染。
+修复 8 项：main.py 真调 resolve_archetype+读 _meta.yaml、CLI 测试改 monkeypatch 拦截 build_workflow 验真、16 专栏测试调 resolve_archetype 去 defaults 副本、config 值合法性校验、design §5.6 优先级与附录A统一、路径硬编码、workflow TODO。
+
+### 可复用资产
+- `resolve_archetype(category, explicit)` 函数可复用到阶段2质检分桶、阶段3结构模板路由、阶段4 prompt 加载
+- `_load_book_meta` 可复用到任何需读 `_meta.yaml` 的场景（展示层、质检层）
+- `sys.modules` 注入假模块的测试手法可复用到所有依赖 langgraph 但需在无 langgraph 环境跑的集成测试
+- "专家团打分→修复→重打分"闭环可复用到所有阶段验收
+
+### 教训/沉淀
+- **TDD 不能只测函数要测链路**：首轮 TDD 只测了 resolve_archetype 函数契约，没测 main.py 是否真调用它，导致"绿了测试但数据流没打通"的虚假绿灯。后续 TDD 必须包含端到端集成测试（拦截 build_workflow 验 initial_state）。
+- **专家团交叉验证的价值**：三个视角独立发现同一个核心问题（死代码），证明多视角并行评审比单视角更能发现结构性缺陷。
+- **设计文档优先级要自洽**：design §5.6 正文与附录A伪代码对优先级表述矛盾，被架构师和规则视角同时指出。设计文档的正文与伪代码必须一致，否则实现时会无所适从。
+
+### 待办（下一 Loop：阶段2质检分桶）
+1. `content_quality.py` 按 archetype 路由规则集（删除 `_is_modern_column` 关键词判定）
+2. `check_numeric_facts` 的 manual_review 误标在 content_quality.py 调用层按 archetype 过滤（不碰 quality.py 禁区）
+3. 新增 `KNOWLEDGE_TERMS_WHITELIST`（Token/Transformer/Attention/RAG 等）
+4. 理财课/AI课质检误报数对比验证（阶段2 验收指标）
+5. 落实 BUG-026 教训：灵魂类检查按桶路由、合规类全桶共享
