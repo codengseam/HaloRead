@@ -207,6 +207,7 @@ class TestMainArchetypeIntegration:
                 "--book", "易经课",
                 "--chapter", "测试章",
                 "--event", "测试事件",
+                "--output-dir", str(PROJECT_ROOT / "output"),
             ],
         )
         rc = main_mod.main()
@@ -229,6 +230,7 @@ class TestMainArchetypeIntegration:
                 "--book", "理财课",
                 "--chapter", "测试章",
                 "--event", "测试事件",
+                "--output-dir", str(PROJECT_ROOT / "output"),
             ],
         )
         rc = main_mod.main()
@@ -248,6 +250,7 @@ class TestMainArchetypeIntegration:
                 "--book", "资治通鉴",
                 "--chapter", "测试章",
                 "--event", "测试事件",
+                "--output-dir", str(PROJECT_ROOT / "output"),
             ],
         )
         rc = main_mod.main()
@@ -269,6 +272,7 @@ class TestMainArchetypeIntegration:
                 "--chapter", "测试章",
                 "--event", "测试事件",
                 "--archetype", "modern",
+                "--output-dir", str(PROJECT_ROOT / "output"),
             ],
         )
         rc = main_mod.main()
@@ -294,6 +298,7 @@ class TestMainArchetypeIntegration:
                 "--chapter", "测试章",
                 "--event", "测试事件",
                 "--archetype", "不存在的桶",
+                "--output-dir", str(PROJECT_ROOT / "output"),
             ],
         )
         rc = main_mod.main()
@@ -341,21 +346,10 @@ EXPECTED_ARCHETYPES = {
 }
 
 
-def _parse_meta_yaml(path: Path) -> dict:
-    """简易解析 _meta.yaml（避免依赖 PyYAML）。"""
-    result = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.split("#", 1)[0].strip()
-        if ":" not in line:
-            continue
-        key, _, value = line.partition(":")
-        key = key.strip()
-        value = value.strip()
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
-        if key:
-            result[key] = value
-    return result
+def _load_meta(book_dir: str) -> dict:
+    """读取真实 _meta.yaml（复用生产 _load_book_meta，避免测试自造解析器漂移）。"""
+    from src.main import _load_book_meta
+    return _load_book_meta(book_dir, str(PROJECT_ROOT / "output"))
 
 
 class TestMetaYamlArchetype:
@@ -364,6 +358,7 @@ class TestMetaYamlArchetype:
     修复专家意见：原测试复制一份 defaults 副本自证，与 resolve_archetype 脱钩。
     现改为调用 resolve_archetype(category, explicit=meta_archetype) 验证，
     让测试真正锁住 resolve_archetype 的行为。
+    解析器复用生产 _load_book_meta，避免两套解析逻辑漂移。
     """
 
     @pytest.fixture(autouse=True)
@@ -377,7 +372,7 @@ class TestMetaYamlArchetype:
     def test_book_archetype_via_resolve(self, book_dir, expected):
         meta_path = PROJECT_ROOT / "output" / book_dir / "_meta.yaml"
         assert meta_path.exists(), f"{book_dir} 的 _meta.yaml 应存在但缺失: {meta_path}"
-        meta = _parse_meta_yaml(meta_path)
+        meta = _load_meta(book_dir)
         category = meta.get("category", "")
         meta_archetype = meta.get("archetype", "") or None
         actual = resolve_archetype(category, explicit=meta_archetype)

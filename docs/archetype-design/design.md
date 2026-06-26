@@ -547,7 +547,9 @@ VALID_ARCHETYPES = {"narrative", "modern", "knowledge", "fiction"}
 def resolve_archetype(category: str, explicit: str | None = None) -> str:
     if explicit in VALID_ARCHETYPES:
         return explicit
-    return ARCHETYPE_DEFAULTS.get(category, "narrative")  # 兜底走古籍
+    value = ARCHETYPE_DEFAULTS.get(category, "narrative")
+    # config 值合法性校验（防笔误脏值污染下游），与生产实现 src/utils/prompts.py:56-60 对齐
+    return value if value in VALID_ARCHETYPES else "narrative"
 ```
 
 ---

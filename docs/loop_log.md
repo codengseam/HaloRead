@@ -1019,7 +1019,8 @@ BUG-013 修复并部署后，PC 浏览器访问 GitHub Pages / ModelScope 均正
 4. `config.yaml`：新增 `archetype_defaults` 映射表（6 条 category→archetype）
 5. `output/易经课/_meta.yaml`：新增 `archetype: knowledge`（唯一需显式覆盖的专栏，经→knowledge）
 6. `src/core/workflow.py`：`_USE_SOUL_INJECTION` 处加 TODO 挂载点（阶段3 升级为按 archetype 路由）
-7. `tests/test_archetype.py`：41 个测试用例（契约 + 16 专栏归类 + main.py 集成验证 archetype 真透传到 initial_state）
+7. `tests/test_archetype.py`：42 个测试用例（契约 + 16 专栏归类 + main.py 集成验证 archetype 真透传到 initial_state）
+8. `docs/archetype-design/design.md`：§5.6 v2 修订（统一信源优先级表述，与附录A伪代码对齐；附录A伪代码补 config 值合法性校验）
 
 ### 专家团打分与修复（LoopAgent 闭环）
 首轮三视角打分：架构师 5.5、测试 6.0、规则 7.5。三视角一致指出核心问题：`resolve_archetype` 是死代码，main.py 没调用它，"打通数据流"只通了一半，archetype 空串污染。
