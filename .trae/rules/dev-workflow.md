@@ -1,47 +1,47 @@
-# 项目开发协作流程规则
+# Project Development Collaboration Workflow
 
-本规则用于指导 Agent 在 Trae IDE 中与用户进行**项目开发协作**时的默认行为。
-详细项目背景见 [README.md](../../README.md)。
+This rule guides the Agent's default behavior during **project development collaboration** in Trae IDE.
+See [README.md](../../README.md) for detailed project background.
 
-## 零、适用范围与边界声明
+## 0. Scope & Boundary
 
-### 1. 适用场景
+### 1. Applicable Scenarios
 
-本规则**仅适用于项目开发协作对话**——即用户在 Trae 中讨论代码改动、功能实现、Bug 修复、流程优化、方案评审等开发类任务时。
+This rule **applies only to project development collaboration conversations** — i.e. when the user discusses code changes, feature implementation, bug fixes, workflow optimization, plan review, and other development tasks in Trae.
 
-**不适用于**：生成古籍讲书笔记。讲书笔记生成由 `.trae/rules/rules.md` 和 `.trae/skills/deep-reading/SKILL.md` 负责，本规则不干预。
+**Not applicable to**: generating classical-book reading notes. Note generation is handled by `.trae/rules/rules.md` and `.trae/skills/deep-reading/SKILL.md`; this rule does not intervene.
 
-### 2. Trae Skill 能力边界（必须如实遵守）
+### 2. Trae Skill Capability Boundary (must be followed honestly)
 
-| 能力 | Skill 是否支持 |
+| Capability | Skill supports? |
 |---|---|
-| 识别用户意图、加载规范、引导 Agent 行为 | 支持 |
-| 让 Agent 调用 RunCommand / Read / Edit 等内置工具 | 支持（通过 Prompt 引导） |
-| **创建 / 调度 sub-agents** | **不支持** |
-| **直接调用 MCP tools** | **不支持** |
-| 执行代码、保存文件、维护状态 | **不支持** |
+| Recognize user intent, load specs, guide Agent behavior | Yes |
+| Let Agent call built-in tools (RunCommand / Read / Edit, etc.) | Yes (via prompt guidance) |
+| **Create / schedule sub-agents** | **No** |
+| **Directly call MCP tools** | **No** |
+| Execute code, save files, maintain state | **No** |
 
-**重要**：当用户提到"启用多个 agent""专家团并行""多 Agent 评审"时，不要假装 Skill 可以调度子 Agent。可行路径只有两条：
-- **路径 A**：由单个 Agent 串行切换视角（架构师→测试→规则），伪并行。
-- **路径 B**：Skill 触发本地 Python 脚本（如 `python scripts/review_plan.py`），由 Python 引擎（LangGraph）做真并行。
+**Important**: When the user mentions "启用多个 agent" / "专家团并行" / "多 Agent 评审", do NOT pretend the Skill can schedule sub-agents. Only two viable paths exist:
+- **Path A**: A single Agent serially switches perspectives (architect → tester → rules), pseudo-parallel.
+- **Path B**: The Skill triggers a local Python script (e.g. `python scripts/review_plan.py`), and the Python engine (LangGraph) does true parallelism.
 
-本项目已为路径 B 配备基础设施：`src/agents/` + `src/core/workflow.py` + `scripts/review_plan.py`。
+This project already provides infrastructure for Path B: `src/agents/` + `src/core/workflow.py` + `scripts/review_plan.py`.
 
-## 一、默认协作流程（每次开发对话自动生效）
+## 1. Default Collaboration Workflow (auto-effective for every development conversation)
 
-收到用户的开发类需求后，**必须按以下顺序执行**，不可跳步：
+After receiving a development request, **execute in the following order**, no skipping:
 
-### 第一步：重述需求
+### Step 1: Restate the requirement
 
-用一句话重述用户意图，确认理解一致。格式：
+Restate the user's intent in one sentence to confirm shared understanding. Format:
 
 > 我理解你要做的是：____（一句话）。核心目标是：____（用户原话或提炼）。
 
-如果用户已明确给出核心目标，直接引用；如果没有，主动提炼并标注"（我提炼的，请确认）"。
+If the user has explicitly stated the core goal, quote it directly; if not, distill it proactively and mark it "（我提炼的，请确认）".
 
-### 第二步：生成计划并等确认
+### Step 2: Generate a plan and wait for confirmation
 
-围绕核心目标列出计划要点，**等用户确认后再执行**。计划格式：
+List plan points around the core goal, **wait for user confirmation before executing**. Plan format:
 
 ```
 ## 计划
@@ -54,63 +54,71 @@
 - 风险点：____
 ```
 
-**不要在用户确认前开始改代码。** 如果用户说"直接做""开始吧""嗯"等明确同意的话，才进入第三步。
+**Do not start changing code before the user confirms.** Only proceed to Step 3 when the user says "直接做" / "开始吧" / "嗯" or other clear consent.
 
-### 第三步：执行
+### Step 3: Execute
 
-执行时遵守以下规范：
+Follow these norms during execution:
 
-- **优先复用现有能力**：先查 `.trae/skills/`、`.trae/rules/`、`.trae/checklists/`、`prompts/`、`src/agents/`、`src/core/` 是否已有可复用的 Skill / 规则 / 提示词 / Agent，避免重复造轮子。
-- **并行提速**：能并行的子任务尽量并行（用 Task 工具启动多个 subagent，或调用 Python 脚本做真并行）。
-- **遵循现有目录结构与命名规范**：见 README §七、§八。
-- **不过度工程化**：只做直接请求或必要的事，不主动加抽象、加配置、加兼容层。
+- **Reuse existing capabilities first**: Check `.trae/skills/`, `.trae/rules/`, `.trae/checklists/`, `prompts/`, `src/agents/`, `src/core/` for reusable Skills / rules / prompts / Agents before reinventing.
+- **Parallel speedup**: Parallelize independent sub-tasks where possible (launch multiple subagents with the Task tool, or call Python scripts for true parallelism).
+- **Follow existing directory structure & naming conventions**: see README §七、§八; when adding/renaming Markdown chapters, do NOT use the 「模块N」 prefix in the `chapter` field or filename (historical issue BUG-019).
+- **No over-engineering**: Only do what is directly requested or necessary; do not proactively add abstractions, configs, or compatibility layers.
+- **All validation issues must be cleared before merge**: Run `python scripts/check_book_structure.py --output output --strict`; P0/P1/P2 must all pass before merge/push. If issues not introduced by this change are found, they still must be fixed; after fixing, judge whether it is a recurring code/data bug, and add regression tests or update `tests/bug_regression_list.md`.
 
-### 第四步：自检
+### Step 4: Self-check
 
-完成后**主动启用自检**，对照 `.trae/checklists/dev-checklist.md` 逐项检查并修复。也可由用户触发 `.trae/skills/dev-selfcheck/SKILL.md`。
+After completion, **proactively trigger self-check**, inspecting item-by-item against `.trae/checklists/dev-checklist.md` and fixing failures. Can also be triggered by the user via `.trae/skills/dev-selfcheck/SKILL.md`.
 
-### 第五步：沉淀（LoopAgent 思维）
+Self-check must include:
+- `python scripts/check_book_structure.py --output output --strict` passes.
+- `pytest` all pass.
+- If a historical or recurring bug was fixed, regression tests have been added or `tests/bug_regression_list.md` updated.
 
-每次开发完成后，做一次沉淀复盘：
+### Step 5: Sediment (LoopAgent mindset)
 
-- 本次改动是否暴露了新的共性问题？
-- 是否需要更新 `.trae/rules/` 或 `src/utils/quality.py`？
-- 是否需要更新 `.trae/checklists/dev-checklist.md`？
-- 是否需要在 `docs/loop_log.md` 追加一条开发沉淀记录？
+After each development completion, do a sediment retrospective:
 
-**目标**：让开发协作本身也变成可迭代的 Loop，沉淀经验，避免同类问题反复出现。
+- Did this change expose a new common problem?
+- Do `.trae/rules/` or `src/utils/quality.py` need updating?
+- Does `.trae/checklists/dev-checklist.md` need updating?
+- Should a development-sediment record be appended to `docs/loop_log.md`?
 
-## 二、提示词固化（无需用户每次粘贴）
+**Goal**: Make development collaboration itself an iterable Loop, sedimenting experience to avoid recurring problems.
 
-用户此前每次对话都要粘贴下面这段提示词：
+## 2. Prompt Solidification (no need for user to paste each time)
+
+Previously the user had to paste this prompt every conversation:
 
 > 启用多个 agent 组成专家团理解下面的需求，并使用 skills 和 checklist 规范执行，用多个 agent 并行提速，完成后启用专家团检查并修复完成，采用 loop agent 的思维来开发优化这个项目；主要是得添加核心目标，然后围绕目标去实现
 
-本规则已将这段提示词拆解为上述五个步骤并固化为默认行为。**用户不再需要手动粘贴**。
+This rule has decomposed that prompt into the five steps above and solidified them as default behavior. **The user no longer needs to paste manually.**
 
-对应关系：
+Mapping:
 
-| 提示词原文 | 固化到 |
+| Original prompt text | Solidified into |
 |---|---|
-| "启用多个 agent 组成专家团理解下面的需求" | 第一步重述需求 + 第二步生成计划；如需真并行评审，触发 `.trae/skills/plan-review/SKILL.md` |
-| "使用 skills 和 checklist 规范执行" | 第三步执行中的"优先复用现有能力" + 第四步自检对照 checklist |
-| "用多个 agent 并行提速" | 第三步执行中的"并行提速" |
-| "完成后启用专家团检查并修复完成" | 第四步自检 |
-| "采用 loop agent 的思维来开发优化这个项目" | 第五步沉淀 |
-| "主要是得添加核心目标，然后围绕目标去实现" | 第一步重述需求中的"核心目标" + 第二步计划中的"围绕核心目标" |
+| "启用多个 agent 组成专家团理解下面的需求" | Step 1 restate requirement + Step 2 generate plan; for true parallel review, trigger `.trae/skills/plan-review/SKILL.md` |
+| "使用 skills 和 checklist 规范执行" | Step 3 "reuse existing capabilities" + Step 4 self-check against checklist |
+| "用多个 agent 并行提速" | Step 3 "parallel speedup" |
+| "完成后启用专家团检查并修复完成" | Step 4 self-check |
+| "采用 loop agent 的思维来开发优化这个项目" | Step 5 sediment |
+| "主要是得添加核心目标，然后围绕目标去实现" | Step 1 "core goal" + Step 2 plan "around the core goal" |
 
-## 三、语言风格
+## 3. Language Style
 
-- 中文为主，自然口语化。
-- 重述需求时简洁明了，不堆砌背景。
-- 计划要点用列表，不用大段文字。
-- 执行过程中及时汇报进度，不沉默操作。
-- 自检报告用清单形式，标注通过/未通过。
+- Chinese-first, natural and colloquial.
+- Restate requirements concisely, no background padding.
+- Use lists for plan points, not long paragraphs.
+- Report progress promptly during execution, no silent operations.
+- Self-check reports use checklist form, marking pass/fail.
 
-## 四、禁止事项
+## 4. Prohibitions
 
-- **不在用户确认前改代码**。
-- **不假装 Skill 可以调度 sub-agents**——做不到就如实说明，给出路径 A 或路径 B 的替代方案。
-- **不破坏现有体系**：`.trae/skills/deep-reading/`、`.trae/rules/rules.md`、`prompts/` 下 7 份讲书提示词、`src/utils/quality.py` 不在本规则的修改范围内。
-- **不过度工程化**：能用规则文件解决的不写 Skill；能用 Skill 引导的不写 Python；只有真需要多 Agent 并行时才动用 LangGraph。
-- **不跳过沉淀**：每次开发完成后都要做第五步沉淀复盘，哪怕只是"本次无新沉淀"也要说明。
+- **Do not change code before user confirmation**.
+- **Do not pretend the Skill can schedule sub-agents** — if it can't, say so honestly and give Path A or Path B alternatives.
+- **Do not break the existing system**: `.trae/skills/deep-reading/`, `.trae/rules/rules.md`, the 7 reading-note prompts under `prompts/`, and `src/utils/quality.py` are out of scope for modification by this rule.
+- **No over-engineering**: Use a rule file instead of a Skill when possible; use a Skill instead of Python when possible; only use LangGraph when true multi-Agent parallelism is needed.
+- **Do not skip sediment**: Every development completion must do the Step 5 sediment retrospective, even if just "no new sediment this time".
+- **Do not skip fixes on the grounds that "the issue was not introduced this time"**: Before merge/push, `check_book_structure.py --strict`, `pytest`, and the regression test suite must all pass.
+- **Do not push/merge while any validation issue exists**: including P2-level issues.
