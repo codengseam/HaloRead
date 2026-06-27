@@ -16,6 +16,7 @@ from typing import Dict, List
 from src.utils.quality import (
     check_ai_cliches,
     check_ai_tone,
+    check_chapter_title_soul,
     check_mixed_language,
     check_modern_jargon,
     check_numeric_facts,
@@ -342,6 +343,108 @@ def _filter_numeric_manual(manual_review: List[dict], archetype: str) -> List[di
     ]
 
 
+def _check_soul_dimension(content: str, cliches_result: dict) -> List[str]:
+    """灵魂维度自动检查（content-quality.md §9.1/9.2/9.3/9.4）。
+
+    §9.1 灵魂三问用启发式近似（无需 LLM，纯 AI 闭环）：
+    - 活人测试：检测两难困境词 + 标签词密度
+    - 洞察独家性：检测绝对化"正确废话"词
+    - 底色敬畏感：检测戏谑/爽化词
+
+    §9.2/9.3/9.4 已实现：
+    - §9.2 AI 套话黑名单（命中 ≥3 次扣 5 分）
+    - §9.3 数字事实硬错误（每项扣 3 分，上限 15）
+    - §9.4 章回体灵魂标题（单标题 <3 分需重写，每个低分标题扣 2 分）
+
+    cliches_result 复用主流程已跑的 check_ai_cliches 结果，避免重复扫描。
+    """
+    issues: List[str] = []
+    body = _strip_frontmatter(content)
+
+    # §9.1 灵魂三问启发式近似
+    issues.extend(_check_soul_three_questions(body))
+
+    # §9.2 AI 套话黑名单
+    if cliches_result["level"] == "warning":
+        issues.append(
+            f"灵魂维度-§9.2 AI套话黑名单命中 {cliches_result['count']} 次"
+        )
+    # §9.3 数字事实硬错误（auto_errors 已在 truth 维度逐条记录，
+    # 这里只做灵魂维度的"是否命中"信号——命中任一即触发灵魂扣分）
+    numeric_result = check_numeric_facts(body)
+    if numeric_result["auto_errors"]:
+        issues.append(
+            f"灵魂维度-§9.3 数字事实硬错误 {len(numeric_result['auto_errors'])} 项"
+        )
+    # §9.4 章回体灵魂标题：提取所有 ## 小标题，单标题 <3 分记为问题
+    # section_template 必需短标题（结语/问道/讲道理等结构标签）跳过检查，
+    # 它们是章节结构必需，非内容标题，check_chapter_title_soul 会误判为事件标签。
+    _SECTION_TEMPLATE_TITLES = {
+        "讲事情", "讲人物", "讲背景", "讲道理", "问道悟道", "结语",
+        "入戏", "破题", "方法论", "避坑", "践行",
+        "概念", "原理", "实践", "速查", "自测", "速查/自测",
+    }
+    title_pattern = re.compile(r"^##\s+(.+?)$", re.MULTILINE)
+    low_score_titles = 0
+    for m in title_pattern.finditer(body):
+        raw_title = m.group(1).strip()
+        # 剥离 "序号、" 前缀（如 "一、备棺" → "备棺"）
+        title_text = re.sub(r"^[\d一二三四五六七八九十百]+[、.]\s*", "", raw_title)
+        if title_text in _SECTION_TEMPLATE_TITLES:
+            continue
+        result = check_chapter_title_soul(title_text)
+        if result["score"] < 3:
+            low_score_titles += 1
+            issues.append(
+                f"灵魂维度-§9.4 标题灵魂不足（{result['score']}分）：{raw_title}"
+            )
+    return issues
+
+
+# --- §9.1 灵魂三问启发式 -----------------------------------------------
+# 三问无正则可完美近似，但可用启发式做粗略自动评分让闭环跑通：
+# - 活人测试：无两难词 + 标签词密集 → 人物是标签而非活人
+# - 洞察独家性：绝对化"正确废话"词密集 → 洞察不独家
+# - 底色敬畏感：戏谑/爽化词命中 → 缺敬畏感
+_DILEMMA_WORDS = re.compile(r"两难|进退|取舍|抉择|左右为难|进退维谷|骑虎难下|举棋不定")
+_LABEL_WORDS = re.compile(r"奸臣|忠臣|伟人|明君|昏君|暴君|昏庸|英明|昏聩|贤明|佞臣")
+_ABSOLUTE_WORDS = re.compile(r"任何|所有|一切|总是|必然|都会|都是|从来|永远|毫无例外")
+_FLIPPANT_WORDS = re.compile(r"哈哈|233|666|牛逼|卧槽|我去|6666|草|艹|哈哈|呵呵|笑死|赢麻|爽翻|炸裂")
+
+
+def _check_soul_three_questions(body: str) -> List[str]:
+    """§9.1 灵魂三问启发式近似（纯 AI 闭环，无需 LLM）。
+
+    Returns:
+        issues 列表，每项为扣分触发说明。
+    """
+    issues: List[str] = []
+
+    # §9.1.1 活人测试：无两难困境词 + 标签词密集 → 人物是标签
+    has_dilemma = bool(_DILEMMA_WORDS.search(body))
+    label_count = len(_LABEL_WORDS.findall(body))
+    if not has_dilemma and label_count >= 3:
+        issues.append(
+            f"灵魂维度-§9.1 活人测试失败：无两难困境词，标签词密集（{label_count}次），人物是标签"
+        )
+
+    # §9.1.2 洞察独家性：绝对化"正确废话"词密集 → 洞察不独家
+    # 阈值 5：叙述性历史文本常含"任何/所有"等词描述规律，3 太敏感误判黄金样本
+    absolute_count = len(_ABSOLUTE_WORDS.findall(body))
+    if absolute_count >= 5:
+        issues.append(
+            f"灵魂维度-§9.1 洞察独家性失败：绝对化词密集（{absolute_count}次），疑似正确废话"
+        )
+
+    # §9.1.3 底色敬畏感：戏谑/爽化词命中 → 缺敬畏感
+    flippant_hits = _FLIPPANT_WORDS.findall(body)
+    if flippant_hits:
+        issues.append(
+            f"灵魂维度-§9.1 底色敬畏感失败：戏谑/爽化词命中 {len(flippant_hits)} 次"
+        )
+    return issues
+
+
 def check_soft_ai_pattern(content: str, max_count: int = 3) -> List[str]:
     """检查「不是X，是Y」软性 AI 句式是否超过上限。"""
     body = _strip_frontmatter(content)
@@ -526,6 +629,9 @@ def run_content_quality_checks(content: str, archetype: str = "narrative") -> Co
     details["citation"].extend(check_sources_section(content))
     details["citation"].extend(check_redundant_citation(content))
 
+    # 5. 灵魂维度（content-quality.md §9.2/9.3/9.4 自动部分；§9.1 三问仍需人工）
+    details["soul"] = _check_soul_dimension(content, cliches_result)
+
     for key in details:
         issues.extend(details[key])
 
@@ -535,6 +641,7 @@ def run_content_quality_checks(content: str, archetype: str = "narrative") -> Co
     score -= min(20, len(details["readability"]) * 2) # 可读性问题每项扣 2 分，上限 20
     score -= min(10, len(details["sequence"]) * 5)    # 顺序问题每项扣 5 分，上限 10
     score -= min(15, len(details["citation"]) * 3)    # 引用问题每项扣 3 分，上限 15
+    score -= min(15, len(details["soul"]) * 3)        # 灵魂问题每项扣 3 分，上限 15
     score = max(0, score)
 
     return ContentQualityReport(
