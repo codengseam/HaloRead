@@ -16,6 +16,7 @@ from typing import Dict, List
 from src.utils.quality import (
     check_ai_cliches,
     check_ai_tone,
+    check_chapter_title_soul,
     check_mixed_language,
     check_modern_jargon,
     check_numeric_facts,
@@ -342,6 +343,47 @@ def _filter_numeric_manual(manual_review: List[dict], archetype: str) -> List[di
     ]
 
 
+def _check_soul_dimension(content: str, cliches_result: dict) -> List[str]:
+    """灵魂维度自动检查（content-quality.md §9.2/9.3/9.4）。
+
+    §9.1 灵魂三问（活人测试/洞察独家性/底色敬畏感）无正则可写，仍需人工/Agent，
+    本函数只覆盖可自动检测的三项：
+    - §9.2 AI 套话黑名单（命中 ≥3 次扣 5 分）
+    - §9.3 数字事实硬错误（每项扣 3 分，上限 15）
+    - §9.4 章回体灵魂标题（单标题 <3 分需重写，每个低分标题扣 2 分）
+
+    cliches_result 复用主流程已跑的 check_ai_cliches 结果，避免重复扫描。
+    """
+    issues: List[str] = []
+    # §9.2 AI 套话黑名单
+    if cliches_result["level"] == "warning":
+        issues.append(
+            f"灵魂维度-§9.2 AI套话黑名单命中 {cliches_result['count']} 次"
+        )
+    # §9.3 数字事实硬错误（auto_errors 已在 truth 维度逐条记录，
+    # 这里只做灵魂维度的"是否命中"信号——命中任一即触发灵魂扣分）
+    numeric_result = check_numeric_facts(_strip_frontmatter(content))
+    if numeric_result["auto_errors"]:
+        issues.append(
+            f"灵魂维度-§9.3 数字事实硬错误 {len(numeric_result['auto_errors'])} 项"
+        )
+    # §9.4 章回体灵魂标题：提取所有 ## 小标题，单标题 <3 分记为问题
+    body = _strip_frontmatter(content)
+    title_pattern = re.compile(r"^##\s+(.+?)$", re.MULTILINE)
+    low_score_titles = 0
+    for m in title_pattern.finditer(body):
+        raw_title = m.group(1).strip()
+        # 剥离 "序号、" 前缀（如 "一、备棺" → "备棺"）
+        title_text = re.sub(r"^[\d一二三四五六七八九十百]+[、.]\s*", "", raw_title)
+        result = check_chapter_title_soul(title_text)
+        if result["score"] < 3:
+            low_score_titles += 1
+            issues.append(
+                f"灵魂维度-§9.4 标题灵魂不足（{result['score']}分）：{raw_title}"
+            )
+    return issues
+
+
 def check_soft_ai_pattern(content: str, max_count: int = 3) -> List[str]:
     """检查「不是X，是Y」软性 AI 句式是否超过上限。"""
     body = _strip_frontmatter(content)
@@ -526,6 +568,9 @@ def run_content_quality_checks(content: str, archetype: str = "narrative") -> Co
     details["citation"].extend(check_sources_section(content))
     details["citation"].extend(check_redundant_citation(content))
 
+    # 5. 灵魂维度（content-quality.md §9.2/9.3/9.4 自动部分；§9.1 三问仍需人工）
+    details["soul"] = _check_soul_dimension(content, cliches_result)
+
     for key in details:
         issues.extend(details[key])
 
@@ -535,6 +580,7 @@ def run_content_quality_checks(content: str, archetype: str = "narrative") -> Co
     score -= min(20, len(details["readability"]) * 2) # 可读性问题每项扣 2 分，上限 20
     score -= min(10, len(details["sequence"]) * 5)    # 顺序问题每项扣 5 分，上限 10
     score -= min(15, len(details["citation"]) * 3)    # 引用问题每项扣 3 分，上限 15
+    score -= min(15, len(details["soul"]) * 3)        # 灵魂问题每项扣 3 分，上限 15
     score = max(0, score)
 
     return ContentQualityReport(
