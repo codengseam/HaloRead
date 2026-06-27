@@ -193,6 +193,8 @@
         .gk-module[data-tone="score"] .gk-card-btn:hover { background: #63477f; }
         .gk-module[data-tone="industry"] .gk-card-btn { background: #3a7a8c; }
         .gk-module[data-tone="industry"] .gk-card-btn:hover { background: #2c606f; }
+        .gk-module[data-tone="action"] .gk-card-btn { background: #b85c38; }
+        .gk-module[data-tone="action"] .gk-card-btn:hover { background: #964a2c; }
         .gk-module[data-tone="ref"] .gk-card-btn { background: #5a6c7d; }
         .gk-module[data-tone="ref"] .gk-card-btn:hover { background: #465564; }
 
@@ -265,8 +267,18 @@
 
     <main class="gk-main">
 
+        <nav class="gk-quicknav" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:12px 20px 24px;border-bottom:1px dashed var(--divider);margin-bottom:32px;">
+            <a href="#m1" style="padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--ink-secondary,#5a5651);text-decoration:none;font-size:13px;">①看清自己</a>
+            <a href="#m2" style="padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--ink-secondary,#5a5651);text-decoration:none;font-size:13px;">②选专业</a>
+            <a href="#m3" style="padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--ink-secondary,#5a5651);text-decoration:none;font-size:13px;">③选学校</a>
+            <a href="#m4" style="padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--ink-secondary,#5a5651);text-decoration:none;font-size:13px;">④定分数线</a>
+            <a href="#m5" style="padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--ink-secondary,#5a5651);text-decoration:none;font-size:13px;">⑤认识产业与就业</a>
+            <a href="#m6" style="padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--ink-secondary,#5a5651);text-decoration:none;font-size:13px;">⑥落地心法</a>
+            <a href="#m7" style="padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--ink-secondary,#5a5651);text-decoration:none;font-size:13px;">⑦资料汇编</a>
+        </nav>
+
         <!-- 模块① 看清自己 -->
-        <section class="gk-module" data-tone="self">
+        <section class="gk-module" data-tone="self" id="m1">
             <div class="gk-module-header">
                 <span class="gk-module-num">①</span>
                 <h2 class="gk-module-title">看清自己</h2>
@@ -292,7 +304,7 @@
         </section>
 
         <!-- 模块② 选专业 -->
-        <section class="gk-module" data-tone="major">
+        <section class="gk-module" data-tone="major" id="m2">
             <div class="gk-module-header">
                 <span class="gk-module-num">②</span>
                 <h2 class="gk-module-title">选专业</h2>
@@ -313,7 +325,7 @@
         </section>
 
         <!-- 模块③ 选学校 -->
-        <section class="gk-module" data-tone="school">
+        <section class="gk-module" data-tone="school" id="m3">
             <div class="gk-module-header">
                 <span class="gk-module-num">③</span>
                 <h2 class="gk-module-title">选学校</h2>
@@ -334,7 +346,7 @@
         </section>
 
         <!-- 模块④ 定分数线 -->
-        <section class="gk-module" data-tone="score">
+        <section class="gk-module" data-tone="score" id="m4">
             <div class="gk-module-header">
                 <span class="gk-module-num">④</span>
                 <h2 class="gk-module-title">定分数线</h2>
@@ -349,12 +361,12 @@
             </div>
         </section>
 
-        <!-- 模块⑤ 认识产业 -->
-        <section class="gk-module" data-tone="industry">
+        <!-- 模块⑤ 认识产业与就业 -->
+        <section class="gk-module" data-tone="industry" id="m5">
             <div class="gk-module-header">
                 <span class="gk-module-num">⑤</span>
-                <h2 class="gk-module-title">认识产业</h2>
-                <p class="gk-module-desc">专业对应的是四年后的就业市场，看清产业周期再选赛道。</p>
+                <h2 class="gk-module-title">认识产业与就业</h2>
+                <p class="gk-module-desc">专业对应的是四年后的就业市场，看清产业周期与就业冷暖再选赛道。</p>
             </div>
             <div class="gk-card-grid">
                 <article class="gk-card">
@@ -362,15 +374,51 @@
                     <p class="gk-card-points">从"十五五"规划与未来十年产业趋势，反推哪些专业会被需要、哪些在退潮。</p>
                     <a class="gk-card-btn" href="index.html?book=高考志愿填报前置认知&chapter=认识产业_十五五与未来赛道">阅读全文 →</a>
                 </article>
+                <article class="gk-card">
+                    <h3 class="gk-card-title">2026 最新就业数据与专业冷暖<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;background:#c0392b;color:#fff;font-size:11px;font-weight:600;vertical-align:middle;">NEW</span></h3>
+                    <p class="gk-card-points">麦可思绿牌红牌、薪资 TOP10、国考专业 TOP10、考研率对比——用最新就业数据反向校准专业选择。</p>
+                    <a class="gk-card-btn" href="index.html?book=高考志愿填报前置认知&chapter=就业图鉴_2026最新就业数据与专业冷暖">阅读全文 →</a>
+                </article>
+                <article class="gk-card">
+                    <h3 class="gk-card-title">从十五五到专业代码与卡脖子<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;background:#c0392b;color:#fff;font-size:11px;font-weight:600;vertical-align:middle;">NEW</span></h3>
+                    <p class="gk-card-points">十五五产业 → 专业代码 → 卡脖子领域（集成电路/工业软件/高端机床/新材料/科学仪器）→ 本硕路径，一张图打通战略到专业。</p>
+                    <a class="gk-card-btn" href="index.html?book=高考志愿填报前置认知&chapter=产业深读_从十五五到专业代码与卡脖子">阅读全文 →</a>
+                </article>
             </div>
         </section>
 
-        <!-- 模块⑥ 资料汇编与心法 -->
-        <section class="gk-module" data-tone="ref">
+        <!-- 模块⑥ 落地心法与照抄即用 -->
+        <section class="gk-module" data-tone="action" id="m6">
             <div class="gk-module-header">
                 <span class="gk-module-num">⑥</span>
-                <h2 class="gk-module-title">资料汇编与心法</h2>
-                <p class="gk-module-desc">权威信源导航 + 落地心法，把认知转化为可执行的填报动作。</p>
+                <h2 class="gk-module-title">落地心法与照抄即用</h2>
+                <p class="gk-module-desc">机构 SOP + 老师话术 + 家长配合 + 决策表 + 一手信息获取，把认知直接变成动作。</p>
+            </div>
+            <div class="gk-card-grid">
+                <article class="gk-card">
+                    <h3 class="gk-card-title">机构 SOP · 老师话术 · 家长配合<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;background:#c0392b;color:#fff;font-size:11px;font-weight:600;vertical-align:middle;">NEW</span></h3>
+                    <p class="gk-card-points">拆解专业机构的引导 SOP 与老师话术，给出家长配合手册与自我定位方法，识破话术不被动。</p>
+                    <a class="gk-card-btn" href="index.html?book=高考志愿填报前置认知&chapter=引导心法_机构SOP老师话术家长配合">阅读全文 →</a>
+                </article>
+                <article class="gk-card">
+                    <h3 class="gk-card-title">决策表 · 讨论清单 · 双漏斗<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;background:#c0392b;color:#fff;font-size:11px;font-weight:600;vertical-align:middle;">NEW</span></h3>
+                    <p class="gk-card-points">家庭决策表模板 + 讨论清单 + 专业/学校双漏斗筛选 + 24 小时核对清单，照抄即用。</p>
+                    <a class="gk-card-btn" href="index.html?book=高考志愿填报前置认知&chapter=照抄即用_决策表讨论清单双漏斗">阅读全文 →</a>
+                </article>
+                <article class="gk-card">
+                    <h3 class="gk-card-title">一手信息 · 官方平台操作手册<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;background:#c0392b;color:#fff;font-size:11px;font-weight:600;vertical-align:middle;">NEW</span></h3>
+                    <p class="gk-card-points">阳光高考平台操作手册 + 考试院数据下载 + 招办电话话术 + 行业一手信息与校友网络挖掘。</p>
+                    <a class="gk-card-btn" href="index.html?book=高考志愿填报前置认知&chapter=一手信息_官方平台操作手册与行业人脉">阅读全文 →</a>
+                </article>
+            </div>
+        </section>
+
+        <!-- 模块⑦ 资料汇编与金句 -->
+        <section class="gk-module" data-tone="ref" id="m7">
+            <div class="gk-module-header">
+                <span class="gk-module-num">⑦</span>
+                <h2 class="gk-module-title">资料汇编与金句</h2>
+                <p class="gk-module-desc">权威信源导航 + 落地金句，把认知转化为可执行的填报动作。</p>
             </div>
             <div class="gk-card-grid">
                 <article class="gk-card">
@@ -389,8 +437,7 @@
     </main>
 
     <footer class="gk-footer">
-        <a class="gk-footer-link" href="index.html?book=高考志愿填报前置认知&chapter=参考资料">📖 参考资料 · 权威信源汇编</a>
-        <p class="gk-disclaimer">⚠️ 本专栏仅作认知科普，所有数据与政策最终以考生所在省份教育考试院官方信息为准。</p>
+        <p class="gk-disclaimer">⚠️ 本专栏仅作认知科普，所有数据与政策最终以考生所在省份教育考试院官方信息为准。全专栏引用编号体系（[OFFICIAL-x]/[EXPERT-x]/[INDUSTRY-x] 等）见各章末尾及专栏根目录《参考资料》文档。</p>
         <p class="gk-copy">© 豪书斋 · HaloRead 编委会</p>
     </footer>
 </body>
