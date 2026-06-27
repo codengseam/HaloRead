@@ -210,6 +210,15 @@ def _copy_static_assets(site_path: Path) -> None:
         ("js/app.js", site_path / "js" / "app.js"),
         ("sw.js", site_path / "sw.js"),
     ]
+
+    # 复制圣贤堂展厅页到 site/demos/（独立演示页，不依赖主站 SPA）
+    demos_dir = root / "demos"
+    if demos_dir.exists():
+        saints_src = demos_dir / "saints_hall.html"
+        if saints_src.exists():
+            saints_dest = site_path / "demos" / "saints_hall.html"
+            saints_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(saints_src, saints_dest)
     for src_rel, dest in assets:
         src = source_dir / Path(src_rel)
         if not src.exists():

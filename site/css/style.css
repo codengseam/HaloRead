@@ -491,6 +491,104 @@ body[data-view="reader"] .brand-header {
     letter-spacing: 0.04em;
 }
 
+/* ===== 圣贤堂入口卡片 ===== */
+.hero-entry {
+    margin-top: 28px;
+    display: flex;
+    justify-content: center;
+}
+
+.entry-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 22px;
+    background: linear-gradient(135deg, var(--card) 0%, var(--bg) 100%);
+    border: 1.5px solid var(--accent);
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--ink);
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    max-width: 100%;
+}
+
+.entry-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    border-color: var(--accent-strong, var(--accent));
+}
+
+.entry-card:active {
+    transform: translateY(0);
+}
+
+.entry-card-icon {
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #a13c2c 0%, #c84838 100%);
+    color: #f5ecd9;
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 700;
+    border-radius: 8px;
+    border: 1px solid #c9a961;
+    box-shadow: 0 0 8px rgba(201, 169, 97, 0.4);
+}
+
+.entry-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.entry-card-title {
+    font-family: var(--font-serif);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.entry-card-desc {
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    opacity: 0.85;
+}
+
+.entry-card-arrow {
+    flex-shrink: 0;
+    font-size: 18px;
+    color: var(--accent);
+    transition: transform 0.25s ease;
+}
+
+.entry-card:hover .entry-card-arrow {
+    transform: translateX(4px);
+}
+
+@media (max-width: 480px) {
+    .entry-card {
+        padding: 12px 18px;
+        gap: 10px;
+    }
+    .entry-card-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 17px;
+    }
+    .entry-card-title {
+        font-size: 15px;
+    }
+    .entry-card-desc {
+        font-size: 11px;
+    }
+}
+
 /* ===== 书架区域 ===== */
 .bookshelf-section {
     max-width: 1200px;
