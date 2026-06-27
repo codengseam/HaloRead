@@ -497,8 +497,12 @@ body[data-view="reader"] .brand-header {
     align-items: center;
     gap: 7px;
     padding: 7px 14px 7px 8px !important;
-    background: linear-gradient(135deg, rgba(161, 60, 44, 0.08) 0%, rgba(201, 169, 97, 0.08) 100%);
-    border: 1.5px solid rgba(201, 169, 97, 0.5);
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32' viewBox='0 0 64 32'%3E%3Cpath d='M0 16 Q8 8 16 16 T32 16 T48 16 T64 16' fill='none' stroke='%23c9a961' stroke-width='0.8' opacity='0.14'/%3E%3Ccircle cx='52' cy='10' r='1.5' fill='%23c9a961' opacity='0.12'/%3E%3Ccircle cx='12' cy='22' r='1.5' fill='%23c9a961' opacity='0.12'/%3E%3C/svg%3E"),
+        linear-gradient(135deg, rgba(161, 60, 44, 0.10) 0%, rgba(201, 169, 97, 0.12) 100%);
+    background-repeat: repeat, no-repeat;
+    background-size: auto, 100% 100%;
+    border: 1.5px solid rgba(201, 169, 97, 0.55);
     border-radius: 20px;
     opacity: 1 !important;
     font-family: var(--font-serif);
@@ -506,14 +510,16 @@ body[data-view="reader"] .brand-header {
     letter-spacing: 0.06em;
     color: var(--ink) !important;
     transition: all 0.25s ease;
-    box-shadow: 0 1px 6px rgba(161, 60, 44, 0.1);
+    box-shadow: 0 1px 6px rgba(161, 60, 44, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .nav-saints:hover {
-    background: linear-gradient(135deg, rgba(161, 60, 44, 0.15) 0%, rgba(201, 169, 97, 0.15) 100%) !important;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32' viewBox='0 0 64 32'%3E%3Cpath d='M0 16 Q8 8 16 16 T32 16 T48 16 T64 16' fill='none' stroke='%23c9a961' stroke-width='0.8' opacity='0.18'/%3E%3Ccircle cx='52' cy='10' r='1.5' fill='%23c9a961' opacity='0.16'/%3E%3Ccircle cx='12' cy='22' r='1.5' fill='%23c9a961' opacity='0.16'/%3E%3C/svg%3E"),
+        linear-gradient(135deg, rgba(161, 60, 44, 0.16) 0%, rgba(201, 169, 97, 0.18) 100%);
     border-color: var(--accent);
     transform: translateY(-1px);
-    box-shadow: 0 3px 10px rgba(161, 60, 44, 0.18);
+    box-shadow: 0 3px 10px rgba(161, 60, 44, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .nav-saints-icon {
@@ -546,6 +552,43 @@ body[data-view="reader"] .brand-header {
         width: 22px;
         height: 22px;
         font-size: 13px;
+    }
+
+    .hero {
+        padding: 24px 16px 18px;
+    }
+
+    .hero-title {
+        font-size: 18px;
+        margin-bottom: 5px;
+        white-space: nowrap;
+        letter-spacing: 0;
+    }
+
+    .hero-subtitle {
+        font-size: 11px;
+        margin-bottom: 10px;
+        white-space: nowrap;
+        letter-spacing: 0.03em;
+    }
+
+    .hero-stats {
+        gap: 20px;
+        font-size: 12px;
+    }
+
+    .hero-stats .stat-value {
+        font-size: 18px;
+    }
+}
+
+@media (max-width: 360px) {
+    .hero-title {
+        font-size: 16px;
+    }
+
+    .hero-subtitle {
+        font-size: 10px;
     }
 }
 
