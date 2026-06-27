@@ -2,6 +2,12 @@
 
 本规则用于指导 Agent 生成 Markdown 讲书笔记。详细项目背景见 [README.md](../../../README.md)。
 
+> **适用范围声明**：本规则仅适用 **narrative 桶**（古籍专栏：史/经/子/集，如资治通鉴、史记、三国、唐宋明纪、孔子传、论语等）。
+> - **modern 桶**（理财/职场/养生类现代专栏）见 [rules-modern.md](rules-modern.md)。
+> - **knowledge 桶**（AI课/易经课/技术类知识专栏）见 [rules-knowledge.md](rules-knowledge.md)。
+> - archetype 信源优先级与路由逻辑见 [design.md §5.6](../../../docs/archetype-design/design.md#五数据流设计)。
+> - 本文件管「怎么写」（写作风格/结构/引用格式）；「怎么查」（白名单/阈值/扣分规则）见 [content-quality.md §8](content-quality.md#八多桶规则集archetype-路由) 多桶规则集。
+
 ## 一、输出结构
 
 每篇笔记固定五段正文加一段结语，顺序不可调换：

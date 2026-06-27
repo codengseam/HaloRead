@@ -446,3 +446,22 @@
 - **涉及文件**：`src/main.py`
 - **回归测试**：`tests/test_workflow_archetype.py::TestStubModeArchetype::test_fiction_falls_back_to_narrative` 断言 `--archetype fiction` 退出码 0、生成 narrative 6 段、stderr 含回落警告。
 - **教训**：跨层枚举白名单必须单一信源；预留桶在 CLI 层应 fail-soft 回退（回落 + 警告）而非透传到下游崩溃。回落逻辑要放在所有分支之前，不能放在某个分支之后。
+
+## PyYAML 未装时 stub 路径读取 quality_check 崩溃（_get_stub_sections 对 list 不兜底）
+
+- **编号**：BUG-030
+- **首次出现**：2026-06-27
+- **类型**：兼容性 / 环境
+- **现象**：在未安装 PyYAML 的环境跑 `python src/main.py --archetype narrative --stub`，`_get_stub_sections` 抛 `AttributeError: 'list' object has no attribute 'get'`，stub 路径崩溃退出非 0。
+- **复现步骤**：
+  1. `pip uninstall pyyaml -y`
+  2. `python src/main.py --book 资治通鉴 --chapter 周纪二 --event 测试 --archetype narrative --stub --dry-run`
+  3. 退出码非 0，stderr 含 `AttributeError: 'list' object has no attribute 'get'`
+- **根因**：`src/utils/config.load_config` 在 PyYAML 未装时 fallback 到内置简单 YAML 解析器，该解析器无法处理 `quality_check` 的嵌套结构（`enabled: true` + `required_sections: [...]`），把整段解析成 list `["enabled", "required_sections"]`。`_get_stub_sections` 和 `workflow.get_required_sections` 直接 `qc.get("required_sections", ...)`，list 无 `.get` 方法 → AttributeError。
+- **修复**：`src/main.py:_get_stub_sections` 加 isinstance 兜底——`cfg` 非 dict 或 `quality_check` 非 dict 时，直接返回 narrative 默认六段（保证 stub 路径不崩）。这是防御性修复，不改主流程。
+- **涉及文件**：`src/main.py`（`_get_stub_sections` 加 isinstance 兜底）
+- **回归测试**：`tests/test_skill_archetype_routing.py::test_get_stub_sections_pyyaml_missing_does_not_crash` 用 monkeypatch 模拟 PyYAML 未装时 `load_config` 返回的异常结构（`quality_check` 是 list），断言返回 narrative 默认六段不抛异常。
+- **教训**：
+  1. 环境降级路径（PyYAML 未装 fallback 内置解析器）的产物类型与正常路径不一致（dict vs list），下游消费者必须 isinstance 兜底，不能假设结构。
+  2. 内置简单 YAML 解析器对嵌套结构的处理是脆弱点，未来应评估是否强制 PyYAML 依赖或重写解析器。
+- **待办**：`src/core/workflow.py:get_required_sections`（行 65-66）有相同 bug，在会话A+B 范围内，本会话不修（避禁区冲突）。装 PyYAML 后该路径不触发，CI 装依赖则不暴露。
