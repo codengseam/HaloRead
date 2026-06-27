@@ -19,3 +19,7 @@ class AgentState(TypedDict):
     sources: Annotated[Dict[str, List[str]], dict_merge]
     final_markdown: str
     errors: Annotated[List[str], lambda a, b: a + b]
+    # 反馈循环第一档：质检 score 落盘到 state（feedback-loop/design.md §4.1）
+    # quality_node 灌入；save_node 消费写 frontmatter / _meta.yaml / score_history。
+    quality_score: int
+    quality_dimensions: Dict[str, int]
