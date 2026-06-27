@@ -166,7 +166,7 @@ class TestMainArchetypeIntegration:
                 captured.update(initial_state)
                 return initial_state
 
-        def fake_build_workflow(output_base="output"):
+        def fake_build_workflow(output_base="output", archetype="narrative"):
             return FakeApp()
 
         fake_mod = types.ModuleType("src.core.workflow")

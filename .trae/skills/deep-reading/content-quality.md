@@ -359,3 +359,57 @@ AI大模型学习、易经课等。跳过年份/名家/时间线/现代术语禁
 - 单篇发现 ≥ 1 个 < 3 分标题 → 扣 2 分
 - 单篇发现 ≥ 3 个 < 3 分标题，或全部为事件标签 → 扣 4 分
 - 全部标题 ≥ 3 分 → 满分
+
+---
+
+## 十、结构模板分桶（archetype 路由）
+
+> 与 `docs/archetype-design/design.md` §10 对齐。本节定义"文章分几段、每段叫什么"的结构模板；§8 定义"每段怎么写、跑哪些质检"的规则集。两者协同：结构模板给骨架，规则集给血肉。
+
+结构模板由 `config.yaml` 的 `section_templates` 顶层字段配置，`src/core/workflow.get_required_sections(archetype)` 纯函数读取，`quality_node` 闭包按 archetype 注入校验。narrative 桶段名与 legacy `quality_check.required_sections` 完全一致（古籍零回归护栏）。
+
+### 10.1 narrative 桶（六段，原封不动）
+
+适用：史/经/子/集类古籍专栏。
+
+| 段名 | 作用 |
+|---|---|
+| 讲事情 | 叙事主线，含时间/年份标注 |
+| 讲人物 | 人物刻画与动机 |
+| 讲背景 | 时代与社会背景 |
+| 讲道理 | 名家点评与义理 |
+| 问道悟道 | 哲思与今鉴 |
+| 结语 | 收束与点睛 |
+
+全 soul injection：tone_setter 注入文风 → 5 Specialist 并行 → editor 汇总 → quality → chief_editor 终审 → save。
+
+### 10.2 modern 桶（五段）
+
+适用：财/职场/养生类现代专栏。
+
+| 段名 | 作用 |
+|---|---|
+| 入戏 | 场景代入，引出问题 |
+| 破题 | 核心观点与拆解 |
+| 方法论 | 可操作的方法与步骤 |
+| 避坑 | 常见误区与反面案例 |
+| 践行 | 落地建议与行动清单 |
+
+跳过 soul injection：orchestrator → 5 Specialist 并行 → editor → quality → save（走原 else 分支，不断链）。阶段4 落地 modern 版 prompt 后再开启 tone_setter/chief_editor。
+
+### 10.3 knowledge 桶（四段）
+
+适用：技/AI/科学类知识专栏。
+
+| 段名 | 作用 |
+|---|---|
+| 概念 | 核心概念定义与边界 |
+| 原理 | 底层原理与机制 |
+| 实践 | 应用场景与案例 |
+| 速查/自测 | 速查表或自测题 |
+
+跳过 soul injection（同 modern）。knowledge 桶术语白名单见 §8.3，中英混杂检查对 Transformer/Attention/Token 等技术术语放行。
+
+### 10.4 fiction 桶（预留，待实现）
+
+design.md §5.2 预留。当前 `workflow._VALID_ARCHETYPES` 不含 fiction，CLI 传 `--archetype fiction` 会回落 narrative（BUG-029）。待阶段4+ 落地小说类 prompt 与结构模板后启用。

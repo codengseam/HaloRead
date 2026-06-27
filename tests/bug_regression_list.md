@@ -434,3 +434,15 @@
 - **涉及文件**：`src/utils/content_quality.py`
 - **回归测试**：`tests/test_content_quality_archetype.py::TestNarrativeBucketKeepsAncientRules::test_narrative_reports_temporal_order` 断言首段 `## 讲事情` 无年份时必报。
 - **教训**：`re.split(r"\n## ", body)` 这类"按换行+标记拆分"的模式要考虑首段无前缀换行的情况，统一用 `(?:^|\n)` 兜底。
+
+## --archetype fiction 触发 build_workflow ValueError（跨层 archetype 白名单不一致）
+
+- **编号**：BUG-029
+- **首次出现**：2026-06-27
+- **类型**：兼容性
+- **现象**：执行 `src/main.py --archetype fiction` 时，`build_workflow(archetype="fiction")` 抛 `ValueError: 非法 archetype: 'fiction'` 崩溃，CLI 直接退出非 0。
+- **根因**：`src/utils/prompts._VALID_ARCHETYPES` 含 `"fiction"`（design.md §5.2 预留桶），但 `src/core/workflow._VALID_ARCHETYPES` 只含 `narrative/modern/knowledge`（fiction 未落地）。两层白名单不一致；`resolve_archetype` 认 `fiction` 合法并透传，`build_workflow` 却拒绝。原回落逻辑放在 stub 分支之后，stub 路径走不到。
+- **修复**：`src/main.py` 将 fiction→narrative 回落统一移到 `resolve_archetype` 之后、stub/真实分支之前（单一拦截点），未落地 archetype 一律回落 narrative 并打 stderr 警告。
+- **涉及文件**：`src/main.py`
+- **回归测试**：`tests/test_workflow_archetype.py::TestStubModeArchetype::test_fiction_falls_back_to_narrative` 断言 `--archetype fiction` 退出码 0、生成 narrative 6 段、stderr 含回落警告。
+- **教训**：跨层枚举白名单必须单一信源；预留桶在 CLI 层应 fail-soft 回退（回落 + 警告）而非透传到下游崩溃。回落逻辑要放在所有分支之前，不能放在某个分支之后。
