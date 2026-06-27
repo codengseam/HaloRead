@@ -224,12 +224,29 @@
   </footer>
 
   <script>
-    // ============ 头像 URL 拼接 ============
-    // 头像用 square_hd（100KB）而非 portrait_4_3（176KB），省 43% 体积
-    // 卡片立绘区 360×300，square_hd 512×512 完全够用，object-fit:cover 会自动裁切
-    const PORTRAIT_API = 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=';
-    function portraitUrl(prompt) {
-      return PORTRAIT_API + encodeURIComponent(prompt) + '&image_size=square_hd';
+    // ============ 头像本地路径映射 ============
+    // 图片已下载到 demos/images/（见 scripts/download_sage_portraits.py）
+    // 用本地缓存，不再每次远程加载，加载速度从秒级降到毫秒级
+    const PORTRAIT_MAP = {
+      '001': 'images/001_kongzi.jpg',
+      '002': 'images/002_yanhui.jpg',
+      '003': 'images/003_zengshen.jpg',
+      '004': 'images/004_kongji.jpg',
+      '005': 'images/005_mengzi.jpg',
+      '006': 'images/006_kongzi.jpg',  // 孟子四圣的孔子，复用 001
+      '007': 'images/007_boyi.jpg',
+      '008': 'images/008_yiyin.jpg',
+      '009': 'images/009_liuxiahui.jpg',
+      '010': 'images/010_sunwu.jpg',
+      '011': 'images/011_wangxizhi.jpg',
+      '012': 'images/012_zhangzhongjing.jpg',
+      '013': 'images/013_wudaozi.jpg',
+      '014': 'images/014_dufu.jpg',
+      '015': 'images/015_luyu.jpg',
+      '016': 'images/016_simaqian.jpg'
+    };
+    function portraitUrl(no) {
+      return PORTRAIT_MAP[no] || '';
     }
     const IMG_ONERROR = 'this.onerror=null;this.src="data:image/svg+xml;utf8,' +
       encodeURIComponent('<svg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"200\\" height=\\"150\\"><rect width=\\"200\\" height=\\"150\\" fill=\\"#2a1a0e\\"/><text x=\\"100\\" y=\\"80\\" font-size=\\"16\\" text-anchor=\\"middle\\" fill=\\"#c9a961\\" font-family=\\"serif\\">圣贤像</text></svg>') + '"';
@@ -673,7 +690,7 @@
 
     // ============ 渲染单张圣人卡片 ============
     function renderCard(s) {
-      const portrait = portraitUrl(s.portraitPrompt);
+      const portrait = portraitUrl(s.no);
       const top = s.quotes[0];
 
       // 防御性校验：以字段存在性判断是否生成链接，避免 hasLink=true 但字段缺失生成 undefined 链接
@@ -701,7 +718,7 @@
 
       return `<article class="sg-card" data-faction="${s.subFaction}">
         <div class="sg-portrait">
-          <img class="lazy-img" data-src="${portrait}" alt="${s.name}立绘" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='300'%3E%3Crect width='360' height='300' fill='%231f1308'/%3E%3Ctext x='180' y='155' font-size='14' text-anchor='middle' fill='%23c9a961' font-family='serif'%3E${s.name}%3C/text%3E%3C/svg%3E" onerror="${IMG_ONERROR}">
+          <img src="${portrait}" alt="${s.name}立绘" onerror="${IMG_ONERROR}">
           <div class="sg-stamp">
             <span class="sg-stamp-title">${s.title}</span>
             <span class="sg-stamp-no">NO.${s.no} · ${s.dynasty} · ${s.state}</span>
@@ -744,34 +761,12 @@
 
     renderGrid();
 
-    // ============ IntersectionObserver 真懒加载 ============
-    // 只有卡片进入可视区（提前 200px）才加载头像，避免 16 张图片首屏全量请求
-    // 配合 square_hd（100KB）+ data-src 占位，首屏只加载 3-4 张可见卡片
-    const imgObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const img = entry.target;
-          if (img.dataset.src) {
-            img.src = img.dataset.src;
-            img.removeAttribute('data-src');
-          }
-          imgObserver.unobserve(img);
-        }
-      });
-    }, { rootMargin: '200px 0px' });
-
-    function observeLazyImgs() {
-      document.querySelectorAll('.lazy-img[data-src]').forEach(img => imgObserver.observe(img));
-    }
-    observeLazyImgs();
-
     // 筛选按钮
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         renderGrid(btn.dataset.filter);
-        observeLazyImgs(); // 筛选后重新观察新渲染的图片
       });
     });
   </script>

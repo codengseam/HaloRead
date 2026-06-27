@@ -219,6 +219,13 @@ def _copy_static_assets(site_path: Path) -> None:
             saints_dest = site_path / "demos" / "saints_hall.html"
             saints_dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(saints_src, saints_dest)
+        # 复制本地缓存的头像图片到 site/demos/images/
+        images_src = demos_dir / "images"
+        if images_src.exists():
+            images_dest = site_path / "demos" / "images"
+            images_dest.mkdir(parents=True, exist_ok=True)
+            for img in images_src.glob("*.jpg"):
+                shutil.copy2(img, images_dest / img.name)
     for src_rel, dest in assets:
         src = source_dir / Path(src_rel)
         if not src.exists():
