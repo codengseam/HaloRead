@@ -112,11 +112,16 @@ def _get_stub_sections(archetype: str) -> list:
     templates = cfg.get("section_templates", {}) if isinstance(cfg, dict) else {}
     if isinstance(templates, dict) and archetype in templates:
         return list(templates[archetype])
-    qc = cfg.get("quality_check", {}) if isinstance(cfg, dict) else {}
-    return list(qc.get(
-        "required_sections",
-        ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道", "结语"],
-    ))
+    # qc 可能是 dict（PyYAML 已装）或 list（PyYAML 未装时内置解析器把嵌套结构解析成 list）
+    # list 情况下无法 .get，直接返回 narrative 默认六段（保证 stub 路径不崩）
+    if isinstance(cfg, dict):
+        qc = cfg.get("quality_check", {})
+        if isinstance(qc, dict):
+            return list(qc.get(
+                "required_sections",
+                ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道", "结语"],
+            ))
+    return ["讲事情", "讲人物", "讲背景", "讲道理", "问道悟道", "结语"]
 
 
 def _load_book_meta(book: str, output_dir: str) -> dict:
