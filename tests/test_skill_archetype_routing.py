@@ -116,12 +116,26 @@ def test_rules_md_body_unchanged_vs_master():
     """rules.md 正文（§一之后）须与 origin/master 完全一致（narrative 禁区）。
 
     narrative 桶 rules.md 只允许在顶部加声明，§一标题及之后内容零改动。
+    CI 环境 fresh checkout 无 origin/master ref，先 fetch depth=1 再用 FETCH_HEAD。
     """
-    result = subprocess.run(
-        ["git", "show", "origin/master:.trae/skills/deep-reading/rules.md"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
-    )
-    master_text = result.stdout
+    # 先尝试 origin/master（本地已有 ref 时直接用）
+    try:
+        result = subprocess.run(
+            ["git", "show", "origin/master:.trae/skills/deep-reading/rules.md"],
+            cwd=ROOT, capture_output=True, text=True, check=True, timeout=30,
+        )
+        master_text = result.stdout
+    except subprocess.CalledProcessError:
+        # CI 环境：fetch master depth=1 后用 FETCH_HEAD
+        subprocess.run(
+            ["git", "fetch", "origin", "master", "--depth=1"],
+            cwd=ROOT, capture_output=True, text=True, check=True, timeout=60,
+        )
+        result = subprocess.run(
+            ["git", "show", "FETCH_HEAD:.trae/skills/deep-reading/rules.md"],
+            cwd=ROOT, capture_output=True, text=True, check=True, timeout=30,
+        )
+        master_text = result.stdout
     # master 版 §一 标题行号（从 1 计）
     master_lines = master_text.splitlines()
     try:
