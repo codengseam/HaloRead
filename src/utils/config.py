@@ -48,11 +48,24 @@ def load_config(config_path: Optional[Union[Path, str]] = None) -> Dict[str, Any
 
 
 def _parse_simple_yaml(path: Path) -> Dict[str, Any]:
-    """极简 YAML 解析，仅支持顶层 key: value / list / dict。"""
+    """极简 YAML 解析，支持顶层 key: value / list / dict，以及 dict 内含 list。"""
     result: Dict[str, Any] = {}
     current_key: Optional[str] = None
     current_list: Optional[list] = None
     current_dict: Optional[Dict[str, Any]] = None
+    current_dict_key: Optional[str] = None
+    current_nested_list: Optional[list] = None
+
+    def _coerce_scalar(value: str) -> Union[str, bool, int]:
+        if value.startswith('"') and value.endswith('"'):
+            return value[1:-1]
+        if value in ("true", "True"):
+            return True
+        if value in ("false", "False"):
+            return False
+        if re.fullmatch(r"-?\d+", value):
+            return int(value)
+        return value
 
     with path.open("r", encoding="utf-8") as f:
         for raw_line in f:
@@ -67,6 +80,8 @@ def _parse_simple_yaml(path: Path) -> Dict[str, Any]:
                 current_key = None
                 current_list = None
                 current_dict = None
+                current_dict_key = None
+                current_nested_list = None
                 if ":" not in stripped:
                     continue
                 key, _, value = stripped.partition(":")
@@ -75,39 +90,50 @@ def _parse_simple_yaml(path: Path) -> Dict[str, Any]:
                 if value == "":
                     result[key] = None
                     current_key = key
-                elif value.startswith('"') and value.endswith('"'):
-                    result[key] = value[1:-1]
-                elif value in ("true", "True"):
-                    result[key] = True
-                elif value in ("false", "False"):
-                    result[key] = False
-                elif re.fullmatch(r"-?\d+", value):
-                    result[key] = int(value)
                 else:
-                    result[key] = value
+                    result[key] = _coerce_scalar(value)
                 continue
 
             if current_key is None:
                 continue
 
-            if stripped.startswith("-"):
-                item = stripped[1:].strip()
-                if item.startswith('"') and item.endswith('"'):
-                    item = item[1:-1]
-                if current_list is None:
-                    current_list = []
-                    result[current_key] = current_list
-                current_list.append(item)
-            elif ":" in stripped:
-                sub_key, _, sub_value = stripped.partition(":")
-                sub_key = sub_key.strip()
-                sub_value = sub_value.strip()
-                if sub_value.startswith('"') and sub_value.endswith('"'):
-                    sub_value = sub_value[1:-1]
-                if current_dict is None:
-                    current_dict = {}
-                    result[current_key] = current_dict
-                current_dict[sub_key] = sub_value
+            if indent == 2:
+                current_list = None
+                current_nested_list = None
+                if stripped.startswith("-"):
+                    item = stripped[1:].strip()
+                    if current_list is None:
+                        current_list = []
+                        result[current_key] = current_list
+                    current_list.append(_coerce_scalar(item))
+                elif ":" in stripped:
+                    sub_key, _, sub_value = stripped.partition(":")
+                    sub_key = sub_key.strip()
+                    sub_value = sub_value.strip()
+                    if current_dict is None:
+                        current_dict = {}
+                        result[current_key] = current_dict
+                    if sub_value == "":
+                        current_dict_key = sub_key
+                        current_dict[sub_key] = None
+                    else:
+                        current_dict[sub_key] = _coerce_scalar(sub_value)
+                continue
+
+            if indent >= 4:
+                if stripped.startswith("-"):
+                    item = stripped[1:].strip()
+                    if current_dict is not None and current_dict_key is not None:
+                        if current_nested_list is None:
+                            current_nested_list = []
+                            current_dict[current_dict_key] = current_nested_list
+                        current_nested_list.append(_coerce_scalar(item))
+                    else:
+                        if current_list is None:
+                            current_list = []
+                            result[current_key] = current_list
+                        current_list.append(_coerce_scalar(item))
+                continue
 
     return result
 

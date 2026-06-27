@@ -340,31 +340,26 @@ class TestStubModeArchetype:
 # ---------------------------------------------------------------------------
 
 class TestQualityNodeArchetypeRouting:
-    """quality_node 按 archetype 路由：传 archetype 给 run_content_quality_checks。
+    """quality_node 闭包按 archetype 取对应 required_sections 传给 run_quality_checks。
 
-    反馈循环第一档换接口后，quality_node 调 run_content_quality_checks(content, archetype=archetype)，
-    不再外部传 expected_sections（archetype 路由由 content_quality.py 内部处理）。
     用 FakeStateGraph 捕获 quality 节点函数，直接调用验证（不真跑图）。
     """
 
     def _capture_and_call_quality_node(self, archetype, monkeypatch):
-        """build_workflow 时捕获 quality 节点函数，mock run_content_quality_checks 后直接调用。"""
-        captured = {"quality_fn": None, "archetype": None}
+        """build_workflow 时捕获 quality 节点函数，mock run_quality_checks 后直接调用。"""
+        captured = {"quality_fn": None, "expected_sections": None}
 
-        def fake_run_content_quality_checks(content, archetype="narrative"):
-            captured["archetype"] = archetype
+        def fake_run_quality_checks(content, expected_sections=None, required_frontmatter=None):
+            captured["expected_sections"] = expected_sections
 
             class FakeReport:
                 passed = True
-                score = 95
                 issues = []
-                details = {"truth": [], "readability": [], "sequence": [], "citation": [], "soul": []}
             return FakeReport()
 
-        # mock 真实模块的 run_content_quality_checks（已被 workflow 顶部 import）
+        # mock 真实模块的 run_quality_checks（已被 workflow 顶部 import）
         monkeypatch.setattr(
-            "src.core.workflow.run_content_quality_checks",
-            fake_run_content_quality_checks,
+            "src.core.workflow.run_quality_checks", fake_run_quality_checks
         )
 
         # patch workflow 模块已绑定的 StateGraph（顶部 from langgraph.graph import）
@@ -391,26 +386,29 @@ class TestQualityNodeArchetypeRouting:
         assert captured["quality_fn"] is not None, "未捕获到 quality 节点函数"
 
         # 直接调用 quality_node 闭包。
-        # quality_node 读 state["archetype"] 传给 run_content_quality_checks，
-        # archetype 路由由 content_quality.py 内部按桶选规则集处理。
-        state = {
-            "final_markdown": "---\ntitle: x\n---\n# x\n",
-            "archetype": archetype,
-        }
+        # 注意：quality_node 通过闭包捕获 required_sections，不读 state["archetype"]，
+        # 因此 state 里不放 archetype（避免给人"state 驱动路由"的错觉）。
+        state = {"final_markdown": "---\ntitle: x\n---\n# x\n"}
         captured["quality_fn"](state)
         return captured
 
     def test_modern_routes_five_sections(self, monkeypatch):
         captured = self._capture_and_call_quality_node("modern", monkeypatch)
-        assert captured["archetype"] == "modern"
+        assert captured["expected_sections"] == [
+            "入戏", "破题", "方法论", "避坑", "践行"
+        ]
 
     def test_knowledge_routes_four_sections(self, monkeypatch):
         captured = self._capture_and_call_quality_node("knowledge", monkeypatch)
-        assert captured["archetype"] == "knowledge"
+        assert captured["expected_sections"] == [
+            "概念", "原理", "实践", "速查/自测"
+        ]
 
     def test_narrative_routes_six_sections(self, monkeypatch):
         captured = self._capture_and_call_quality_node("narrative", monkeypatch)
-        assert captured["archetype"] == "narrative"
+        assert captured["expected_sections"] == [
+            "讲事情", "讲人物", "讲背景", "讲道理", "问道悟道", "结语"
+        ]
 
 
 # ---------------------------------------------------------------------------

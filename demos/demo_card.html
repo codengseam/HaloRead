@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>圣贤堂 · 孔子｜人物卡片（三风格切换）</title>
+  <style>
+    /* ============ 公共变量 ============ */
+    :root {
+      --font-serif: "Noto Serif SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+      --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+    body {
+      font-family: var(--font-serif);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 10px 32px;
+      gap: 14px;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    /* ============ 风格切换器 ============ */
+    .style-switcher {
+      position: sticky;
+      top: 8px;
+      z-index: 10;
+      display: flex;
+      gap: 6px;
+      padding: 5px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      max-width: 100%;
+    }
+
+    .style-tab {
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      font-family: var(--font-serif);
+      color: #555;
+      background: transparent;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: all 0.25s ease;
+      white-space: nowrap;
+    }
+
+    .style-tab.active {
+      background: #2c2c2c;
+      color: #faf8f5;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .style-tab:hover:not(.active) { background: rgba(0, 0, 0, 0.06); }
+
+    /* ============ 卡片容器 ============ */
+    .card-stage { width: 100%; display: flex; justify-content: center; }
+
+    .card-instance { display: none; width: 100%; max-width: 460px; }
+    .card-instance.active { display: block; animation: fadeIn 0.4s ease; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============================================================
+       风格一：古典卷轴风
+       ============================================================ */
+    body[data-style="scroll"] {
+      background: #e8e2d5;
+      color: #2c2c2c;
+    }
+
+    .scroll-card {
+      position: relative;
+      max-width: 440px;
+      background: #faf8f5;
+      background-image:
+        radial-gradient(ellipse at 20% 10%, rgba(139,90,43,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, rgba(161,60,44,0.03) 0%, transparent 50%);
+      padding: 32px 20px 28px;
+      box-shadow: 0 4px 24px rgba(60,40,20,0.18), 0 1px 0 rgba(255,255,255,0.6) inset;
+      border-radius: 4px;
+    }
+    .scroll-card::before, .scroll-card::after {
+      content: ""; position: absolute; top: 0; bottom: 0; width: 12px;
+      background: linear-gradient(180deg, #6b4423 0%, #8b5a2b 30%, #6b4423 70%, #4a2f18 100%);
+      box-shadow: 0 0 8px rgba(0,0,0,0.2);
+    }
+    .scroll-card::before { left: -12px; border-radius: 4px 0 0 4px; }
+    .scroll-card::after { right: -12px; border-radius: 0 4px 4px 0; }
+
+    .sc-header { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid rgba(44,44,44,0.1); margin-bottom: 20px; }
+    .sc-seal { flex-shrink: 0; width: 52px; height: 52px; background: #a13c2c; color: #fff; display: flex; align-items: center; justify-content: center; flex-direction: column; font-size: 13px; letter-spacing: 0.1em; line-height: 1.1; border-radius: 3px; transform: rotate(-6deg); box-shadow: 0 2px 6px rgba(161,60,44,0.4); font-weight: 700; text-align: center; }
+    .sc-seal span { display: block; }
+    .sc-name { flex: 1; padding-top: 4px; }
+    .sc-name-main { font-size: 3rem; font-weight: 700; letter-spacing: 0.12em; line-height: 1; }
+    .sc-name-sub { margin-top: 7px; font-size: 0.86rem; color: #7a7a7a; letter-spacing: 0.15em; }
+
+    .sc-portrait { position: relative; margin: 0 auto 14px; width: 76%; max-width: 260px; background: linear-gradient(180deg,#fff 0%,#f0ece5 100%); border: 1px solid rgba(139,90,43,0.18); border-radius: 4px; padding: 7px 7px 0; box-shadow: 0 2px 8px rgba(60,40,20,0.08); }
+    .sc-portrait img { display: block; width: 100%; height: auto; aspect-ratio: 4/3; object-fit: cover; border-radius: 2px; background: #f0ece5; }
+    .sc-portrait-cap { text-align: center; font-size: 0.7rem; color: #7a7a7a; letter-spacing: 0.2em; padding: 7px 0 9px; border-top: 1px dashed rgba(139,90,43,0.18); margin-top: 7px; }
+
+    .sc-tags { display: flex; justify-content: center; gap: 7px; flex-wrap: wrap; margin-bottom: 22px; }
+    .sc-tag { font-size: 0.76rem; color: #a13c2c; border: 1px solid #a13c2c; border-radius: 2px; padding: 3px 11px; letter-spacing: 0.1em; background: rgba(161,60,44,0.04); }
+
+    .sc-title { display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 700; letter-spacing: 0.15em; margin: 20px 0 13px; }
+    .sc-title::before { content: ""; width: 4px; height: 15px; background: #a13c2c; }
+    .sc-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg,rgba(139,90,43,0.18),transparent); }
+
+    .sc-score { display: flex; flex-direction: column; gap: 10px; }
+    .sc-score-row { display: flex; flex-direction: column; gap: 2px; }
+    .sc-score-head { display: flex; align-items: baseline; gap: 9px; }
+    .sc-score-dim { font-size: 0.92rem; font-weight: 700; min-width: 54px; letter-spacing: 0.08em; }
+    .sc-score-bar { flex: 1; height: 7px; background: #f0ece5; border-radius: 1px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.08); }
+    .sc-score-fill { height: 100%; background: linear-gradient(90deg,#4a4a4a 0%,#2c2c2c 70%,#7a2a1c 100%); border-radius: 1px; }
+    .sc-score-val { font-size: 0.96rem; font-weight: 700; color: #a13c2c; min-width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+    .sc-score-note { font-size: 0.7rem; color: #7a7a7a; letter-spacing: 0.06em; margin-left: 63px; }
+
+    .sc-link { color: #a13c2c; text-decoration: none; border-bottom: 1px dashed rgba(161,60,44,0.4); transition: all 0.2s; cursor: pointer; }
+    .sc-link:hover { border-bottom-style: solid; background: rgba(161,60,44,0.06); }
+
+    .sc-deed { display: flex; flex-direction: column; gap: 11px; }
+    .sc-deed-item { padding-left: 13px; border-left: 2px solid rgba(139,90,43,0.18); }
+
+    .sc-quote { display: flex; flex-direction: column; gap: 12px; }
+    .sc-quote-item { position: relative; padding: 11px 13px 11px 34px; background: rgba(161,60,44,0.04); border-left: 2px solid #a13c2c; border-radius: 2px; }
+    .sc-quote-item::before { content: "印"; position: absolute; left: 7px; top: 9px; width: 19px; height: 19px; background: #a13c2c; color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; border-radius: 2px; transform: rotate(-4deg); font-weight: 700; }
+    .sc-quote-text { font-size: 1.02rem; font-weight: 600; line-height: 1.5; letter-spacing: 0.04em; }
+    .sc-quote-src { margin-top: 5px; font-size: 0.72rem; color: #7a7a7a; letter-spacing: 0.08em; }
+
+    .sc-bio { font-size: 0.86rem; color: #4a4a4a; line-height: 1.8; letter-spacing: 0.03em; text-align: justify; text-indent: 2em; padding: 13px 11px; background: rgba(139,90,43,0.04); border-radius: 2px; }
+
+    .sc-foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(44,44,44,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .sc-foot-meta { font-size: 0.7rem; color: #7a7a7a; letter-spacing: 0.1em; }
+    .sc-foot-seal { width: 44px; height: 44px; background: #a13c2c; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1.1; letter-spacing: 0.05em; border-radius: 3px; transform: rotate(4deg); box-shadow: 0 2px 4px rgba(161,60,44,0.3); font-weight: 700; text-align: center; }
+
+    /* ============================================================
+       风格二：三国杀卡牌风
+       ============================================================ */
+    body[data-style="sanguosha"] {
+      background: radial-gradient(ellipse at top, #3d2817 0%, #2a1a0e 70%);
+      color: #f5ecd9;
+    }
+
+    .sg-card {
+      /* 固定手机版尺寸：竖向堆叠，max-width 360px，方便未来网格铺满多张卡片 */
+      max-width: 360px;
+      background: linear-gradient(135deg, #3d2817 0%, #2a1a0e 100%);
+      border: 2px solid #c9a961;
+      border-radius: 8px;
+      box-shadow: 0 0 0 1px #8b7332 inset, 0 0 24px rgba(201,169,97,0.25), 0 8px 32px rgba(0,0,0,0.5);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .sg-card::before, .sg-card::after { content: ""; position: absolute; width: 20px; height: 20px; border: 1.5px solid #c9a961; pointer-events: none; }
+    .sg-card::before { top: 6px; left: 6px; border-right: none; border-bottom: none; }
+    .sg-card::after { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+
+    .sg-portrait { position: relative; background: linear-gradient(180deg,#1f1308 0%,#2a1a0e 100%); border-bottom: 1px solid rgba(201,169,97,0.3); height: 300px; overflow: hidden; }
+    .sg-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(0.12) contrast(1.05); }
+    .sg-portrait::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 60%,rgba(42,26,14,0.85) 100%), linear-gradient(90deg,transparent 70%,rgba(42,26,14,0.4) 100%); pointer-events: none; }
+    .sg-stamp { position: absolute; bottom: 14px; left: 12px; z-index: 2; display: flex; flex-direction: column; gap: 5px; }
+    .sg-stamp-faction { display: inline-block; padding: 4px 11px; background: linear-gradient(135deg,#a13c2c 0%,#c84838 100%); color: #f5ecd9; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.2em; border-radius: 2px; border: 1px solid #c9a961; box-shadow: 0 0 8px rgba(201,169,97,0.4); width: fit-content; }
+    .sg-stamp-no { font-size: 0.68rem; color: #c9a961; letter-spacing: 0.15em; }
+
+    .sg-info { padding: 18px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+    .sg-name-row { display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid rgba(201,169,97,0.3); }
+    .sg-name { font-size: 2rem; font-weight: 700; color: #c9a961; letter-spacing: 0.1em; line-height: 1; text-shadow: 0 0 12px rgba(201,169,97,0.4); }
+    .sg-courtesy { font-size: 0.92rem; color: rgba(245,236,217,0.7); letter-spacing: 0.1em; }
+    .sg-tags { display: flex; gap: 7px; flex-wrap: wrap; }
+    .sg-tag { font-size: 0.72rem; color: #c9a961; border: 1px solid rgba(201,169,97,0.3); padding: 3px 10px; border-radius: 12px; letter-spacing: 0.08em; background: rgba(201,169,97,0.06); }
+
+    .sg-radar-section { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .sg-radar-wrap { width: 100%; max-width: 230px; aspect-ratio: 1; }
+    .sg-radar-svg { width: 100%; height: 100%; display: block; }
+    .sg-radar-grid { fill: none; stroke: rgba(201,169,97,0.3); stroke-width: 0.8; }
+    .sg-radar-axis { stroke: rgba(201,169,97,0.3); stroke-width: 0.6; stroke-dasharray: 2 2; }
+    .sg-radar-data { fill: rgba(201,169,97,0.28); stroke: #c9a961; stroke-width: 1.8; stroke-linejoin: round; filter: drop-shadow(0 0 4px rgba(201,169,97,0.5)); }
+    .sg-radar-point { fill: #c84838; stroke: #f5ecd9; stroke-width: 1; }
+    .sg-radar-label { fill: #f5ecd9; font-size: 11px; font-weight: 700; font-family: var(--font-serif); text-anchor: middle; dominant-baseline: middle; }
+    .sg-radar-value { fill: #c9a961; font-size: 9px; font-family: var(--font-serif); text-anchor: middle; dominant-baseline: middle; }
+
+    .sg-quote { position: relative; padding: 11px 13px 11px 26px; background: rgba(201,169,97,0.06); border-left: 3px solid #c84838; border-radius: 2px; }
+    .sg-quote::before { content: "\201C"; position: absolute; left: 5px; top: -2px; font-size: 2.2rem; color: #c9a961; font-family: serif; line-height: 1.2; opacity: 0.7; }
+    .sg-quote-text { font-size: 1.05rem; font-weight: 600; line-height: 1.5; letter-spacing: 0.04em; }
+    .sg-quote-src { margin-top: 4px; font-size: 0.7rem; color: rgba(245,236,217,0.55); letter-spacing: 0.08em; }
+
+    .sg-deed { display: flex; flex-direction: column; gap: 8px; }
+    .sg-deed-item { display: flex; gap: 9px; align-items: flex-start; }
+    .sg-deed-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: #c9a961; margin-top: 7px; box-shadow: 0 0 6px rgba(201,169,97,0.6); }
+    .sg-deed-body { flex: 1; }
+    .sg-deed-title { font-size: 0.86rem; font-weight: 700; color: #c9a961; letter-spacing: 0.06em; }
+    .sg-deed-text { font-size: 0.78rem; color: rgba(245,236,217,0.7); line-height: 1.55; margin-top: 2px; }
+
+    .sg-link { color: #c9a961; text-decoration: none; border-bottom: 1px dashed rgba(201,169,97,0.5); transition: all 0.2s; cursor: pointer; }
+    .sg-link:hover { border-bottom-style: solid; color: #f5ecd9; }
+
+    .sg-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 11px; border-top: 1px solid rgba(201,169,97,0.3); font-size: 0.7rem; color: rgba(245,236,217,0.55); letter-spacing: 0.1em; }
+    .sg-foot-bio { flex: 1; line-height: 1.5; margin-right: 11px; }
+
+    /* ============================================================
+       风格三：现代极简风
+       ============================================================ */
+    body[data-style="modern"] {
+      background: #f4f3f0;
+      color: #1a1a1a;
+      font-family: var(--font-sans);
+    }
+
+    .md-card {
+      max-width: 440px;
+      background: #fff;
+      padding: 32px 26px;
+      border-radius: 16px;
+      box-shadow: 0 1px 0 #ebe8e2, 0 12px 40px rgba(0,0,0,0.06);
+    }
+
+    .md-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 13px; padding-bottom: 24px; border-bottom: 1px solid #ebe8e2; }
+    .md-avatar { width: 92px; height: 92px; border-radius: 50%; overflow: hidden; border: 2px solid #ebe8e2; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: #fafaf8; }
+    .md-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .md-name-area { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+    .md-name { font-family: var(--font-serif); font-size: 2.1rem; font-weight: 700; letter-spacing: 0.06em; line-height: 1; }
+    .md-name-sub { font-size: 0.82rem; color: #8a8a8a; letter-spacing: 0.1em; }
+    .md-tags { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+    .md-tag { font-size: 0.72rem; color: #8b5a2b; background: rgba(139,90,43,0.1); padding: 4px 11px; border-radius: 14px; letter-spacing: 0.06em; font-weight: 500; }
+
+    .md-bio { padding: 18px 0; font-size: 0.9rem; color: #4a4a4a; line-height: 1.75; text-align: center; letter-spacing: 0.02em; border-bottom: 1px solid #ebe8e2; }
+
+    .md-section { padding: 20px 0; border-bottom: 1px solid #ebe8e2; }
+    .md-section:last-of-type { border-bottom: none; }
+    .md-title { font-family: var(--font-serif); font-size: 0.96rem; font-weight: 700; letter-spacing: 0.18em; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .md-title::before { content: ""; width: 3px; height: 13px; background: #8b5a2b; border-radius: 2px; }
+
+    .md-score { display: flex; flex-direction: column; gap: 13px; }
+    .md-score-row { display: flex; flex-direction: column; gap: 4px; }
+    .md-score-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .md-score-dim-wrap { display: flex; align-items: baseline; gap: 8px; }
+    .md-score-dim { font-family: var(--font-serif); font-size: 0.92rem; font-weight: 700; letter-spacing: 0.04em; }
+    .md-score-note { font-size: 0.7rem; color: #8a8a8a; }
+    .md-score-val { font-family: var(--font-serif); font-size: 1rem; font-weight: 700; color: #8b5a2b; font-variant-numeric: tabular-nums; }
+    .md-score-bar { height: 6px; background: #ece8e0; border-radius: 3px; overflow: hidden; }
+    .md-score-fill { height: 100%; background: linear-gradient(90deg,#8b5a2b 0%,#b07a4b 100%); border-radius: 3px; }
+
+    .md-quote { display: flex; flex-direction: column; gap: 18px; }
+    .md-quote-item { padding-left: 15px; border-left: 2px solid rgba(139,90,43,0.3); }
+    .md-quote-text { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 600; line-height: 1.55; letter-spacing: 0.02em; }
+    .md-quote-src { margin-top: 5px; font-size: 0.72rem; color: #8a8a8a; letter-spacing: 0.06em; }
+
+    .md-link { color: #8b5a2b; text-decoration: none; border-bottom: 1px dashed rgba(139,90,43,0.5); transition: all 0.2s; cursor: pointer; }
+    .md-link:hover { border-bottom-style: solid; background: rgba(139,90,43,0.05); }
+
+    .md-timeline { position: relative; padding-left: 17px; }
+    .md-timeline::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 1px; background: #ebe8e2; }
+    .md-deed-item { position: relative; padding-bottom: 15px; }
+    .md-deed-item:last-child { padding-bottom: 0; }
+    .md-deed-item::before { content: ""; position: absolute; left: -17px; top: 6px; width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 2px solid #8b5a2b; }
+    .md-deed-title { font-family: var(--font-serif); font-size: 0.92rem; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 3px; }
+    .md-deed-text { font-size: 0.82rem; color: #4a4a4a; line-height: 1.6; }
+
+    .md-foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid #ebe8e2; display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: #8a8a8a; letter-spacing: 0.08em; }
+    .md-foot-no { font-family: var(--font-serif); color: #8b5a2b; font-weight: 600; }
+
+    /* ============================================================
+       响应式
+       三国杀主样式已固定手机版（竖向堆叠 + max-width 360px），
+       电脑端也展示同样尺寸，方便未来网格铺满多张卡片
+       ============================================================ */
+    @media (max-width: 375px) {
+      body { padding: 12px 6px 24px; }
+      .style-tab { padding: 7px 12px; font-size: 0.76rem; }
+      .scroll-card { padding: 26px 15px 22px; }
+      .scroll-card::before, .scroll-card::after { width: 9px; }
+      .scroll-card::before { left: -9px; }
+      .scroll-card::after { right: -9px; }
+      .sc-name-main { font-size: 2.5rem; }
+      .sc-portrait { width: 86%; }
+      .sg-portrait { height: 250px; }
+      .sg-name { font-size: 1.8rem; }
+      .md-card { padding: 24px 18px; border-radius: 12px; }
+      .md-avatar { width: 78px; height: 78px; }
+      .md-name { font-size: 1.85rem; }
+    }
+  </style>
+</head>
+<body data-style="sanguosha">
+
+  <!-- 风格切换器 -->
+  <nav class="style-switcher" role="tablist" aria-label="卡片风格切换">
+    <button class="style-tab" data-target="scroll" role="tab">古典卷轴</button>
+    <button class="style-tab active" data-target="sanguosha" role="tab">三国杀卡牌</button>
+    <button class="style-tab" data-target="modern" role="tab">现代极简</button>
+  </nav>
+
+  <!-- 卡片舞台 -->
+  <div class="card-stage">
+    <article class="card-instance" id="card-scroll"></article>
+    <article class="card-instance active" id="card-sanguosha"></article>
+    <article class="card-instance" id="card-modern"></article>
+  </div>
+
+  <script>
+    // ============ 数据 ============
+    // 头像：反差版孔子——虎背熊腰、赤膊肌肉、单手驾车、弟子随车
+    //      史书依据：
+    //      《史记·孔子世家》「孔子长九尺有六寸，人皆谓之长人而异之」——身材极其高大
+    //      《史记·孔子世家》「孔子为儿嬉戏，常陈俎豆，设礼容」+ 父叔梁纥「以勇力闻」「偪阳之战举城门」——孔家有力士基因
+    //      《论语·子罕》「吾何执？执御乎？执射乎？吾执御矣」——孔子自认擅长驾车
+    //      《列女传》「孔子有所之，必由是御」——孔子出行常亲自驾车
+    //      《礼记·射义》「孔子射于矍相之圃，盖观者如堵墙」——孔子射箭时围观者众，臂力惊人
+    //      画面突出"跟大众印象不同却符合历史"的孔子：不是文弱老者，而是虎背熊腰、单手驾车的壮汉
+    const PORTRAIT_PROMPT = '春秋时期孔子反差形象，虎背熊腰肌肉发达的壮汉，身高九尺六寸的长人，赤裸上身露出结实肌肉和宽阔肩膀，浓眉大眼短须，面容英武刚毅，单手握缰绳驾驭战车，另一手挥斥方遒，战车上身后跟着几名弟子子路颜回等人，动态构图，水墨国风重彩插画，米白宣纸背景，史诗感历史人物画，体现孔子力士身材与御车绝技';
+    const PORTRAIT_URL = 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=' +
+      encodeURIComponent(PORTRAIT_PROMPT) + '&image_size=portrait_4_3';
+
+    // 跳转链接：指向线上静态站点的章节页（相对路径，部署后自动生效）
+    // 站点是 SPA，通过 ?book=&chapter= 参数路由到对应章节（app.js 的 openBookFromUrl 解析）
+    const SITE_BASE = './index.html';
+    function chapterLink(book, chapterEvent) {
+      return SITE_BASE + '?book=' + encodeURIComponent(book) + '&chapter=' + encodeURIComponent(chapterEvent);
+    }
+
+    const FIGURE = {
+      name: '孔子',
+      formalName: '孔丘',
+      courtesyName: '仲尼',
+      faction: '圣贤堂',
+      dynasty: '春秋',
+      state: '鲁国',
+      lifespan: '前551–前479',
+      portrait: PORTRAIT_URL,
+      scores: [
+        { dim: '仁德', value: 98, note: '仁者爱人，克己复礼为仁' },
+        { dim: '学识', value: 96, note: '博学于文，多能鄙事' },
+        { dim: '教化', value: 99, note: '有教无类，弟子三千' },
+        { dim: '思想', value: 98, note: '吾道一以贯之，忠恕而已' },
+        { dim: '言传', value: 95, note: '述而不作，论语传世' },
+        { dim: '影响', value: 100, note: '万世师表，至圣先师' },
+      ],
+      // 名言：点击跳转到线上站点对应章节
+      quotes: [
+        { text: '三人行，必有我师焉。', source: '《论语·述而》', link: chapterLink('论语', '教育之道_学而时习') },
+        { text: '己所不欲，勿施于人。', source: '《论语·卫灵公》', link: chapterLink('论语', '修身处世与齐家_处世智慧') },
+        { text: '知者不惑，仁者不忧，勇者不惧。', source: '《论语·子罕》', link: chapterLink('论语', '修身处世与齐家_修身之道') },
+      ],
+      // 事迹：点击跳转到线上站点对应章节
+      deeds: [
+        { title: '夹谷之会', text: '齐鲁会盟任相礼，临危不乱，当场诛优倡震慑齐人，逼齐归还能地。', link: chapterLink('孔子传', '鲁国从政_夹谷之会') },
+        { title: '陈蔡绝粮', text: '困于陈蔡七日，弟子饥病，孔子弦歌不辍，曰"君子固穷"。', link: chapterLink('孔子传', '周游列国_陈蔡绝粮') },
+        { title: '删诗定礼', text: '晚年归鲁，删《诗》三百，赞《周易》，作《春秋》，笔则笔削则削。', link: chapterLink('孔子传', '归鲁修业与身后哀荣_删诗定礼') },
+        { title: '韦编三绝', text: '晚而喜《易》，读之韦编三绝，传《易》于商瞿。', link: chapterLink('孔子传', '归鲁修业与身后哀荣_作春秋') },
+      ],
+      bio: '孔子（前551–前479），名丘，字仲尼，春秋鲁国陬邑人。儒家学派创始人，开私学先河，弟子三千，贤者七十二。其思想以仁礼为核心，被尊为"至圣先师"，影响中华文脉两千余年。',
+      bioShort: '儒家创始人，开私学先河，弟子三千，贤者七十二，被尊为"至圣先师"。'
+    };
+
+    // 图片兜底：加载失败显示占位
+    const IMG_ONERROR = 'this.onerror=null;this.src="data:image/svg+xml;utf8,' +
+      encodeURIComponent('<svg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"200\\" height=\\"150\\"><rect width=\\"200\\" height=\\"150\\" fill=\\"#f0ece5\\"/><text x=\\"100\\" y=\\"80\\" font-size=\\"16\\" text-anchor=\\"middle\\" fill=\\"#7a7a7a\\" font-family=\\"serif\\">孔子像</text></svg>') + '"';
+
+    // ============ 雷达图 SVG 生成 ============
+    function buildRadar(scores) {
+      const cx = 150, cy = 150, R = 110, n = scores.length;
+      const angles = scores.map((_, i) => (-90 + i * (360 / n)) * Math.PI / 180);
+      const rings = [0.2, 0.4, 0.6, 0.8, 1.0].map(r =>
+        angles.map(a => (cx + R * r * Math.cos(a)).toFixed(1) + ',' + (cy + R * r * Math.sin(a)).toFixed(1)).join(' '));
+      const dataPts = scores.map((s, i) => {
+        const r = (s.value / 100) * R;
+        return { x: cx + r * Math.cos(angles[i]), y: cy + r * Math.sin(angles[i]) };
+      });
+      const dataPoly = dataPts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+      const axes = angles.map(a => ({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }));
+      const labels = scores.map((s, i) => {
+        const lr = R + 24;
+        return { x: cx + lr * Math.cos(angles[i]), y: cy + lr * Math.sin(angles[i]), dim: s.dim, value: s.value };
+      });
+      return { rings, dataPoly, axes, dataPts, labels, cx, cy };
+    }
+
+    function renderRadar(scores) {
+      const r = buildRadar(scores);
+      return `<svg class="sg-radar-svg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+        ${r.rings.map(pts => `<polygon class="sg-radar-grid" points="${pts}"></polygon>`).join('')}
+        ${r.axes.map(a => `<line class="sg-radar-axis" x1="${r.cx}" y1="${r.cy}" x2="${a.x.toFixed(1)}" y2="${a.y.toFixed(1)}"></line>`).join('')}
+        <polygon class="sg-radar-data" points="${r.dataPoly}"></polygon>
+        ${r.dataPts.map(p => `<circle class="sg-radar-point" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2"></circle>`).join('')}
+        ${r.labels.map(l => `<text class="sg-radar-label" x="${l.x.toFixed(1)}" y="${(l.y-6).toFixed(1)}">${l.dim}</text><text class="sg-radar-value" x="${l.x.toFixed(1)}" y="${(l.y+8).toFixed(1)}">${l.value}</text>`).join('')}
+      </svg>`;
+    }
+
+    // ============ 风格一：古典卷轴 ============
+    function renderScroll() {
+      const f = FIGURE;
+      document.getElementById('card-scroll').innerHTML = `
+        <div class="scroll-card">
+          <div class="sc-header">
+            <div class="sc-seal"><span>圣</span><span>贤</span><span>堂</span></div>
+            <div class="sc-name">
+              <div class="sc-name-main">${f.name}</div>
+              <div class="sc-name-sub">${f.formalName} · 字 ${f.courtesyName}</div>
+            </div>
+          </div>
+          <div class="sc-portrait">
+            <img src="${f.portrait}" alt="${f.name}画像" loading="lazy" onerror="${IMG_ONERROR}">
+            <div class="sc-portrait-cap">先师孔子行教像</div>
+          </div>
+          <div class="sc-tags">
+            <span class="sc-tag">${f.dynasty}</span>
+            <span class="sc-tag">${f.state}</span>
+            <span class="sc-tag">${f.lifespan}</span>
+          </div>
+          <h2 class="sc-title">六维评鉴</h2>
+          <div class="sc-score">
+            ${f.scores.map(s => `
+              <div class="sc-score-row">
+                <div class="sc-score-head">
+                  <span class="sc-score-dim">${s.dim}</span>
+                  <div class="sc-score-bar"><div class="sc-score-fill" style="width:${s.value}%"></div></div>
+                  <span class="sc-score-val">${s.value}</span>
+                </div>
+                <div class="sc-score-note">${s.note}</div>
+              </div>`).join('')}
+          </div>
+          <h2 class="sc-title">精彩事迹</h2>
+          <div class="sc-deed">
+            ${f.deeds.map(d => `
+              <div class="sc-deed-item">
+                <a class="sc-link sc-deed-title" href="${d.link}" target="_blank" rel="noopener" title="查看《${d.title}》原文">${d.title} ↗</a>
+                <div class="sc-deed-text" style="margin-top:3px">${d.text}</div>
+              </div>`).join('')}
+          </div>
+          <h2 class="sc-title">经典名言</h2>
+          <div class="sc-quote">
+            ${f.quotes.map(q => `
+              <div class="sc-quote-item">
+                <a class="sc-link sc-quote-text" href="${q.link}" target="_blank" rel="noopener" title="查看原文">${q.text}</a>
+                <div class="sc-quote-src">—— ${q.source}</div>
+              </div>`).join('')}
+          </div>
+          <h2 class="sc-title">人物简介</h2>
+          <p class="sc-bio">${f.bio}</p>
+          <div class="sc-foot">
+            <span class="sc-foot-meta">圣贤堂 · 第壹号</span>
+            <div class="sc-foot-seal">至圣<br>先师</div>
+          </div>
+        </div>`;
+    }
+
+    // ============ 风格二：三国杀卡牌 ============
+    function renderSanguosha() {
+      const f = FIGURE;
+      const top = f.quotes[0];
+      document.getElementById('card-sanguosha').innerHTML = `
+        <div class="sg-card">
+          <div class="sg-portrait">
+            <img src="${f.portrait}" alt="${f.name}立绘" loading="lazy" onerror="${IMG_ONERROR}">
+            <div class="sg-stamp">
+              <span class="sg-stamp-faction">${f.faction}</span>
+              <span class="sg-stamp-no">NO.001 · ${f.dynasty} · ${f.state}</span>
+            </div>
+          </div>
+          <div class="sg-info">
+            <div class="sg-name-row">
+              <span class="sg-name">${f.name}</span>
+              <span class="sg-courtesy">${f.formalName} · 字 ${f.courtesyName}</span>
+            </div>
+            <div class="sg-tags">
+              <span class="sg-tag">${f.dynasty}</span>
+              <span class="sg-tag">${f.state}</span>
+              <span class="sg-tag">${f.lifespan}</span>
+            </div>
+            <div class="sg-radar-section">
+              <div class="sg-radar-wrap">${renderRadar(f.scores)}</div>
+            </div>
+            <div class="sg-quote">
+              <a class="sg-link sg-quote-text" href="${top.link}" target="_blank" rel="noopener" title="查看原文">${top.text}</a>
+              <div class="sg-quote-src">—— ${top.source}</div>
+            </div>
+            <div class="sg-deed">
+              ${f.deeds.slice(0, 3).map(d => `
+                <div class="sg-deed-item">
+                  <div class="sg-deed-dot"></div>
+                  <div class="sg-deed-body">
+                    <a class="sg-link sg-deed-title" href="${d.link}" target="_blank" rel="noopener">${d.title} ↗</a>
+                    <div class="sg-deed-text">${d.text}</div>
+                  </div>
+                </div>`).join('')}
+            </div>
+            <div class="sg-foot">
+              <span class="sg-foot-bio">${f.bioShort}</span>
+              <span>圣贤堂 · 壹号</span>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    // ============ 风格三：现代极简 ============
+    function renderModern() {
+      const f = FIGURE;
+      document.getElementById('card-modern').innerHTML = `
+        <div class="md-card">
+          <div class="md-head">
+            <div class="md-avatar">
+              <img src="${f.portrait}" alt="${f.name}头像" loading="lazy" onerror="${IMG_ONERROR}">
+            </div>
+            <div class="md-name-area">
+              <div class="md-name">${f.name}</div>
+              <div class="md-name-sub">${f.formalName} · 字 ${f.courtesyName}</div>
+            </div>
+            <div class="md-tags">
+              <span class="md-tag">${f.faction}</span>
+              <span class="md-tag">${f.dynasty} · ${f.state}</span>
+              <span class="md-tag">${f.lifespan}</span>
+            </div>
+          </div>
+          <p class="md-bio">${f.bio}</p>
+          <section class="md-section">
+            <h2 class="md-title">六维评鉴</h2>
+            <div class="md-score">
+              ${f.scores.map(s => `
+                <div class="md-score-row">
+                  <div class="md-score-head">
+                    <div class="md-score-dim-wrap">
+                      <span class="md-score-dim">${s.dim}</span>
+                      <span class="md-score-note">${s.note}</span>
+                    </div>
+                    <span class="md-score-val">${s.value}</span>
+                  </div>
+                  <div class="md-score-bar"><div class="md-score-fill" style="width:${s.value}%"></div></div>
+                </div>`).join('')}
+            </div>
+          </section>
+          <section class="md-section">
+            <h2 class="md-title">经典名言</h2>
+            <div class="md-quote">
+              ${f.quotes.map(q => `
+                <div class="md-quote-item">
+                  <a class="md-link md-quote-text" href="${q.link}" target="_blank" rel="noopener" title="查看原文">${q.text}</a>
+                  <div class="md-quote-src">—— ${q.source}</div>
+                </div>`).join('')}
+            </div>
+          </section>
+          <section class="md-section">
+            <h2 class="md-title">精彩事迹</h2>
+            <div class="md-timeline">
+              ${f.deeds.map(d => `
+                <div class="md-deed-item">
+                  <a class="md-link md-deed-title" href="${d.link}" target="_blank" rel="noopener" title="查看《${d.title}》原文">${d.title} ↗</a>
+                  <div class="md-deed-text">${d.text}</div>
+                </div>`).join('')}
+            </div>
+          </section>
+          <div class="md-foot">
+            <span>圣贤堂</span>
+            <span class="md-foot-no">NO.001</span>
+          </div>
+        </div>`;
+    }
+
+    // ============ 风格切换 ============
+    function switchStyle(target) {
+      document.body.setAttribute('data-style', target);
+      document.querySelectorAll('.style-tab').forEach(t => t.classList.toggle('active', t.dataset.target === target));
+      document.querySelectorAll('.card-instance').forEach(c => c.classList.toggle('active', c.id === 'card-' + target));
+    }
+
+    document.querySelectorAll('.style-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchStyle(tab.dataset.target));
+    });
+
+    // ============ 初始渲染 ============
+    renderScroll();
+    renderSanguosha();
+    renderModern();
+  </script>
+</body>
+</html>

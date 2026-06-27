@@ -1,8 +1,5 @@
 import os
-import re
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 from langgraph.graph import END, START, StateGraph
 
@@ -17,10 +14,9 @@ from src.agents import (
 )
 from src.core.state import AgentState
 from src.utils.config import load_config
-from src.utils.content_quality import run_content_quality_checks
 from src.utils.logger import get_logger, make_log_path
 from src.utils.markdown import save_markdown
-from src.utils.quality import run_quality_checks  # legacy：build_workflow 兜底用
+from src.utils.quality import run_quality_checks
 
 # --- Soul Injection（文风注入 / 终审）可选节点 ---------------------------------
 # 配置开关：SOUL_INJECTION_ENABLED=1 开启（默认），=0 关闭走原管线。
@@ -46,151 +42,6 @@ except ImportError as exc:  # 另一个 agent 尚未创建该文件时兜底
 # 详见 docs/archetype-design/design.md §10、§10.6
 # fiction 桶待落地，阶段3 不接入。
 _VALID_ARCHETYPES = {"narrative", "modern", "knowledge"}
-
-# --- 反馈循环第一档：评分落盘辅助函数 -----------------------------------
-# 详见 docs/feedback-loop/design.md §4.1
-# - _inject_quality_frontmatter：把 quality_score / quality_dimensions 注入单篇 frontmatter
-# - _update_meta_score：扫描 book_dir 下所有 .md 重算 avg/min 写回 _meta.yaml
-# - _append_score_history：append 一条评分记录到 docs/reviews/score_history_{book}.yaml
-_FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
-
-
-def _sanitize_filename(name: str) -> str:
-    """简单文件名安全化（与 markdown.py 同语义，避免跨模块导入私有函数）。"""
-    if not name:
-        return "untitled"
-    safe = name.strip().replace("/", "_").replace("\\", "_").replace("..", "_")
-    return safe.strip("_") or "untitled"
-
-
-def _inject_quality_frontmatter(
-    content: str, score: int, dimensions: Dict[str, int]
-) -> str:
-    """在 frontmatter 末尾追加 quality_score / quality_dimensions 字段。
-
-    若 content 无 frontmatter（如 stub 占位笔记），原样返回。
-    若已存在字段，不重复注入（幂等）。
-    """
-    match = _FRONTMATTER_RE.match(content)
-    if not match:
-        return content
-    fm_body = match.group(1)
-    existing_keys = {
-        line.split(":", 1)[0].strip()
-        for line in fm_body.splitlines()
-        if ":" in line
-    }
-    additions = []
-    if "quality_score" not in existing_keys:
-        additions.append(f"quality_score: {score}")
-    if "quality_dimensions" not in existing_keys:
-        additions.append("quality_dimensions:")
-        for k, v in dimensions.items():
-            additions.append(f"  {k}: {v}")
-    if not additions:
-        return content
-    new_fm = fm_body.rstrip("\n") + "\n" + "\n".join(additions) + "\n"
-    return content[: match.start(1)] + new_fm + content[match.end(1):]
-
-
-def _collect_book_scores(book_dir: Path) -> list:
-    """扫描 book_dir 下所有 *.md 的 quality_score，返回整数列表。"""
-    import yaml  # 延迟导入：PyYAML 是项目依赖但仅在落盘时需要
-
-    scores = []
-    for md_path in book_dir.glob("*.md"):
-        try:
-            text = md_path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        m = _FRONTMATTER_RE.match(text)
-        if not m:
-            continue
-        try:
-            fm = yaml.safe_load(m.group(1)) or {}
-        except yaml.YAMLError:
-            continue
-        s = fm.get("quality_score")
-        if isinstance(s, (int, float)) and not isinstance(s, bool):
-            scores.append(int(s))
-    return scores
-
-
-def _update_meta_score(book_dir: Path) -> None:
-    """更新书级 _meta.yaml 的 avg_score / min_score 聚合字段。
-
-    仅当 _meta.yaml 已存在时更新（不主动新建）。
-    build_site.py 的 _load_book_meta 只读 6 个 key，新增字段不影响站点构建。
-    """
-    import yaml  # 延迟导入：PyYAML 是项目依赖但仅在落盘时需要
-
-    meta_path = book_dir / "_meta.yaml"
-    if not meta_path.exists():
-        return
-    try:
-        meta = yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
-        if not isinstance(meta, dict):
-            meta = {}
-    except yaml.YAMLError:
-        meta = {}
-
-    scores = _collect_book_scores(book_dir)
-    if scores:
-        meta["avg_score"] = round(sum(scores) / len(scores), 1)
-        meta["min_score"] = min(scores)
-    else:
-        meta.pop("avg_score", None)
-        meta.pop("min_score", None)
-
-    tmp = meta_path.with_suffix(".tmp")
-    tmp.write_text(
-        yaml.safe_dump(meta, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
-    tmp.replace(meta_path)
-
-
-def _append_score_history(
-    book: str,
-    chapter: str,
-    event: str,
-    archetype: str,
-    score: int,
-    dimensions: Dict[str, int],
-    reviews_dir: Path,
-) -> None:
-    """append 一条评分记录到 docs/reviews/score_history_{book}.yaml。
-
-    使用 yaml 多文档格式（--- 分隔），每条一个 document，
-    后续可用 yaml.safe_load_all 读取做趋势分析。
-    灵魂维度已补齐 §9.2/9.3/9.4 自动算分（content_quality.py _check_soul_dimension），
-    §9.1 三问仍需人工，记录 soul_issues 数量供人工补分参考。
-    """
-    import yaml  # 延迟导入：PyYAML 是项目依赖但仅在落盘时需要
-
-    reviews_dir.mkdir(parents=True, exist_ok=True)
-    safe_book = _sanitize_filename(book)
-    history_path = reviews_dir / f"score_history_{safe_book}.yaml"
-    soul_issues = dimensions.get("soul", 0)
-    record = {
-        "date": datetime.now().astimezone().replace(microsecond=0).isoformat(),
-        "book": book,
-        "chapter": chapter,
-        "event": event,
-        "archetype": archetype,
-        "score": score,
-        "dimensions": dimensions,
-        "soul_auto_issues": soul_issues,
-        "soul_note": (
-            "灵魂维度已全自动算分（§9.1 三问启发式近似 + §9.2 套话 + §9.3 数字 + §9.4 标题），"
-            "纯 AI 闭环无需人工介入"
-        ),
-    }
-    with history_path.open("a", encoding="utf-8") as f:
-        f.write("---\n")
-        yaml.safe_dump(
-            record, f, allow_unicode=True, sort_keys=False, default_flow_style=False
-        )
 
 # 阶段1/2 已落地 AgentState.archetype；阶段3 在此消费它。
 _LEGACY_REQUIRED_SECTIONS = [
@@ -288,29 +139,24 @@ def build_workflow(
         return editor.run(state)
 
     def quality_node(state: AgentState) -> dict:
-        """质量检查节点：跑带 score 的 content_quality 引擎，回灌 score 到 state。
+        """质量检查节点：检查结构完整性、AI 味、引用等。
 
-        换接口前调 legacy run_quality_checks（无 score），现换 run_content_quality_checks
-        反馈循环第一档接线点（feedback-loop/design.md §4.1）。
+        required_sections 由 build_workflow 闭包按 archetype 注入（阶段3）。
         """
         content = state.get("final_markdown", "")
-        archetype = state.get("archetype", "narrative")
-        report = run_content_quality_checks(content, archetype=archetype)
+        required_frontmatter = [
+            "title", "book", "chapter", "event", "created_at", "source_agents"
+        ]
+        report = run_quality_checks(
+            content,
+            expected_sections=required_sections,
+            required_frontmatter=required_frontmatter,
+        )
         if report.passed:
-            logger.info("质量检查通过（score=%d）", report.score)
+            logger.info("质量检查通过")
         else:
-            logger.warning(
-                "质量检查发现问题（score=%d）：%s",
-                report.score,
-                "; ".join(report.issues),
-            )
-        return {
-            "errors": report.issues,
-            "quality_score": report.score,
-            "quality_dimensions": {
-                k: len(v) for k, v in report.details.items()
-            },
-        }
+            logger.warning("质量检查发现问题：%s", "; ".join(report.issues))
+        return {"errors": report.issues}
 
     def chief_editor_node(state: AgentState) -> dict:
         """终审节点：试点期仅打标记，不阻断保存。"""
@@ -347,7 +193,6 @@ def build_workflow(
         cfg = load_config()
         logs_dir = cfg.get("logs", {}).get("base_dir", "logs")
         log_path = make_log_path(logs_dir, event)
-        quality_score = state.get("quality_score", 0)
         try:
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text(
@@ -355,50 +200,20 @@ def build_workflow(
                 f"章节: {state.get('chapter', '')}\n"
                 f"事件: {state.get('event', '')}\n"
                 f"输出: {state.get('output_path', '')}\n"
-                f"质量评分: {quality_score}\n"
                 f"质量问题: {state.get('errors', [])}\n",
                 encoding="utf-8",
             )
         except Exception as exc:
             logger.warning("无法写入日志文件 %s: %s", log_path, exc)
 
-        # 反馈循环第一档：注入 quality_score / quality_dimensions 到 frontmatter
-        quality_dimensions = state.get("quality_dimensions", {})
-        content_with_score = _inject_quality_frontmatter(
-            state["final_markdown"], quality_score, quality_dimensions
-        )
-
         path = save_markdown(
             book=state["book"],
             chapter=state["chapter"],
             event=state["event"],
-            content=content_with_score,
+            content=state["final_markdown"],
             base_dir=output_base,
         )
-        logger.info("笔记已保存至 %s（score=%d）", path, quality_score)
-
-        # 更新书级 _meta.yaml 的 avg/min 聚合
-        try:
-            book_dir = Path(output_base) / _sanitize_filename(state["book"])
-            _update_meta_score(book_dir)
-        except Exception as exc:
-            logger.warning("更新 _meta.yaml 聚合分数失败：%s", exc)
-
-        # append 评分历史到 docs/reviews/score_history_{book}.yaml
-        try:
-            reviews_dir = Path("docs/reviews")
-            _append_score_history(
-                book=state["book"],
-                chapter=state["chapter"],
-                event=state["event"],
-                archetype=state.get("archetype", "narrative"),
-                score=quality_score,
-                dimensions=quality_dimensions,
-                reviews_dir=reviews_dir,
-            )
-        except Exception as exc:
-            logger.warning("追加评分历史失败：%s", exc)
-
+        logger.info("笔记已保存至 %s", path)
         return {"output_path": str(path)}
 
     # 阶段4 边链裁剪：按 archetype 从 SECTION_TEMPLATES 反查需要的 specialist

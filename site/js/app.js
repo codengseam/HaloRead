@@ -506,7 +506,7 @@
         }
     }
 
-    function openBook(bookId) {
+    function openBook(bookId, chapterPath) {
         const book = state.booksData.find((b) => b.id === bookId);
         if (!book) {
             const bookNode = state.treeData.find((b) => b.title === bookId);
@@ -526,13 +526,32 @@
         elements.reader.innerHTML = '<div class="reader-placeholder"><p>正在加载…</p></div>';
         refreshTreeView();
 
-        // 优先跳转到缓存页，无缓存则打开第一章
-        const cachedPath = getCachedPosition(bookId);
         const bookNotes = flattenTree(state.currentBookTree);
-        if (cachedPath && bookNotes.some((n) => n.path === cachedPath)) {
-            loadNote(cachedPath);
-        } else if (bookNotes.length > 0) {
-            loadNote(bookNotes[0].path);
+        // 优先跳转到 URL 指定章节，其次缓存页，最后第一章
+        if (chapterPath && bookNotes.some((n) => n.path === chapterPath)) {
+            loadNote(chapterPath);
+        } else {
+            const cachedPath = getCachedPosition(bookId);
+            if (cachedPath && bookNotes.some((n) => n.path === cachedPath)) {
+                loadNote(cachedPath);
+            } else if (bookNotes.length > 0) {
+                loadNote(bookNotes[0].path);
+            }
+        }
+    }
+
+    // 从 URL 参数 ?book=&chapter= 自动打开书并定位章节（供人物卡片等外部链接深跳转）
+    function openBookFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const bookId = params.get('book');
+        const chapter = params.get('chapter');
+        if (!bookId) return;
+        // chapter 参数为「章节_事件」形式，需拼成相对路径 book/chapter_event.md
+        if (chapter) {
+            const chapterPath = bookId + '/' + chapter + '.md';
+            openBook(bookId, chapterPath);
+        } else {
+            openBook(bookId);
         }
     }
 
@@ -712,6 +731,8 @@
                     renderCategoryTabs();
                     renderBookshelf();
                     updateChapterNav();
+                    // 数据就绪后检查 URL 参数，支持 ?book=&chapter= 深跳转
+                    openBookFromUrl();
                 }
             );
         } catch (err) {
