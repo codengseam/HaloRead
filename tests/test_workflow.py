@@ -133,6 +133,7 @@ def test_workflow_quality_score_persists_to_frontmatter(monkeypatch):
         assert "score: 92" in history_text, "score_history 应记录 score"
         assert "archetype: narrative" in history_text, "score_history 应记录 archetype"
         assert "soul_auto_issues:" in history_text, "score_history 应记录 soul_auto_issues"
+        assert "纯 AI 闭环" in history_text, "score_history 的 soul_note 应说明已全自动算分"
 
         # 清理测试产物
         for f in history_files:
