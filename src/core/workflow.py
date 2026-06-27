@@ -182,8 +182,8 @@ def _append_score_history(
         "dimensions": dimensions,
         "soul_auto_issues": soul_issues,
         "soul_note": (
-            "灵魂维度已自动算分（§9.2 套话/§9.3 数字/§9.4 标题）；"
-            "§9.1 三问（活人测试/洞察独家性/底色敬畏感）仍需人工评分"
+            "灵魂维度已全自动算分（§9.1 三问启发式近似 + §9.2 套话 + §9.3 数字 + §9.4 标题），"
+            "纯 AI 闭环无需人工介入"
         ),
     }
     with history_path.open("a", encoding="utf-8") as f:
