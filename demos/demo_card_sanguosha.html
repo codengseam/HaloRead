@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>圣贤堂 · 孔子｜三国杀卡牌风 Demo</title>
+  <style>
+    :root {
+      --bg: #2a1a0e;
+      --bg-deep: #3d2817;
+      --gold: #c9a961;
+      --gold-soft: rgba(201, 169, 97, 0.3);
+      --gold-deep: #8b7332;
+      --paper: #f5ecd9;
+      --paper-soft: rgba(245, 236, 217, 0.7);
+      --vermilion: #a13c2c;
+      --vermilion-bright: #c84838;
+      --muted: rgba(245, 236, 217, 0.55);
+      --font-serif: "Noto Serif SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      background:
+        radial-gradient(ellipse at top, #3d2817 0%, #2a1a0e 70%);
+      font-family: var(--font-serif);
+      color: var(--paper);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px 10px;
+    }
+
+    /* 卡牌主体 */
+    .hero-card {
+      position: relative;
+      width: 100%;
+      max-width: 760px;
+      background: linear-gradient(135deg, #3d2817 0%, #2a1a0e 100%);
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      box-shadow:
+        0 0 0 1px var(--gold-deep) inset,
+        0 0 24px rgba(201, 169, 97, 0.25),
+        0 8px 32px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 42% 58%;
+    }
+
+    /* 装饰角花 */
+    .hero-card::before,
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border: 1.5px solid var(--gold);
+      pointer-events: none;
+    }
+    .hero-card::before { top: 6px; left: 6px; border-right: none; border-bottom: none; }
+    .hero-card::after { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+
+    /* 左侧：人物立绘 */
+    .portrait-pane {
+      position: relative;
+      background: linear-gradient(180deg, #1f1308 0%, #2a1a0e 100%);
+      border-right: 1px solid var(--gold-soft);
+      min-height: 480px;
+      overflow: hidden;
+    }
+
+    .portrait-pane img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: sepia(0.15) contrast(1.05);
+    }
+
+    .portrait-pane::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, transparent 60%, rgba(42, 26, 14, 0.85) 100%),
+        linear-gradient(90deg, transparent 70%, rgba(42, 26, 14, 0.4) 100%);
+      pointer-events: none;
+    }
+
+    .portrait-stamp {
+      position: absolute;
+      bottom: 16px;
+      left: 14px;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stamp-faction {
+      display: inline-block;
+      padding: 4px 12px;
+      background: linear-gradient(135deg, var(--vermilion) 0%, var(--vermilion-bright) 100%);
+      color: var(--paper);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      border-radius: 2px;
+      border: 1px solid var(--gold);
+      box-shadow: 0 0 8px rgba(201, 169, 97, 0.4);
+      width: fit-content;
+    }
+
+    .stamp-no {
+      font-size: 0.7rem;
+      color: var(--gold);
+      letter-spacing: 0.15em;
+    }
+
+    /* 右侧：信息区 */
+    .info-pane {
+      padding: 24px 22px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .name-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--gold-soft);
+    }
+
+    .name-main {
+      font-size: 2.6rem;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.1em;
+      line-height: 1;
+      text-shadow: 0 0 12px rgba(201, 169, 97, 0.4);
+    }
+
+    .name-courtesy {
+      font-size: 0.95rem;
+      color: var(--paper-soft);
+      letter-spacing: 0.1em;
+    }
+
+    .meta-tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .meta-tag {
+      font-size: 0.74rem;
+      color: var(--gold);
+      border: 1px solid var(--gold-soft);
+      padding: 3px 10px;
+      border-radius: 12px;
+      letter-spacing: 0.08em;
+      background: rgba(201, 169, 97, 0.06);
+    }
+
+    /* 雷达图区 */
+    .radar-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .radar-wrap {
+      width: 100%;
+      max-width: 280px;
+      aspect-ratio: 1;
+    }
+
+    .radar-svg { width: 100%; height: 100%; display: block; }
+
+    .radar-grid { fill: none; stroke: var(--gold-soft); stroke-width: 0.8; }
+    .radar-axis { stroke: var(--gold-soft); stroke-width: 0.6; stroke-dasharray: 2 2; }
+    .radar-data {
+      fill: rgba(201, 169, 97, 0.28);
+      stroke: var(--gold);
+      stroke-width: 1.8;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 4px rgba(201, 169, 97, 0.5));
+    }
+    .radar-point {
+      fill: var(--vermilion-bright);
+      stroke: var(--paper);
+      stroke-width: 1;
+    }
+    .radar-label {
+      fill: var(--paper);
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-serif);
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+    .radar-value {
+      fill: var(--gold);
+      font-size: 9px;
+      font-family: var(--font-serif);
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    /* 台词区 */
+    .quote-block {
+      position: relative;
+      padding: 12px 14px 12px 28px;
+      background: rgba(201, 169, 97, 0.06);
+      border-left: 3px solid var(--vermilion-bright);
+      border-radius: 2px;
+    }
+
+    .quote-block::before {
+      content: "\201C";
+      position: absolute;
+      left: 6px;
+      top: 0;
+      font-size: 2.4rem;
+      color: var(--gold);
+      font-family: serif;
+      line-height: 1.2;
+      opacity: 0.7;
+    }
+
+    .quote-text {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--paper);
+      line-height: 1.5;
+      letter-spacing: 0.04em;
+    }
+
+    .quote-source {
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    /* 事迹区 */
+    .deed-list { display: flex; flex-direction: column; gap: 9px; }
+
+    .deed-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .deed-dot {
+      flex-shrink: 0;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--gold);
+      margin-top: 7px;
+      box-shadow: 0 0 6px rgba(201, 169, 97, 0.6);
+    }
+
+    .deed-body { flex: 1; }
+
+    .deed-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.06em;
+    }
+
+    .deed-text {
+      font-size: 0.8rem;
+      color: var(--paper-soft);
+      line-height: 1.55;
+      margin-top: 2px;
+    }
+
+    /* 底部 */
+    .card-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid var(--gold-soft);
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .card-bottom .bio-mini {
+      flex: 1;
+      line-height: 1.5;
+      margin-right: 12px;
+    }
+
+    /* 手机适配：竖向堆叠 */
+    @media (max-width: 767px) {
+      .hero-card {
+        grid-template-columns: 1fr;
+        max-width: 420px;
+      }
+      .portrait-pane {
+        min-height: auto;
+        height: 300px;
+        border-right: none;
+        border-bottom: 1px solid var(--gold-soft);
+      }
+      .info-pane { padding: 20px 18px 18px; }
+      .name-main { font-size: 2.2rem; }
+      .radar-wrap { max-width: 240px; }
+    }
+
+    @media (max-width: 375px) {
+      body { padding: 12px 6px; }
+      .portrait-pane { height: 260px; }
+      .name-main { font-size: 1.9rem; }
+      .info-pane { padding: 16px 14px; gap: 12px; }
+      .quote-text { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <article class="hero-card" id="card"></article>
+
+  <script>
+    const FIGURE = {
+      id: 'confucius',
+      name: '孔子',
+      formalName: '孔丘',
+      courtesyName: '仲尼',
+      faction: '圣贤堂',
+      dynasty: '春秋',
+      state: '鲁国',
+      lifespan: '前551–前479',
+      portrait: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=' +
+        encodeURIComponent('中国古代圣贤孔子画像，先师孔子行教像风格，长髯老者，身着深衣大袖，手持笏板，水墨工笔人物画，米白宣纸背景，端庄肃穆，历史人物肖像，传统国画') +
+        '&image_size=portrait_4_3',
+      scores: [
+        { dim: '仁德', value: 98, note: '仁者爱人' },
+        { dim: '学识', value: 96, note: '博学多能' },
+        { dim: '教化', value: 99, note: '有教无类' },
+        { dim: '思想', value: 98, note: '吾道一以贯之' },
+        { dim: '言传', value: 95, note: '述而不作' },
+        { dim: '影响', value: 100, note: '万世师表' },
+      ],
+      quotes: [
+        { text: '三人行，必有我师焉。', source: '《论语·述而》' },
+        { text: '己所不欲，勿施于人。', source: '《论语·卫灵公》' },
+        { text: '知者不惑，仁者不忧，勇者不惧。', source: '《论语·子罕》' },
+      ],
+      deeds: [
+        { title: '夹谷之会', text: '齐鲁会盟任相礼，临危不乱，逼齐人归还能地。' },
+        { title: '陈蔡绝粮', text: '困于陈蔡七日，弦歌不辍，君子固穷。' },
+        { title: '删诗定礼', text: '晚年删《诗》三百，赞《周易》，作《春秋》。' },
+        { title: '韦编三绝', text: '晚而喜《易》，读之韦编三绝。' },
+      ],
+      bio: '儒家创始人，开私学先河，弟子三千，贤者七十二，被尊为"至圣先师"。'
+    };
+
+    // 雷达图生成（6 边形，顶部起，顺时针）
+    function buildRadar(scores) {
+      const cx = 150, cy = 150, R = 110;
+      const n = scores.length;
+      // 6 个轴角度（从顶部 -90° 起，顺时针每 60°）
+      const angles = scores.map((_, i) => (-90 + i * (360 / n)) * Math.PI / 180);
+
+      // 5 圈网格（20/40/60/80/100%）
+      const rings = [0.2, 0.4, 0.6, 0.8, 1.0].map(r =>
+        angles.map(a => {
+          const x = cx + R * r * Math.cos(a);
+          const y = cy + R * r * Math.sin(a);
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ')
+      );
+
+      // 数据多边形
+      const dataPoints = scores.map((s, i) => {
+        const r = (s.value / 100) * R;
+        const x = cx + r * Math.cos(angles[i]);
+        const y = cy + r * Math.sin(angles[i]);
+        return { x, y };
+      });
+      const dataPoly = dataPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+      // 轴线
+      const axes = angles.map(a => {
+        const x = cx + R * Math.cos(a);
+        const y = cy + R * Math.sin(a);
+        return { x, y };
+      });
+
+      // 标签位置（外推 22px）
+      const labels = scores.map((s, i) => {
+        const lr = R + 24;
+        const x = cx + lr * Math.cos(angles[i]);
+        const y = cy + lr * Math.sin(angles[i]);
+        return { x, y, dim: s.dim, value: s.value };
+      });
+
+      return { rings, dataPoly, axes, dataPoints, labels, cx, cy };
+    }
+
+    function renderRadar(scores) {
+      const r = buildRadar(scores);
+      return `
+        <svg class="radar-svg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+          <!-- 网格圈 -->
+          ${r.rings.map(pts => `<polygon class="radar-grid" points="${pts}"></polygon>`).join('')}
+          <!-- 轴线 -->
+          ${r.axes.map(a => `<line class="radar-axis" x1="${r.cx}" y1="${r.cy}" x2="${a.x.toFixed(1)}" y2="${a.y.toFixed(1)}"></line>`).join('')}
+          <!-- 数据多边形 -->
+          <polygon class="radar-data" points="${r.dataPoly}"></polygon>
+          <!-- 数据点 -->
+          ${r.dataPoints.map(p => `<circle class="radar-point" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.2"></circle>`).join('')}
+          <!-- 标签 -->
+          ${r.labels.map(l => `
+            <text class="radar-label" x="${l.x.toFixed(1)}" y="${(l.y - 6).toFixed(1)}">${l.dim}</text>
+            <text class="radar-value" x="${l.x.toFixed(1)}" y="${(l.y + 8).toFixed(1)}">${l.value}</text>
+          `).join('')}
+        </svg>
+      `;
+    }
+
+    function render() {
+      const card = document.getElementById('card');
+      const f = FIGURE;
+      const topQuote = f.quotes[0];
+
+      card.innerHTML = `
+        <div class="portrait-pane">
+          <img src="${f.portrait}" alt="${f.name}立绘" loading="lazy"
+               onerror="this.style.display='none'">
+          <div class="portrait-stamp">
+            <span class="stamp-faction">${f.faction}</span>
+            <span class="stamp-no">NO.001 · ${f.dynasty} · ${f.state}</span>
+          </div>
+        </div>
+
+        <div class="info-pane">
+          <div class="name-row">
+            <span class="name-main">${f.name}</span>
+            <span class="name-courtesy">${f.formalName} · 字 ${f.courtesyName}</span>
+          </div>
+
+          <div class="meta-tags">
+            <span class="meta-tag">${f.dynasty}</span>
+            <span class="meta-tag">${f.state}</span>
+            <span class="meta-tag">${f.lifespan}</span>
+          </div>
+
+          <div class="radar-section">
+            <div class="radar-wrap">${renderRadar(f.scores)}</div>
+          </div>
+
+          <div class="quote-block">
+            <div class="quote-text">${topQuote.text}</div>
+            <div class="quote-source">—— ${topQuote.source}</div>
+          </div>
+
+          <div class="deed-list">
+            ${f.deeds.slice(0, 3).map(d => `
+              <div class="deed-item">
+                <div class="deed-dot"></div>
+                <div class="deed-body">
+                  <div class="deed-title">${d.title}</div>
+                  <div class="deed-text">${d.text}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="card-bottom">
+            <span class="bio-mini">${f.bio}</span>
+            <span>圣贤堂 · 壹号</span>
+          </div>
+        </div>
+      `;
+    }
+
+    render();
+  </script>
+</body>
+</html>

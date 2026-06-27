@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>圣贤堂 · 孔子｜古典卷轴风 Demo</title>
+  <style>
+    :root {
+      --paper: #faf8f5;
+      --paper-deep: #f0ece5;
+      --ink: #2c2c2c;
+      --ink-soft: #4a4a4a;
+      --muted: #7a7a7a;
+      --vermilion: #a13c2c;
+      --vermilion-deep: #7a2a1c;
+      --bronze: #8b5a2b;
+      --bronze-soft: rgba(139, 90, 43, 0.18);
+      --divider: rgba(44, 44, 44, 0.1);
+      --font-serif: "Noto Serif SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      background: #e8e2d5;
+      font-family: var(--font-serif);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      padding: 24px 12px;
+    }
+
+    /* 卷轴卡片整体 */
+    .scroll-card {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      background: var(--paper);
+      background-image:
+        radial-gradient(ellipse at 20% 10%, rgba(139, 90, 43, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, rgba(161, 60, 44, 0.03) 0%, transparent 50%),
+        repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(139, 90, 43, 0.015) 3px, rgba(139, 90, 43, 0.015) 4px);
+      padding: 36px 22px 32px;
+      box-shadow:
+        0 4px 24px rgba(60, 40, 20, 0.18),
+        0 1px 0 rgba(255, 255, 255, 0.6) inset;
+      border-radius: 4px;
+    }
+
+    /* 卷轴木轴（左右两条） */
+    .scroll-card::before,
+    .scroll-card::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 14px;
+      background: linear-gradient(180deg, #6b4423 0%, #8b5a2b 30%, #6b4423 70%, #4a2f18 100%);
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+    }
+    .scroll-card::before { left: -14px; border-radius: 4px 0 0 4px; }
+    .scroll-card::after { right: -14px; border-radius: 0 4px 4px 0; }
+
+    /* 顶部：印章 + 姓名 */
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--divider);
+      margin-bottom: 22px;
+    }
+
+    .seal-faction {
+      flex-shrink: 0;
+      width: 56px;
+      height: 56px;
+      background: var(--vermilion);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      line-height: 1.1;
+      border-radius: 3px;
+      transform: rotate(-6deg);
+      box-shadow: 0 2px 6px rgba(161, 60, 44, 0.4);
+      font-weight: 700;
+      padding: 4px;
+      text-align: center;
+    }
+    .seal-faction span { display: block; }
+
+    .name-block { flex: 1; padding-top: 4px; }
+
+    .name-main {
+      font-size: 3.4rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .name-sub {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+    }
+
+    /* 画像区 */
+    .portrait-wrap {
+      position: relative;
+      margin: 0 auto 16px;
+      width: 78%;
+      max-width: 280px;
+      background: linear-gradient(180deg, #fff 0%, var(--paper-deep) 100%);
+      border: 1px solid var(--bronze-soft);
+      border-radius: 4px;
+      padding: 8px 8px 0;
+      box-shadow: 0 2px 8px rgba(60, 40, 20, 0.08);
+    }
+
+    .portrait-wrap img {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      border-radius: 2px;
+      background: var(--paper-deep);
+    }
+
+    .portrait-caption {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      padding: 8px 0 10px;
+      border-top: 1px dashed var(--bronze-soft);
+      margin-top: 8px;
+    }
+
+    /* 标签栏 */
+    .tag-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 26px;
+    }
+
+    .tag {
+      font-size: 0.78rem;
+      color: var(--vermilion);
+      border: 1px solid var(--vermilion);
+      border-radius: 2px;
+      padding: 3px 12px;
+      letter-spacing: 0.1em;
+      background: rgba(161, 60, 44, 0.04);
+    }
+
+    /* 区块标题 */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 0.15em;
+      margin: 22px 0 14px;
+    }
+    .section-title::before {
+      content: "";
+      width: 4px;
+      height: 16px;
+      background: var(--vermilion);
+    }
+    .section-title::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--bronze-soft), transparent);
+    }
+
+    /* 评分区：竖向水墨条 */
+    .score-list { display: flex; flex-direction: column; gap: 11px; }
+
+    .score-row { display: flex; flex-direction: column; gap: 3px; }
+
+    .score-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .score-dim {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 0.08em;
+      min-width: 56px;
+    }
+
+    .score-bar {
+      flex: 1;
+      height: 8px;
+      background: var(--paper-deep);
+      border-radius: 1px;
+      overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    .score-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--ink-soft) 0%, var(--ink) 70%, var(--vermilion-deep) 100%);
+      border-radius: 1px;
+      transition: width 0.6s ease;
+    }
+
+    .score-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--vermilion);
+      min-width: 32px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-left: 66px;
+    }
+
+    /* 事迹区 */
+    .deed-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .deed-item {
+      padding-left: 14px;
+      border-left: 2px solid var(--bronze-soft);
+    }
+
+    .deed-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--vermilion);
+      letter-spacing: 0.08em;
+      margin-bottom: 3px;
+    }
+
+    .deed-text {
+      font-size: 0.86rem;
+      color: var(--ink-soft);
+      line-height: 1.65;
+    }
+
+    /* 名言区 */
+    .quote-list { display: flex; flex-direction: column; gap: 14px; }
+
+    .quote-item {
+      position: relative;
+      padding: 12px 14px 12px 36px;
+      background: rgba(161, 60, 44, 0.04);
+      border-left: 2px solid var(--vermilion);
+      border-radius: 2px;
+    }
+
+    .quote-item::before {
+      content: "印";
+      position: absolute;
+      left: 8px;
+      top: 10px;
+      width: 20px;
+      height: 20px;
+      background: var(--vermilion);
+      color: #fff;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 2px;
+      transform: rotate(-4deg);
+      font-weight: 700;
+    }
+
+    .quote-text {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.5;
+      letter-spacing: 0.04em;
+    }
+
+    .quote-source {
+      margin-top: 6px;
+      font-size: 0.74rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    /* 简介 */
+    .bio {
+      font-size: 0.88rem;
+      color: var(--ink-soft);
+      line-height: 1.8;
+      letter-spacing: 0.03em;
+      text-align: justify;
+      text-indent: 2em;
+      padding: 14px 12px;
+      background: rgba(139, 90, 43, 0.04);
+      border-radius: 2px;
+    }
+
+    /* 底部落款 */
+    .card-footer {
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid var(--divider);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .seal-final {
+      width: 48px;
+      height: 48px;
+      background: var(--vermilion);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      line-height: 1.1;
+      letter-spacing: 0.05em;
+      border-radius: 3px;
+      transform: rotate(4deg);
+      box-shadow: 0 2px 4px rgba(161, 60, 44, 0.3);
+      font-weight: 700;
+      text-align: center;
+      padding: 2px;
+    }
+
+    /* 手机适配 */
+    @media (max-width: 375px) {
+      body { padding: 16px 6px; }
+      .scroll-card { padding: 28px 16px 24px; }
+      .scroll-card::before, .scroll-card::after { width: 10px; }
+      .scroll-card::before { left: -10px; }
+      .scroll-card::after { right: -10px; }
+      .name-main { font-size: 2.8rem; }
+      .seal-faction { width: 48px; height: 48px; font-size: 12px; }
+      .portrait-wrap { width: 88%; }
+      .score-note { margin-left: 0; }
+    }
+
+    @media (min-width: 768px) {
+      .scroll-card { max-width: 480px; padding: 48px 36px 40px; }
+      .name-main { font-size: 4rem; }
+    }
+  </style>
+</head>
+<body>
+  <article class="scroll-card" id="card"></article>
+
+  <script>
+    const FIGURE = {
+      id: 'confucius',
+      name: '孔子',
+      formalName: '孔丘',
+      courtesyName: '仲尼',
+      faction: '圣贤堂',
+      dynasty: '春秋',
+      state: '鲁国',
+      lifespan: '前551–前479',
+      portrait: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=' +
+        encodeURIComponent('中国古代圣贤孔子画像，先师孔子行教像风格，长髯老者，身着深衣大袖，手持笏板，水墨工笔人物画，米白宣纸背景，端庄肃穆，历史人物肖像，传统国画') +
+        '&image_size=portrait_4_3',
+      scores: [
+        { dim: '仁德', value: 98, note: '仁者爱人，克己复礼为仁' },
+        { dim: '学识', value: 96, note: '博学于文，多能鄙事' },
+        { dim: '教化', value: 99, note: '有教无类，弟子三千' },
+        { dim: '思想', value: 98, note: '吾道一以贯之，忠恕而已' },
+        { dim: '言传', value: 95, note: '述而不作，论语传世' },
+        { dim: '影响', value: 100, note: '万世师表，至圣先师' },
+      ],
+      quotes: [
+        { text: '三人行，必有我师焉。', source: '《论语·述而》' },
+        { text: '己所不欲，勿施于人。', source: '《论语·卫灵公》' },
+        { text: '知者不惑，仁者不忧，勇者不惧。', source: '《论语·子罕》' },
+      ],
+      deeds: [
+        { title: '夹谷之会', text: '齐鲁会盟任相礼，临危不乱，当场诛优倡震慑齐人，逼齐归还能地。' },
+        { title: '陈蔡绝粮', text: '困于陈蔡七日，弟子饥病，孔子弦歌不辍，曰"君子固穷"。' },
+        { title: '删诗定礼', text: '晚年归鲁，删《诗》三百，赞《周易》，作《春秋》，笔则笔削则削。' },
+        { title: '韦编三绝', text: '晚而喜《易》，读之韦编三绝，传《易》于商瞿。' },
+      ],
+      bio: '孔子（前551–前479），名丘，字仲尼，春秋鲁国陬邑人。儒家学派创始人，开私学先河，弟子三千，贤者七十二。其思想以仁礼为核心，被尊为"至圣先师"，影响中华文脉两千余年。'
+    };
+
+    function render() {
+      const card = document.getElementById('card');
+      const f = FIGURE;
+
+      card.innerHTML = `
+        <header class="card-header">
+          <div class="seal-faction"><span>圣</span><span>贤</span><span>堂</span></div>
+          <div class="name-block">
+            <div class="name-main">${f.name}</div>
+            <div class="name-sub">${f.formalName} · 字 ${f.courtesyName}</div>
+          </div>
+        </header>
+
+        <div class="portrait-wrap">
+          <img src="${f.portrait}" alt="${f.name}画像" loading="lazy"
+               onerror="this.style.background='var(--paper-deep)';this.alt='画像加载失败'">
+          <div class="portrait-caption">先师孔子行教像</div>
+        </div>
+
+        <div class="tag-row">
+          <span class="tag">${f.dynasty}</span>
+          <span class="tag">${f.state}</span>
+          <span class="tag">${f.lifespan}</span>
+        </div>
+
+        <h2 class="section-title">六维评鉴</h2>
+        <div class="score-list">
+          ${f.scores.map(s => `
+            <div class="score-row">
+              <div class="score-head">
+                <span class="score-dim">${s.dim}</span>
+                <div class="score-bar"><div class="score-fill" style="width:${s.value}%"></div></div>
+                <span class="score-value">${s.value}</span>
+              </div>
+              <div class="score-note">${s.note}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <h2 class="section-title">精彩事迹</h2>
+        <div class="deed-list">
+          ${f.deeds.map(d => `
+            <div class="deed-item">
+              <div class="deed-title">${d.title}</div>
+              <div class="deed-text">${d.text}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <h2 class="section-title">经典名言</h2>
+        <div class="quote-list">
+          ${f.quotes.map(q => `
+            <div class="quote-item">
+              <div class="quote-text">${q.text}</div>
+              <div class="quote-source">—— ${q.source}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <h2 class="section-title">人物简介</h2>
+        <p class="bio">${f.bio}</p>
+
+        <footer class="card-footer">
+          <span class="footer-meta">圣贤堂 · 第壹号</span>
+          <div class="seal-final">至圣<br>先师</div>
+        </footer>
+      `;
+    }
+
+    render();
+  </script>
+</body>
+</html>
