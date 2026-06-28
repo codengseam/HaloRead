@@ -543,6 +543,10 @@ body[data-view="reader"] .brand-header {
     box-shadow: 0 0 10px rgba(201, 169, 97, 0.7);
 }
 
+.nav-text-short {
+    display: none;
+}
+
 @media (max-width: 480px) {
     .nav-saints {
         padding: 6px 12px 6px 7px !important;
@@ -1653,8 +1657,27 @@ body[data-view="home"] .bottom-bar {
 /* ============ 移动端适配 ============ */
 @media (max-width: 768px) {
     .brand-header {
-        padding: 12px 16px;
-        gap: 12px;
+        padding: 10px 14px;
+        gap: 10px;
+    }
+
+    .brand-lockup {
+        gap: 10px;
+    }
+
+    .brand-badge {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        font-size: 18px;
+    }
+
+    .brand-name {
+        font-size: 16px;
+    }
+
+    .brand-motto {
+        font-size: 10px;
     }
 
     .brand-actions {
@@ -1665,6 +1688,31 @@ body[data-view="home"] .bottom-bar {
 
     .brand-actions .nav-link:not(.nav-saints) {
         display: none;
+    }
+
+    .nav-text-full {
+        display: none;
+    }
+
+    .nav-text-short {
+        display: inline;
+    }
+
+    .nav-saints {
+        padding: 5px 10px 5px 5px !important;
+        gap: 5px;
+    }
+
+    .nav-saints-icon {
+        width: 22px;
+        height: 22px;
+        font-size: 13px;
+    }
+
+    .brand-actions .btn-primary {
+        padding: 7px 12px;
+        font-size: 12px;
+        white-space: nowrap;
     }
 
     .toolbar {
