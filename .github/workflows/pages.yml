@@ -7,6 +7,8 @@ on:
     paths:
       - 'output/**'
       - 'site/**'
+      - 'src/web/static-site/**'
+      - 'demos/**'
       - 'scripts/build_site.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
