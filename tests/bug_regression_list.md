@@ -541,3 +541,42 @@
   - `python scripts/check_book_structure.py --output output --strict` 通过
   - `pytest -q` 通过
 - **教训**：按钮文案变更必须同步审视其事件处理器；静态站点/PWA 的前端行为修复必须同步升级 Service Worker 缓存名，否则 PC 端正常、手机端仍旧的“幽灵版本”会反复出现。
+
+## 圣贤堂图片加载慢且标题链接 404
+
+- **编号**：BUG-034
+- **首次出现**：2026-06-28
+- **类型**：性能 / 链接 / 部署
+- **环境**：圣贤堂展厅页 `demos/saints_hall.html`，部署到 `site/demos/saints_hall.html`
+- **现象**：
+  1. 圣贤堂人物头像加载慢，首屏 5 张卡片同时加载时感知明显。
+  2. 点击有链接的圣人名言/事迹标题，跳转后显示 404，无法进入对应章节阅读页。
+- **复现步骤**：
+  1. 打开圣贤堂页面（本地 `demos/saints_hall.html` 或部署后 `site/demos/saints_hall.html`）。
+  2. 观察头像加载：无占位、无懒加载，5 张高分辨率图片同时请求。
+  3. 点击孔子“学而时习之”或“夹谷之会”等带 ↗ 标记的链接，部署版本会跳转到不存在的 `/site/index.html?book=...`。
+- **根因**：
+  1. **图片慢**：头像虽已本地化（`demos/images/*.jpg`），但单张 912×1216 约 200KB，无懒加载、无占位骨架、无缩略图，首屏 5 张同时解码渲染。
+  2. **404**：`saints_hall.html` 内部链接写死 `../site/index.html?...`，适合在本地 `demos/` 目录打开；但 `build_site.py` 会把它复制到 `site/demos/`，相对路径被错解析为 `site/site/index.html`，导致部署后 404。
+- **修复**：
+  1. 图片优化：
+     - 为头像生成 400px 宽缩略图到 `demos/images/thumbs/`（体积从 ~3.4MB 降到 ~700KB）。
+     - `saints_hall.html` 默认加载缩略图，并通过 `srcset` 在 2x/高清屏回退到原图。
+     - 添加 `loading="lazy"`、`decoding="async"`、width/height 属性减少 CLS。
+     - 添加占位骨架与渐显动画，预加载首屏孔子头像。
+  2. 链接修复：
+     - 源文件保留 `../site/index.html?...`，保证本地直接打开可用。
+     - `build_site.py` 复制到 `site/demos/` 时自动把 `../site/index.html?` 重写为 `../index.html?`。
+  3. 构建脚本：`build_site.py` 新增 `_ensure_sage_portrait_thumbnails()` 自动生成/更新缩略图，并复制 `images/thumbs/` 到 `site/demos/images/thumbs/`。
+  4. 依赖：`requirements.txt` 新增 `Pillow>=10.0`。
+- **涉及文件**：`demos/saints_hall.html`、`scripts/build_site.py`、`requirements.txt`、`site/demos/saints_hall.html`（构建产物）、`site/demos/images/thumbs/`（构建产物）
+- **回归测试**：
+  - `tests/run_regression_suite.sh` 第4步：构建静态站点成功
+  - `tests/run_regression_suite.sh` 第9步：HTTP 冒烟测试关键资源 200
+  - 部署后检查 `site/demos/saints_hall.html` 中链接为 `../index.html?book=`
+  - `pytest -q` 通过
+  - `python scripts/check_book_structure.py --output output --strict` 通过
+- **教训**：
+  1. 独立演示页被复制到 `site/` 下部署时，必须处理相对路径变化；源文件路径与部署路径不一致时，应通过构建脚本重写而非要求源文件同时适配两种路径。
+  2. 图片本地化不等于性能合格：还需匹配显示尺寸的缩略图、懒加载、占位骨架，才能避免首屏同时下载多张高清图。
+  3. 新依赖（Pillow）必须落到 `requirements.txt`，否则 CI/新环境构建时会跳过缩略图生成。

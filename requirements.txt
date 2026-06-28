@@ -21,5 +21,8 @@ duckduckgo-search>=7.0
 pypdf>=3.0
 pdfplumber>=0.11
 
+# 图片处理（生成圣贤堂头像缩略图）
+Pillow>=10.0
+
 # 开发 / 测试
 pytest>=8.0

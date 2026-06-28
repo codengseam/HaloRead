@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>圣贤堂 · 诸圣列传</title>
+  <link rel="preload" as="image" href="images/001_kongzi.jpg" type="image/jpeg">
   <style>
     /* ============================================================
        圣贤堂展厅页 · 三国杀卡牌风（固定手机版尺寸，网格铺满）
@@ -131,8 +132,12 @@
     .sg-card::after { bottom: 6px; right: 6px; border-left: none; border-top: none; }
 
     .sg-portrait { position: relative; background: linear-gradient(180deg,#1f1308 0%,#2a1a0e 100%); border-bottom: 1px solid rgba(201,169,97,0.3); height: 300px; overflow: hidden; }
-    .sg-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(0.12) contrast(1.05); }
-    .sg-portrait::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 60%,rgba(42,26,14,0.85) 100%), linear-gradient(90deg,transparent 70%,rgba(42,26,14,0.4) 100%); pointer-events: none; }
+    .sg-portrait::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(201,169,97,0.08), transparent); animation: shimmer 1.6s infinite; z-index: 1; pointer-events: none; }
+    .sg-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(0.12) contrast(1.05); position: relative; z-index: 2; opacity: 0; transition: opacity 0.35s ease; }
+    .sg-portrait img.loaded { opacity: 1; }
+    .sg-portrait img[src*="data:image/svg"] { opacity: 1; }
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .sg-portrait::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg,transparent 60%,rgba(42,26,14,0.85) 100%), linear-gradient(90deg,transparent 70%,rgba(42,26,14,0.4) 100%); pointer-events: none; z-index: 3; }
     .sg-stamp { position: absolute; bottom: 14px; left: 12px; z-index: 2; display: flex; flex-direction: column; gap: 5px; }
     .sg-stamp-title { display: inline-block; padding: 4px 11px; background: linear-gradient(135deg,#a13c2c 0%,#c84838 100%); color: var(--color-ink); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.2em; border-radius: 2px; border: 1px solid var(--color-gold); box-shadow: 0 0 8px rgba(201,169,97,0.4); width: fit-content; }
     .sg-stamp-no { font-size: 0.68rem; color: var(--color-gold); letter-spacing: 0.15em; }
@@ -225,14 +230,33 @@
   <script>
     // ============ 头像本地路径映射 ============
     // 图片已下载到 demos/images/（见 scripts/download_sage_portraits.py）
-    // 用本地缓存，不再每次远程加载，加载速度从秒级降到毫秒级
+    // 用本地缓存，不再每次远程加载；同时生成 400px 宽缩略图到 demos/images/thumbs/，
+    // 首屏用 thumbs 加速，srcset 保留原图供 2x/高清屏回退。
     const PORTRAIT_MAP = {
+      '001': 'images/thumbs/001_kongzi.jpg',
+      '002': 'images/thumbs/002_yanhui.jpg',
+      '003': 'images/thumbs/003_zengshen.jpg',
+      '004': 'images/thumbs/004_kongji.jpg',
+      '005': 'images/thumbs/005_mengzi.jpg',
+      '006': 'images/thumbs/006_kongzi.jpg',  // 孟子四圣的孔子，复用 001
+      '007': 'images/thumbs/007_boyi.jpg',
+      '008': 'images/thumbs/008_yiyin.jpg',
+      '009': 'images/thumbs/009_liuxiahui.jpg',
+      '010': 'images/thumbs/010_sunwu.jpg',
+      '011': 'images/thumbs/011_wangxizhi.jpg',
+      '012': 'images/thumbs/012_zhangzhongjing.jpg',
+      '013': 'images/thumbs/013_wudaozi.jpg',
+      '014': 'images/thumbs/014_dufu.jpg',
+      '015': 'images/thumbs/015_luyu.jpg',
+      '016': 'images/thumbs/016_simaqian.jpg'
+    };
+    const PORTRAIT_FULL_MAP = {
       '001': 'images/001_kongzi.jpg',
       '002': 'images/002_yanhui.jpg',
       '003': 'images/003_zengshen.jpg',
       '004': 'images/004_kongji.jpg',
       '005': 'images/005_mengzi.jpg',
-      '006': 'images/006_kongzi.jpg',  // 孟子四圣的孔子，复用 001
+      '006': 'images/006_kongzi.jpg',
       '007': 'images/007_boyi.jpg',
       '008': 'images/008_yiyin.jpg',
       '009': 'images/009_liuxiahui.jpg',
@@ -246,6 +270,9 @@
     };
     function portraitUrl(no) {
       return PORTRAIT_MAP[no] || '';
+    }
+    function fullPortraitUrl(no) {
+      return PORTRAIT_FULL_MAP[no] || '';
     }
     const IMG_ONERROR = 'this.onerror=null;this.src="data:image/svg+xml;utf8,' +
       encodeURIComponent('<svg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"200\\" height=\\"150\\"><rect width=\\"200\\" height=\\"150\\" fill=\\"#2a1a0e\\"/><text x=\\"100\\" y=\\"80\\" font-size=\\"16\\" text-anchor=\\"middle\\" fill=\\"#c9a961\\" font-family=\\"serif\\">圣贤像</text></svg>') + '"';
@@ -682,9 +709,10 @@
     }
 
     // ============ 章节链接生成（仅 hasLink=true 时有效）============
-    // demos/ 目录下无 index.html，指向上一级 site/index.html（部署产物，已验证存在）
+    // 源文件在 demos/，使用 ../site/index.html 方便本地直接打开；
+    // build_site.py 复制到 site/demos/ 时会自动重写为 ../index.html，确保部署后可用。
     function chapterLink(book, chapter) {
-      return '../site/index.html?book=' + encodeURIComponent(book) + '&chapter=' + encodeURIComponent(chapter);
+      return '../index.html?book=' + encodeURIComponent(book) + '&chapter=' + encodeURIComponent(chapter);
     }
 
     // ============ 渲染单张圣人卡片 ============
@@ -715,9 +743,12 @@
         </div>`;
       }).join('');
 
+      const fullPortrait = fullPortraitUrl(s.no);
+      const srcset = fullPortrait ? `${portrait} 1x, ${fullPortrait} 2x` : portrait;
+
       return `<article class="sg-card" data-faction="${s.subFaction}">
         <div class="sg-portrait">
-          <img src="${portrait}" alt="${s.name}立绘" onerror="${IMG_ONERROR}">
+          <img src="${portrait}" srcset="${srcset}" alt="${s.name}立绘" loading="lazy" decoding="async" width="360" height="300" onload="this.classList.add('loaded')" onerror="${IMG_ONERROR}">
           <div class="sg-stamp">
             <span class="sg-stamp-title">${s.title}</span>
             <span class="sg-stamp-no">NO.${s.no} · ${s.dynasty} · ${s.state}</span>

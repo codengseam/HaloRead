@@ -193,6 +193,35 @@ def _category_sort_key(category: str) -> tuple[int, str]:
     return (50, category)
 
 
+def _ensure_sage_portrait_thumbnails(images_dir: Path, max_width: int = 400) -> None:
+    """为圣贤堂头像生成缩略图，减少首屏图片体积。
+
+    卡片最大显示宽度约 360px，缩略图取 400px 可覆盖 1x/2x 屏；
+    原图保留在 images/，缩略图写入 images/thumbs/。
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        print("[build_site] Pillow 未安装，跳过头像缩略图生成", file=sys.stderr)
+        return
+
+    thumbs_dir = images_dir / "thumbs"
+    thumbs_dir.mkdir(parents=True, exist_ok=True)
+
+    for img_path in sorted(images_dir.glob("*.jpg")):
+        thumb_path = thumbs_dir / img_path.name
+        if thumb_path.exists() and thumb_path.stat().st_mtime >= img_path.stat().st_mtime:
+            continue
+        try:
+            with Image.open(img_path) as im:
+                if im.width > max_width:
+                    ratio = max_width / im.width
+                    im = im.resize((max_width, int(im.height * ratio)), Image.LANCZOS)
+                im.save(thumb_path, "JPEG", quality=85, optimize=True)
+        except Exception as exc:
+            print(f"[build_site] 生成缩略图失败 {img_path.name}: {exc}", file=sys.stderr)
+
+
 def _copy_static_assets(site_path: Path) -> None:
     """将 src/web/static-site/ 下的前端产物复制到 site/。
 
@@ -219,14 +248,25 @@ def _copy_static_assets(site_path: Path) -> None:
         if saints_src.exists():
             saints_dest = site_path / "demos" / "saints_hall.html"
             saints_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(saints_src, saints_dest)
+            # 源文件在 demos/，使用 ../site/index.html 可在本地直接打开；
+            # 复制到 site/demos/ 后需回退到 site 根目录，故重写为 ../index.html。
+            html = saints_src.read_text(encoding="utf-8")
+            html = html.replace("../site/index.html?", "../index.html?")
+            saints_dest.write_text(html, encoding="utf-8")
         # 复制本地缓存的头像图片到 site/demos/images/
         images_src = demos_dir / "images"
         if images_src.exists():
             images_dest = site_path / "demos" / "images"
             images_dest.mkdir(parents=True, exist_ok=True)
+            _ensure_sage_portrait_thumbnails(images_src)
             for img in images_src.glob("*.jpg"):
                 shutil.copy2(img, images_dest / img.name)
+            thumbs_src = images_src / "thumbs"
+            if thumbs_src.exists():
+                thumbs_dest = images_dest / "thumbs"
+                thumbs_dest.mkdir(parents=True, exist_ok=True)
+                for thumb in thumbs_src.glob("*.jpg"):
+                    shutil.copy2(thumb, thumbs_dest / thumb.name)
     for src_rel, dest in assets:
         src = source_dir / Path(src_rel)
         if not src.exists():
