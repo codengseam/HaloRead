@@ -1701,6 +1701,7 @@ body[data-view="home"] .bottom-bar {
     .nav-saints {
         padding: 5px 10px 5px 5px !important;
         gap: 5px;
+        font-size: 11px;
     }
 
     .nav-saints-icon {
@@ -1710,8 +1711,8 @@ body[data-view="home"] .bottom-bar {
     }
 
     .brand-actions .btn-primary {
-        padding: 7px 12px;
-        font-size: 12px;
+        padding: 6px 11px;
+        font-size: 11px;
         white-space: nowrap;
     }
 
