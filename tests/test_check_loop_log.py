@@ -1,12 +1,13 @@
-"""scripts/check_loop_log.py 的单元测试。
+"""scripts/check_loop_log.py 的单元测试（适配分片结构）。
 
-覆盖 6 个用例：
-1. 合法 loop_log 通过
+覆盖 7 个用例：
+1. 合法分片结构通过
 2. 日期非倒序失败
 3. 非法 #lesson slug 失败
-4. 化石标题未迁出（strict 阻断）
-5. #lesson 计数告警（P3 不阻断）
-6. --strict 模式阻断 P3
+4. 沉淀缺少稳定锚点失败
+5. 锚点重复失败
+6. 化石标题未迁出（strict 阻断）
+7. #lesson 计数告警与 strict 阻断
 """
 
 from __future__ import annotations
@@ -14,251 +15,303 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+
+def _anchor(date: str, heading: str) -> str:
+    from hashlib import sha256
+
+    digest = sha256(f"{date}::{heading}".encode("utf-8")).hexdigest()[:6]
+    return f"loop-{date.replace('-', '')}-{digest}"
+
+
 from scripts.check_loop_log import (  # noqa: E402
+    check_anchors,
     check_date_descending,
     check_fossil_migrated,
-    check_index_anchors,
+    check_index_links,
     check_lesson_count_warning,
     check_lesson_slug_legal,
     run,
 )
 
 
-VALID_LOOP_LOG = """# LoopAgent 循环日志
+def _setup(tmp_path: Path, main_content: str, shard_contents: dict[str, str]) -> Path:
+    """在临时目录构造 docs/loop_log.md + docs/loop_log/*.md。
 
-> 历史测评框架与评分表见 [docs/archive/loop_log_fossils.md](archive/loop_log_fossils.md)。
+    fixture 已提前创建目录，此处仅写文件。
+    """
+    docs_dir = tmp_path / "docs"
+    shard_dir = docs_dir / "loop_log"
+
+    main_file = docs_dir / "loop_log.md"
+    main_file.write_text(main_content, encoding="utf-8")
+
+    for name, content in shard_contents.items():
+        (shard_dir / name).write_text(content, encoding="utf-8")
+
+    return docs_dir
+
+
+@pytest.fixture(autouse=True)
+def _patch_paths(monkeypatch, tmp_path):
+    """每个测试运行时把 SHARD_DIR / MAIN_FILE 指向临时目录。"""
+    from scripts import check_loop_log
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    shard_dir = docs_dir / "loop_log"
+    shard_dir.mkdir(exist_ok=True)
+
+    monkeypatch.setattr(check_loop_log, "SHARD_DIR", shard_dir)
+    monkeypatch.setattr(check_loop_log, "MAIN_FILE", docs_dir / "loop_log.md")
+
+
+def _make_main(*links: str) -> str:
+    body = "\n".join(f"- {link}" for link in links)
+    return f"""# LoopAgent 循环日志
 
 ## 索引区
 
-### 最近 10 条沉淀（按日期倒序）
-- [2026-06-26 示例 A](#L16)
-- [2026-06-25 示例 B](#L24)
-
-### 主题锚点
-- `#reader_interaction`：阅读器/沉浸/翻页
+<!-- AUTOGEN START: loop_log index -->
+{body}
+<!-- AUTOGEN END: loop_log index -->
 
 ---
 
-## 2026-06-26 示例 A
+## 方案 C 手册
+"""
+
+
+# ---------- 1. 合法分片结构通过 ----------
+
+
+def test_valid_shard_structure_passes(tmp_path):
+    """构造合法分片结构，run() 返回 0。"""
+    h = "2026-06-26 示例 A"
+    a = _anchor("2026-06-26", h)
+    shard = f"""<a id="{a}"></a>
+
+## {h}
 
 正文 A。
 
 **教训标签**：`#lesson: git_hygiene`
-
----
-
-## 2026-06-25 示例 B
-
-正文 B。
-
-**教训标签**：`#lesson: book_structure`
 """
-
-
-def _write(tmp_path: Path, content: str) -> Path:
-    p = tmp_path / "loop_log.md"
-    p.write_text(content, encoding="utf-8")
-    return p
-
-
-# ---------- 1. 合法 loop_log 通过 ----------
-
-
-def test_valid_loop_log_passes(tmp_path):
-    """构造合法 loop_log 内容，run() 返回 0。"""
-    p = _write(tmp_path, VALID_LOOP_LOG)
-    rc = run(p, strict=False)
-    assert rc == 0
+    _setup(
+        tmp_path,
+        _make_main(f"[2026-06-26 示例 A](loop_log/2026-06.md#{a})"),
+        {"2026-06.md": shard},
+    )
+    assert run(strict=False) == 0
 
 
 # ---------- 2. 日期非倒序失败 ----------
 
 
 def test_date_not_descending_fails(tmp_path):
-    """日期乱序（06-25 在 06-26 之上）应导致核心校验失败。"""
-    content = """# LoopAgent 循环日志
+    """跨分片日期乱序应导致核心校验失败。"""
+    h1, h2 = "2026-06-25 早的在上", "2026-06-26 晚的在下"
+    a1, a2 = _anchor("2026-06-25", h1), _anchor("2026-06-26", h2)
+    shard = f"""<a id="{a1}"></a>
 
-## 索引区
-
----
-
-## 2026-06-25 早的在上
+## {h1}
 
 正文。
 
 **教训标签**：`#lesson: git_hygiene`
 
----
+<a id="{a2}"></a>
 
-## 2026-06-26 晚的在下
+## {h2}
 
 正文。
 
 **教训标签**：`#lesson: git_hygiene`
 """
-    p = _write(tmp_path, content)
-    errors = check_date_descending(p.read_text(encoding="utf-8"))
-    assert any("日期非倒序" in e for e in errors), errors
-    rc = run(p, strict=False)
-    assert rc == 1
+    _setup(
+        tmp_path,
+        _make_main(
+            f"[2026-06-26 晚的在下](loop_log/2026-06.md#{a2})",
+            f"[2026-06-25 早的在上](loop_log/2026-06.md#{a1})",
+        ),
+        {"2026-06.md": shard},
+    )
+    assert run(strict=False) == 1
+
+
+def test_date_not_descending_across_shards_fails(tmp_path):
+    """跨分片日期乱序（新月份分片排在旧月份之后）应导致核心校验失败。"""
+    h1, h2 = "2026-06-25 六月沉淀", "2026-07-01 七月沉淀"
+    a1, a2 = _anchor("2026-06-25", h1), _anchor("2026-07-01", h2)
+    _setup(
+        tmp_path,
+        _make_main(),
+        {
+            "2026-06.md": f"""<a id="{a1}"></a>
+
+## {h1}
+
+正文。
+
+**教训标签**：`#lesson: git_hygiene`
+""",
+            "2026-07.md": f"""<a id="{a2}"></a>
+
+## {h2}
+
+正文。
+
+**教训标签**：`#lesson: git_hygiene`
+""",
+        },
+    )
+    assert run(strict=False) == 1
 
 
 # ---------- 3. 非法 #lesson slug 失败 ----------
 
 
 def test_invalid_lesson_slug_fails(tmp_path):
-    """非法 slug（如 random_text）应触发 P1 失败。"""
-    content = """# LoopAgent 循环日志
+    """非法 slug 应触发 P1 失败。"""
+    h = "2026-06-26 示例"
+    a = _anchor("2026-06-26", h)
+    shard = f"""<a id="{a}"></a>
 
-## 索引区
-
----
-
-## 2026-06-26 示例
+## {h}
 
 正文。
 
 **教训标签**：`#lesson: random_text`
 """
-    p = _write(tmp_path, content)
-    errors = check_lesson_slug_legal(p.read_text(encoding="utf-8"))
-    assert any("random_text" in e for e in errors), errors
-    rc = run(p, strict=False)
-    assert rc == 1
+    _setup(tmp_path, _make_main(), {"2026-06.md": shard})
+    assert run(strict=False) == 1
 
 
-# ---------- 4. 化石标题未迁出（strict 阻断） ----------
+# ---------- 4. 沉淀缺少稳定锚点失败 ----------
+
+
+def test_missing_anchor_fails(tmp_path):
+    """H2 前缺少稳定锚点应触发 P1 失败。"""
+    shard = """## 2026-06-26 示例
+
+正文。
+
+**教训标签**：`#lesson: git_hygiene`
+"""
+    _setup(tmp_path, _make_main(), {"2026-06.md": shard})
+    assert run(strict=False) == 1
+
+
+# ---------- 5. 锚点重复失败 ----------
+
+
+def test_duplicate_anchor_fails(tmp_path):
+    """同一锚点出现在两个 H2 前应触发 P1 失败。"""
+    a = "loop-20260626-000000"
+    shard = f"""<a id="{a}"></a>
+
+## 2026-06-26 示例 A
+
+正文。
+
+**教训标签**：`#lesson: git_hygiene`
+
+<a id="{a}"></a>
+
+## 2026-06-26 示例 B
+
+正文。
+
+**教训标签**：`#lesson: book_structure`
+"""
+    _setup(tmp_path, _make_main(), {"2026-06.md": shard})
+    assert run(strict=False) == 1
+
+
+# ---------- 6. 化石标题未迁出（strict 阻断） ----------
 
 
 def test_fossil_section_not_migrated_fails(tmp_path):
-    """loop_log.md 中若残留 ## 一、测评框架 等化石标题，--strict 应阻断。"""
-    content = """# LoopAgent 循环日志
-
-## 一、测评框架
+    """分片中若残留化石标题，--strict 应阻断。"""
+    h = "2026-06-26 示例"
+    a = _anchor("2026-06-26", h)
+    shard = f"""## 一、测评框架
 
 (化石内容)
 
-## 2026-06-26 示例
+<a id="{a}"></a>
+
+## {h}
 
 正文。
 
 **教训标签**：`#lesson: git_hygiene`
 """
-    p = _write(tmp_path, content)
-    warnings = check_fossil_migrated(p.read_text(encoding="utf-8"))
-    assert any("化石标题未迁出" in w for w in warnings), warnings
-    # 非 strict 不阻断
-    assert run(p, strict=False) == 0
-    # strict 阻断
-    assert run(p, strict=True) == 1
+    _setup(tmp_path, _make_main(), {"2026-06.md": shard})
+    assert run(strict=False) == 0
+    assert run(strict=True) == 1
 
 
-# ---------- 5. #lesson 计数告警（P3 不阻断） ----------
+# ---------- 7. #lesson 计数告警与 strict 阻断 ----------
 
 
-def test_lesson_count_warning_p3(tmp_path):
-    """同一 slug 出现 ≥3 次且未标'已入checklist: yes'应 P3 告警，但退出码 0。"""
-    content = """# LoopAgent 循环日志
+def test_lesson_count_warning_and_strict(tmp_path):
+    """同一 slug 出现 ≥3 次且未声明'已入checklist: yes'应 P3 告警，strict 阻断。"""
+    h1, h2, h3 = "2026-06-26 A", "2026-06-25 B", "2026-06-24 C"
+    a1, a2, a3 = _anchor("2026-06-26", h1), _anchor("2026-06-25", h2), _anchor("2026-06-24", h3)
+    shard = f"""<a id="{a1}"></a>
 
-## 索引区
-
----
-
-## 2026-06-26 A
+## {h1}
 
 正文。
 
 **教训标签**：`#lesson: book_structure`
 
----
+<a id="{a2}"></a>
 
-## 2026-06-25 B
+## {h2}
 
 正文。
 
 **教训标签**：`#lesson: book_structure`
 
----
+<a id="{a3}"></a>
 
-## 2026-06-24 C
+## {h3}
 
 正文。
 
 **教训标签**：`#lesson: book_structure`
 """
-    p = _write(tmp_path, content)
-    warnings = check_lesson_count_warning(p.read_text(encoding="utf-8"))
-    assert any("book_structure" in w and "≥3" in w for w in warnings), warnings
-    # 非 strict 退出码 0
-    assert run(p, strict=False) == 0
+    _setup(tmp_path, _make_main(), {"2026-06.md": shard})
+    assert run(strict=False) == 0
+    assert run(strict=True) == 1
 
 
-# ---------- 6. --strict 模式阻断 P3 ----------
+# ---------- 补充：索引链接校验 ----------
 
 
-def test_strict_mode_blocks_p3(tmp_path):
-    """--strict 模式下 P3 告警也阻断退出码。"""
-    # 复用用例 5 的内容：book_structure 出现 3 次
-    content = """# LoopAgent 循环日志
+def test_index_link_to_missing_anchor_warns(tmp_path):
+    """索引指向不存在的锚点应触发 P3 告警。"""
+    h = "2026-06-26 示例"
+    a = _anchor("2026-06-26", h)
+    shard = f"""<a id="{a}"></a>
 
-## 索引区
-
----
-
-## 2026-06-26 A
-
-正文。
-
-**教训标签**：`#lesson: book_structure`
-
----
-
-## 2026-06-25 B
-
-正文。
-
-**教训标签**：`#lesson: book_structure`
-
----
-
-## 2026-06-24 C
-
-正文。
-
-**教训标签**：`#lesson: book_structure`
-"""
-    p = _write(tmp_path, content)
-    # strict 应阻断
-    assert run(p, strict=True) == 1
-
-
-# ---------- 补充：索引锚点校验 ----------
-
-
-def test_index_anchor_target_must_be_h2(tmp_path):
-    """索引锚点指向的行不是 H2 应触发 P3 告警。"""
-    # L8 不是 ## 开头
-    content = """# LoopAgent 循环日志
-
-## 索引区
-
-### 最近 10 条沉淀（按日期倒序）
-- [2026-06-26 示例](#L8)
-
----
-
-正文段落（L8 在这里）。
-
-## 2026-06-26 示例
+## {h}
 
 正文。
 
 **教训标签**：`#lesson: git_hygiene`
 """
-    p = _write(tmp_path, content)
-    warnings = check_index_anchors(p.read_text(encoding="utf-8"))
-    assert any("指向的不是 H2" in w for w in warnings), warnings
+    _setup(
+        tmp_path,
+        _make_main("[2026-06-26 示例](loop_log/2026-06.md#loop-20260626-ffffff)"),
+        {"2026-06.md": shard},
+    )
+    assert run(strict=False) == 0
+    assert run(strict=True) == 1

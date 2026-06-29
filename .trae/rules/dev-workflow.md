@@ -62,8 +62,8 @@
 ### 第三步：执行
 
 **开始前必读 loop_log**：
-1. 用 Grep 工具按本次任务主题关键词检索 `docs/loop_log.md`
-2. 若命中相关记录，引用命中的 H2 标题行号作为本次执行的前置参考（格式：`参考历史教训：docs/loop_log.md#L<行号>`）
+1. 用 Grep 工具按本次任务主题关键词检索 `docs/loop_log/` 下的分片（如 `2026-06.md`）以及 `docs/loop_log.md` 主文件
+2. 若命中相关记录，引用命中的稳定锚点作为本次执行的前置参考（格式：`参考历史教训：docs/loop_log/YYYY-MM.md#loop-<anchor>`）
 3. 若无命中，在执行报告中显式声明"本次任务无相关历史教训"，方可进入执行
 
 **禁止**：仅填"未发现相关教训"一句话即过，必须先执行 Grep 检索动作。
@@ -93,7 +93,13 @@
 - 本次改动是否暴露了新的共性问题？
 - 是否需要更新 `.trae/rules/` 或 `src/utils/quality.py`？
 - 是否需要更新 `.trae/checklists/dev-checklist.md`？
-- 是否需要在 `docs/loop_log.md` 追加一条开发沉淀记录？
+- 是否需要在 `docs/loop_log/YYYY-MM.md` 当月分片追加一条开发沉淀记录？
+
+**loop_log 写入流程**：
+1. 只 append 到当月分片（如 `docs/loop_log/2026-06.md`），不要修改 `docs/loop_log.md` 主文件。
+2. 主文件的索引区、教训计数表、稳定锚点由 `scripts/regen_loop_log_index.py` 自动生成，**禁止手写索引条目、禁止手动改计数表、禁止手写 `#L` 行号锚点**。
+3. 新增/修改分片后，运行 `python scripts/regen_loop_log_index.py` 重生成主文件，再运行 `python scripts/check_loop_log.py` 校验。
+4. 若当月分片不存在，新建 `docs/loop_log/YYYY-MM.md`（文件名格式 `YYYY-MM.md`）。
 
 **loop_log 写入门槛**（启发式，不强制白名单）：
 
@@ -110,7 +116,7 @@
 **写 loop_log 时必带的 #lesson slug**（从下表选，多选用空格分隔）：
 - `git_hygiene` / `reader_interaction` / `content_quality` / `book_structure` / `deployment` / `soul_injection` / `ai_course`
 
-完整 slug 主题表与方案 C 手册见 `docs/loop_log.md` 文件末尾。
+完整 slug 主题表与方案 C 手册见 `docs/loop_log.md` 主文件末尾。
 
 **目标**：让开发协作本身也变成可迭代的 Loop，沉淀经验，避免同类问题反复出现。
 

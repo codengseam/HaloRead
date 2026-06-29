@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""HaloRead loop_log.md 结构校验脚本。
+"""HaloRead loop_log 结构校验脚本。
 
 校验项：
-- [核心 P1] 1. 日期倒序：所有 "## YYYY-MM-DD ..." 标题按日期倒序排列
+- [核心 P1] 1. 日期倒序：所有分片中的 H2 沉淀按日期倒序排列
 - [核心 P1] 2. #lesson slug 合法：每条记录底部 #lesson 标签必须来自受控 slug 表
-- [P3 提示] 3. 索引锚点对应：索引区"最近10条"的锚点指向的 H2 必须存在
-- [P3 提示] 4. #lesson 计数告警：同一 slug 出现 ≥3 次且未标"已入checklist: yes"时告警
-- [P3 提示] 5. 化石区已迁出：loop_log.md 中不应出现"## 一、测评框架"等化石标题
+- [核心 P1] 3. 分片 H2 前必须存在稳定锚点，且锚点全局唯一
+- [P3 提示] 4. 索引区链接可解析：主文件索引中的跨文件链接能命中对应分片的锚点
+- [P3 提示] 5. #lesson 计数告警：同一 slug 出现 ≥3 次且未标"已入checklist: yes"时告警
+- [P3 提示] 6. 化石区已迁出：loop_log 中不应出现"## 一、测评框架"等化石标题
 
 退出码：
 - 0：核心校验全部通过（P3 告警不阻断）
@@ -46,13 +47,18 @@ FOSSIL_TITLE_PATTERNS = [
     re.compile(r"^### 第\d+章", re.MULTILINE),
 ]
 
-H2_DATE_RE = re.compile(r"^## (\d{4})-(\d{2})-(\d{2})\b", re.MULTILINE)
+DATE_RE = re.compile(r"(?P<date>\d{4}-\d{2}-\d{2})")
+H2_RE = re.compile(r"^##\s+(?P<heading>.+)$", re.MULTILINE)
 LESSON_TAG_RE = re.compile(r"#lesson:\s*(\w+)")
-INDEX_ANCHOR_RE = re.compile(r"^\- \[(\d{4}-\d{2}-\d{2})[^\]]*\]\(#L(\d+)\)", re.MULTILINE)
-# 已入checklist 标记必须独占一行（行首到行尾），避免命中方案 C 手册里的示例文本。
+ANCHOR_RE = re.compile(r'<a\s+id="(?P<anchor>loop-\d{8}-[a-f0-9]{6})"\s*></a>')
+INDEX_LINK_RE = re.compile(
+    r"\]\(loop_log/(?P<shard>[\w\-.]+)\.(?P<ext>md)#(?P<anchor>loop-\d{8}-[a-f0-9]{6})\)"
+)
 CHECKLIST_MARKER_RE = re.compile(r"^已入checklist:\s*yes\s*$", re.MULTILINE | re.IGNORECASE)
 
-DEFAULT_LOOP_LOG = Path(__file__).resolve().parent.parent / "docs" / "loop_log.md"
+ROOT = Path(__file__).resolve().parent.parent
+SHARD_DIR = ROOT / "docs" / "loop_log"
+MAIN_FILE = ROOT / "docs" / "loop_log.md"
 
 
 def _load(path: Path) -> str:
@@ -62,113 +68,231 @@ def _load(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def check_date_descending(content: str) -> list[str]:
-    """核心 P1：所有 ## YYYY-MM-DD 标题按日期倒序排列。返回错误列表。"""
-    errors: list[str] = []
-    matches = list(H2_DATE_RE.finditer(content))
-    if not matches:
-        errors.append("[P1] 未找到任何 ## YYYY-MM-DD ... 标题，日期倒序校验无法执行")
+def _extract_entries(shards: list[Path]) -> list[dict]:
+    """从所有分片中提取沉淀条目。"""
+    entries = []
+    for shard_path in sorted(shards):
+        text = shard_path.read_text(encoding="utf-8")
+        for m in H2_RE.finditer(text):
+            heading = m.group("heading").strip()
+            dm = DATE_RE.search(heading)
+            if not dm:
+                continue
+            entries.append(
+                {
+                    "date": dm.group("date"),
+                    "heading": heading,
+                    "shard": shard_path.name,
+                    "shard_path": shard_path,
+                    "h2_start": m.start(),
+                }
+            )
+    return entries
+
+
+def _collect_anchors(entries: list[dict], shards: list[Path]) -> dict[str, list[tuple[str, str]]]:
+    """收集每个沉淀前是否有稳定锚点。返回 anchor -> [(shard, heading), ...]。"""
+    anchors: dict[str, list[tuple[str, str]]] = {}
+    shard_texts = {p.name: p.read_text(encoding="utf-8") for p in shards}
+
+    for e in entries:
+        text = shard_texts[e["shard"]]
+        prefix = text[: e["h2_start"]]
+        # 找到 H2 之前最后一个锚点（跳过末尾空白）
+        found = None
+        for am in ANCHOR_RE.finditer(prefix):
+            found = am
+        if found and prefix[found.end() :].strip() == "":
+            anchor = found.group("anchor")
+            anchors.setdefault(anchor, []).append((e["shard"], e["heading"]))
+    return anchors
+
+
+def check_date_descending(entries: list[dict]) -> list[str]:
+    """核心 P1：所有 H2 沉淀按阅读顺序（分片文件名排序 + 分片内行号）日期倒序排列。"""
+    errors = []
+    if not entries:
         return errors
 
-    prev_date = ""
-    prev_line = 0
-    for m in matches:
-        date_str = m.group(1) + "-" + m.group(2) + "-" + m.group(3)
-        line_no = content.count("\n", 0, m.start()) + 1
-        if prev_date and date_str > prev_date:
+    # 按阅读顺序排序：分片文件名升序，同分片内按 h2_start（行内偏移）升序
+    ordered = sorted(entries, key=lambda x: (x["shard"], x["h2_start"]))
+    prev = ordered[0]
+    for cur in ordered[1:]:
+        if cur["date"] > prev["date"]:
             errors.append(
-                f"[P1] 日期非倒序：L{line_no} '{date_str}' 晚于上一条 '{prev_date}' (L{prev_line})"
+                f"[P1] 日期非倒序：{cur['shard']} '{cur['heading'][:40]}' "
+                f"({cur['date']}) 晚于前一条 {prev['shard']} '{prev['heading'][:40]}' ({prev['date']})"
             )
-        prev_date = date_str
-        prev_line = line_no
+        prev = cur
     return errors
 
 
-def check_lesson_slug_legal(content: str) -> list[str]:
-    """核心 P1：所有 #lesson slug 必须来自受控表。返回错误列表。"""
-    errors: list[str] = []
-    for m in LESSON_TAG_RE.finditer(content):
-        slug = m.group(1)
-        line_no = content.count("\n", 0, m.start()) + 1
-        if slug not in CONTROLLED_SLUGS:
-            errors.append(
-                f"[P1] 非法 #lesson slug '{slug}' (L{line_no})，必须来自受控表："
-                + ", ".join(sorted(CONTROLLED_SLUGS))
-            )
+def check_lesson_slug_legal(entries: list[dict], shards: list[Path]) -> list[str]:
+    """核心 P1：所有 #lesson slug 必须来自受控表。"""
+    errors = []
+    shard_texts = {p.name: p.read_text(encoding="utf-8") for p in shards}
+    for e in entries:
+        text = shard_texts[e["shard"]]
+        block_end = len(text)
+        next_h2 = H2_RE.search(text, e["h2_start"] + 1)
+        if next_h2:
+            block_end = next_h2.start()
+        block = text[e["h2_start"] : block_end]
+        for m in LESSON_TAG_RE.finditer(block):
+            slug = m.group(1)
+            if slug not in CONTROLLED_SLUGS:
+                errors.append(
+                    f"[P1] 非法 #lesson slug '{slug}' in {e['shard']} "
+                    f"'{e['heading'][:40]}'，必须来自受控表："
+                    + ", ".join(sorted(CONTROLLED_SLUGS))
+                )
     return errors
 
 
-def check_index_anchors(content: str) -> list[str]:
-    """P3：索引区"最近10条"的锚点指向的 H2 必须存在。返回告警列表。"""
-    warnings: list[str] = []
-    lines = content.split("\n")
-    for m in INDEX_ANCHOR_RE.finditer(content):
-        date_str = m.group(1)
-        anchor_line = int(m.group(2))
-        if anchor_line < 1 or anchor_line > len(lines):
-            warnings.append(
-                f"[P3] 索引锚点指向越界行号 L{anchor_line} (date={date_str})"
+def check_anchors(entries: list[dict], shards: list[Path]) -> list[str]:
+    """核心 P1：每个 H2 前必须存在稳定锚点，且锚点全局唯一。"""
+    errors = []
+    anchors = _collect_anchors(entries, shards)
+    covered = set(anchors.keys())
+
+    for e in entries:
+        expected_anchor = None
+        # 根据标题内容重新计算期望锚点（与 regen 脚本一致）
+        from hashlib import sha256
+
+        digest = sha256(f"{e['date']}::{e['heading']}".encode("utf-8")).hexdigest()[:6]
+        expected_anchor = f"loop-{e['date'].replace('-', '')}-{digest}"
+        if expected_anchor not in covered:
+            errors.append(
+                f"[P1] 沉淀缺少稳定锚点：{e['shard']} '{e['heading'][:40]}'，"
+                f"期望 <a id=\"{expected_anchor}\"></a>"
             )
+
+    for anchor, locations in anchors.items():
+        if len(locations) > 1:
+            locs = ", ".join(f"{s}: '{h[:30]}'" for s, h in locations)
+            errors.append(f"[P1] 锚点 '{anchor}' 重复出现：{locs}")
+
+    return errors
+
+
+def check_index_links(main_text: str, entries: list[dict]) -> list[str]:
+    """P3：主文件索引区链接能命中分片中的锚点。"""
+    warnings = []
+    anchor_set = set()
+    for e in entries:
+        from hashlib import sha256
+
+        digest = sha256(f"{e['date']}::{e['heading']}".encode("utf-8")).hexdigest()[:6]
+        anchor_set.add(f"loop-{e['date'].replace('-', '')}-{digest}")
+
+    for m in INDEX_LINK_RE.finditer(main_text):
+        shard = f"{m.group('shard')}.{m.group('ext')}"
+        anchor = m.group("anchor")
+        shard_path = SHARD_DIR / shard
+        if not shard_path.exists():
+            warnings.append(f"[P3] 索引指向不存在的分片：{shard}")
             continue
-        target = lines[anchor_line - 1]
-        if not target.startswith("## "):
-            warnings.append(
-                f"[P3] 索引锚点 #L{anchor_line} 指向的不是 H2 标题（实际：'{target[:40]}'）"
-            )
-            continue
-        if date_str not in target:
-            warnings.append(
-                f"[P3] 索引锚点 #L{anchor_line} 日期 {date_str} 与目标 H2 不匹配（'{target[:40]}'）"
-            )
+        if anchor not in anchor_set:
+            warnings.append(f"[P3] 索引指向缺失的锚点：{shard}#{anchor}")
     return warnings
 
 
-def check_lesson_count_warning(content: str) -> list[str]:
-    """P3：同一 slug 出现 ≥3 次且未标"已入checklist: yes"时告警。返回告警列表。"""
-    warnings: list[str] = []
-    slug_counter: Counter[str] = Counter(LESSON_TAG_RE.findall(content))
+def _checklist_marker_for_slug(text: str, slug: str) -> bool:
+    """检查某 slug 所在沉淀块内是否声明了'已入checklist: yes'。"""
+    # 按 H2 切分后，对每个块检查是否同时包含该 slug 和 checklist 标记
+    blocks = re.split(r"\n## ", text)
+    for block in blocks:
+        if f"`#lesson: {slug}`" in block and CHECKLIST_MARKER_RE.search(block):
+            return True
+    return False
 
-    # 把每条记录（按 H2 切分）的"已入checklist: yes"标记收集起来
-    # 简化策略：全文只要存在任一"已入checklist: yes"标记，则该 slug 视为已入
-    has_checklist_marker = bool(CHECKLIST_MARKER_RE.search(content))
+
+def check_lesson_count_warning(entries: list[dict], shards: list[Path], main_text: str) -> list[str]:
+    """P3：同一 slug 出现 ≥3 次且未在任一分片声明'已入checklist: yes'时告警。"""
+    warnings = []
+    shard_texts = {p.name: p.read_text(encoding="utf-8") for p in shards}
+    all_shard_text = "\n".join(shard_texts.values())
+    slug_counter = Counter(LESSON_TAG_RE.findall(all_shard_text))
 
     for slug, count in slug_counter.items():
-        if count >= 3 and not has_checklist_marker:
+        if count >= 3 and not _checklist_marker_for_slug(all_shard_text, slug):
             warnings.append(
-                f"[P3] #lesson slug '{slug}' 出现 {count} 次（≥3），但全文未发现"
-                f"'已入checklist: yes' 标记，建议触发方案 C（见 docs/loop_log.md 文件末）"
+                f"[P3] #lesson slug '{slug}' 出现 {count} 次（≥3），"
+                f"但未在任一分片中声明'已入checklist: yes'，建议触发方案 C"
             )
     return warnings
 
 
-def check_fossil_migrated(content: str) -> list[str]:
-    """P3：loop_log.md 中不应出现化石标题。返回告警列表。"""
-    warnings: list[str] = []
-    for pattern in FOSSIL_TITLE_PATTERNS:
-        for m in pattern.finditer(content):
-            line_no = content.count("\n", 0, m.start()) + 1
+def check_fossil_migrated(main_text: str, shards: list[Path]) -> list[str]:
+    """P3：loop_log 中不应出现化石标题。"""
+    warnings = []
+    texts = [main_text] + [p.read_text(encoding="utf-8") for p in shards]
+    for text in texts:
+        for pattern in FOSSIL_TITLE_PATTERNS:
+            for m in pattern.finditer(text):
+                warnings.append(
+                    f"[P3] 发现化石标题未迁出：'{m.group(0)}'，"
+                    f"应移到 docs/archive/loop_log_fossils.md"
+                )
+    return warnings
+
+
+def check_counts_match(main_text: str, entries: list[dict], shards: list[Path]) -> list[str]:
+    """P3：主文件计数表数字与分片实际统计一致。"""
+    warnings = []
+    shard_texts = {p.name: p.read_text(encoding="utf-8") for p in shards}
+    all_text = "\n".join(shard_texts.values())
+    actual_counts = Counter(LESSON_TAG_RE.findall(all_text))
+
+    # 解析主文件表格中的数字（容忍多种格式）
+    table_re = re.compile(
+        r"\|\s*`#(\w+)`[^|]*\|\s*(\d+)\s*\|"
+    )
+    declared = {slug: int(count) for slug, count in table_re.findall(main_text)}
+
+    for slug in CONTROLLED_SLUGS:
+        actual = actual_counts.get(slug, 0)
+        declared_count = declared.get(slug)
+        if declared_count is not None and declared_count != actual:
             warnings.append(
-                f"[P3] 发现化石标题未迁出：L{line_no} '{m.group(0)}'，"
-                f"应移到 docs/archive/loop_log_fossils.md"
+                f"[P3] 教训计数表 #{slug} 显示 {declared_count} 次，"
+                f"实际分片统计 {actual} 次，请运行 regen_loop_log_index.py 重生成"
             )
     return warnings
 
 
-def run(path: Path, strict: bool = False) -> int:
-    content = _load(path)
-    if not content:
+def run(strict: bool = False) -> int:
+    if not SHARD_DIR.exists():
+        print(f"[P1] 分片目录不存在: {SHARD_DIR}", file=sys.stderr)
         return 1
 
-    core_errors: list[str] = []
-    p3_warnings: list[str] = []
+    shards = [p for p in SHARD_DIR.iterdir() if p.suffix == ".md"]
+    if not shards:
+        print(f"[P1] 分片目录下无 .md 文件: {SHARD_DIR}", file=sys.stderr)
+        return 1
 
-    core_errors.extend(check_date_descending(content))
-    core_errors.extend(check_lesson_slug_legal(content))
-    p3_warnings.extend(check_index_anchors(content))
-    p3_warnings.extend(check_lesson_count_warning(content))
-    p3_warnings.extend(check_fossil_migrated(content))
+    main_text = _load(MAIN_FILE)
+    if not main_text:
+        return 1
 
-    print(f"=== loop_log 结构校验 ({path}) ===")
+    entries = _extract_entries(shards)
+    if not entries:
+        print("[P1] 未在任何分片中找到带日期的 H2 沉淀", file=sys.stderr)
+        return 1
+
+    core_errors = []
+    p3_warnings = []
+
+    core_errors.extend(check_date_descending(entries))
+    core_errors.extend(check_lesson_slug_legal(entries, shards))
+    core_errors.extend(check_anchors(entries, shards))
+    p3_warnings.extend(check_index_links(main_text, entries))
+    p3_warnings.extend(check_lesson_count_warning(entries, shards, main_text))
+    p3_warnings.extend(check_fossil_migrated(main_text, shards))
+    p3_warnings.extend(check_counts_match(main_text, entries, shards))
+
+    print(f"=== loop_log 结构校验 ({len(entries)} 条沉淀, {len(shards)} 个分片) ===")
     print(f"核心校验（P1）：{len(core_errors)} 项失败")
     for e in core_errors:
         print(f"  ❌ {e}")
@@ -187,20 +311,14 @@ def run(path: Path, strict: bool = False) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="HaloRead loop_log.md 结构校验")
-    parser.add_argument(
-        "--path",
-        type=Path,
-        default=DEFAULT_LOOP_LOG,
-        help=f"loop_log.md 路径（默认：{DEFAULT_LOOP_LOG}）",
-    )
+    parser = argparse.ArgumentParser(description="HaloRead loop_log 结构校验")
     parser.add_argument(
         "--strict",
         action="store_true",
         help="P3 告警也阻断退出码",
     )
     args = parser.parse_args()
-    return run(args.path, strict=args.strict)
+    return run(strict=args.strict)
 
 
 if __name__ == "__main__":
