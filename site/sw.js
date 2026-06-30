@@ -2,7 +2,7 @@
  * 豪书斋 Service Worker
  * 缓存策略：核心资源预缓存 + 数据/笔记运行时缓存
  */
-const CACHE_NAME = 'halo-read-v7'; // 2026-06-29 SSG 章节页上线，bump 规避 BUG-018 幽灵旧版
+const CACHE_NAME = 'halo-read-v8'; // 2026-06-29 沉浸模式恢复整屏全屏（BUG-021 修正版），bump 规避旧版缓存
 const PRECACHE_ASSETS = [
     './',
     './index.html',

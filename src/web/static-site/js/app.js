@@ -91,7 +91,20 @@
         pageModeBtns: document.getElementById('pageModeBtns'),
         autoScrollBtns: document.getElementById('autoScrollBtns'),
         autoScrollSpeedRange: document.getElementById('autoScrollSpeedRange'),
-        autoScrollSpeedVal: document.getElementById('autoScrollSpeedVal')
+        autoScrollSpeedVal: document.getElementById('autoScrollSpeedVal'),
+        offlineExportBtn: document.getElementById('offlineExportBtn'),
+        exportOverlay: document.getElementById('exportOverlay'),
+        exportClose: document.getElementById('exportClose'),
+        exportBookTip: document.getElementById('exportBookTip'),
+        exportTree: document.getElementById('exportTree'),
+        exportSelectAllBtn: document.getElementById('exportSelectAllBtn'),
+        exportClearBtn: document.getElementById('exportClearBtn'),
+        exportCounter: document.getElementById('exportCounter'),
+        exportConfirmBtn: document.getElementById('exportConfirmBtn'),
+        exportCancelBtn: document.getElementById('exportCancelBtn'),
+        exportProgress: document.getElementById('exportProgress'),
+        exportProgressFill: document.getElementById('exportProgressFill'),
+        exportProgressText: document.getElementById('exportProgressText')
     };
 
     function escapeHtml(text) {
@@ -1307,19 +1320,56 @@
     }
 
     /* ============ 沉浸阅读模式 ============ */
-    // 纯 CSS 沉浸：仅用 .immersive-mode 隐藏 UI + 内容占满。
-    // 不调用任何系统全屏 API，避免小米/部分浏览器强制横屏。
+    // BUG-021 修正：重新引入 Fullscreen API 实现"整屏全屏"（隐藏浏览器地址栏/操作栏），
+    // 但与 BUG-021 不同：
+    //   1. 不调用 orientation 锁定 API（screen[.]orientation[.]lock，强制横屏根因）
+    //   2. 小米浏览器 UA 跳过 Fullscreen API（小米 requestFullscreen 会强制横屏），仅用纯 CSS 沉浸
+    //   3. Fullscreen 失败时 fallback 到纯 CSS 沉浸（保留 body class）
+    function isXiaomiBrowser() {
+        // 小米原生浏览器 UA 含 MiuiBrowser；红米也用同款
+        return /MiuiBrowser/i.test(navigator.userAgent);
+    }
+
+    function requestBrowserFullscreen() {
+        const el = document.documentElement;
+        const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (!fn) return false;
+        try {
+            const p = fn.call(el);
+            return p && typeof p.then === 'function' ? p : Promise.resolve();
+        } catch (e) {
+            return Promise.reject(e);
+        }
+    }
+
+    function exitBrowserFullscreen() {
+        const fn = document.exitFullscreen || document.webkitExitFullscreen;
+        if (!fn) return;
+        try { fn.call(document); } catch (e) { /* 忽略 */ }
+    }
+
     function enterImmersiveMode() {
         document.body.classList.add('immersive-mode');
         // 进入沉浸时隐藏 UI 工具栏，让正文占满
         document.body.classList.add('ui-hidden');
         updateImmersiveBtn(true);
+        // 小米浏览器跳过 Fullscreen API，仅用纯 CSS 沉浸
+        if (isXiaomiBrowser()) return;
+        // 尝试整屏全屏，失败回退到纯 CSS（body class 已加，无需额外处理）
+        const p = requestBrowserFullscreen();
+        if (p && p.catch) {
+            p.catch(function () { /* 静默 fallback 到纯 CSS 沉浸 */ });
+        }
     }
 
     function exitImmersiveMode() {
         document.body.classList.remove('immersive-mode');
         document.body.classList.remove('ui-hidden');
         updateImmersiveBtn(false);
+        // 仅当当前处于 Fullscreen 状态时才退出
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            exitBrowserFullscreen();
+        }
     }
 
     function toggleImmersiveMode() {
@@ -1341,6 +1391,474 @@
             // 初始化 aria-pressed（HTML 未声明时 getAttribute 返回 null）
             elements.immersiveBtn.setAttribute('aria-pressed', 'false');
             elements.immersiveBtn.addEventListener('click', toggleImmersiveMode);
+        }
+    }
+
+    /* ============ 离线下载（导出 Markdown） ============ */
+    // 第一性原理：源文件已是 markdown，导出 = 抓取 + 剥 frontmatter + 标题降级 + 三级层级拼装。
+    // 目录识别靠 H1(书) / H2(章) / H3(笔记) 三级，正文原有标题降级到 H4-H6 避免污染大纲。
+    const EXPORT_CONCURRENCY = 6;
+
+    // 导出时的临时状态：选中的 path 集合
+    const exportState = {
+        selectedPaths: new Set(),
+        allPaths: [],
+        exporting: false
+    };
+
+    /**
+     * 把 state.currentBookTree 归一化为 chapters 列表（每项 chapter 含 children=notes）。
+     * currentBookTree 可能有 3 种形状：
+     *  - chapters 列表（openBook 正常路径，book.tree）
+     *  - [bookNode]（openBook fallback，书节点包装）
+     *  - 多书树（loadTree 无 currentBook 时，死代码路径）
+     * 通过检测首层节点的孙节点是否存在来区分。
+     */
+    function normalizeChaptersForExport(tree) {
+        if (!Array.isArray(tree) || tree.length === 0) return [];
+        const first = tree[0];
+        const hasGrandChildren = first && Array.isArray(first.children)
+            && first.children[0] && Array.isArray(first.children[0].children);
+        if (hasGrandChildren) {
+            // 书节点包装：取该书（单书包装）或保持多书树（多书）
+            return tree.length === 1 ? (first.children || []) : tree;
+        }
+        return tree;
+    }
+
+    function openExportModal() {
+        // 必须先打开一本书
+        if (!state.currentBook || !state.currentBookTree || state.currentBookTree.length === 0) {
+            if (elements.exportBookTip) {
+                elements.exportBookTip.textContent = '请在书架中打开一本书后再使用离线下载。';
+                elements.exportBookTip.style.display = '';
+            }
+            if (elements.exportTree) elements.exportTree.innerHTML = '';
+            if (elements.exportConfirmBtn) elements.exportConfirmBtn.disabled = true;
+            if (elements.exportSelectAllBtn) elements.exportSelectAllBtn.disabled = true;
+            if (elements.exportClearBtn) elements.exportClearBtn.disabled = true;
+        } else {
+            if (elements.exportBookTip) {
+                elements.exportBookTip.textContent = `当前书籍：${state.currentBook}（共 ${flattenTree(state.currentBookTree).length} 篇笔记）`;
+                elements.exportBookTip.style.display = '';
+            }
+            if (elements.exportSelectAllBtn) elements.exportSelectAllBtn.disabled = false;
+            if (elements.exportClearBtn) elements.exportClearBtn.disabled = false;
+            renderExportTree();
+        }
+        resetExportProgress();
+        if (elements.exportOverlay) {
+            elements.exportOverlay.classList.add('open');
+            elements.exportOverlay.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function closeExportModal() {
+        if (exportState.exporting) return; // 导出进行中不允许关闭
+        if (elements.exportOverlay) {
+            elements.exportOverlay.classList.remove('open');
+            elements.exportOverlay.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    function resetExportProgress() {
+        if (elements.exportProgress) elements.exportProgress.hidden = true;
+        if (elements.exportProgressFill) elements.exportProgressFill.style.width = '0%';
+        if (elements.exportProgressText) elements.exportProgressText.textContent = '准备中…';
+    }
+
+    function renderExportTree() {
+        exportState.selectedPaths = new Set();
+        exportState.allPaths = [];
+        if (!elements.exportTree) return;
+        elements.exportTree.innerHTML = '';
+
+        // state.currentBookTree 归一化为 chapters 列表（兼容书节点包装/多书树形状）
+        const chapters = normalizeChaptersForExport(state.currentBookTree || []);
+        if (chapters.length === 0) {
+            elements.exportTree.innerHTML = '<div class="empty-state">本书暂无笔记</div>';
+            updateExportCounter();
+            return;
+        }
+
+        // 渲染 chapter -> note 两级结构（书名已在 exportBookTip 显示）
+        const ul = document.createElement('ul');
+        ul.className = 'export-list';
+
+        chapters.forEach((chapterNode) => {
+            const chapterLi = document.createElement('li');
+            chapterLi.className = 'export-node export-chapter';
+            const chapterRow = document.createElement('div');
+            chapterRow.className = 'export-row export-row-chapter';
+            const chapterCb = document.createElement('input');
+            chapterCb.type = 'checkbox';
+            chapterCb.className = 'export-checkbox export-checkbox-chapter';
+            chapterCb.dataset.role = 'chapter';
+            const chapterLabel = document.createElement('span');
+            chapterLabel.className = 'export-label';
+            chapterLabel.textContent = chapterNode.title || '未命名章节';
+            chapterRow.appendChild(chapterCb);
+            chapterRow.appendChild(chapterLabel);
+            chapterLi.appendChild(chapterRow);
+
+            const notesUl = document.createElement('ul');
+            notesUl.className = 'export-sublist';
+            (chapterNode.children || []).forEach((noteNode) => {
+                if (!noteNode.path) return;
+                exportState.allPaths.push(noteNode.path);
+                const noteLi = document.createElement('li');
+                noteLi.className = 'export-node export-note';
+                const noteRow = document.createElement('div');
+                noteRow.className = 'export-row export-row-note';
+                const noteCb = document.createElement('input');
+                noteCb.type = 'checkbox';
+                noteCb.className = 'export-checkbox export-checkbox-note';
+                noteCb.dataset.role = 'note';
+                noteCb.dataset.path = noteNode.path;
+                const noteLabel = document.createElement('span');
+                noteLabel.className = 'export-label';
+                noteLabel.textContent = noteNode.title || noteNode.event || '未命名笔记';
+                noteRow.appendChild(noteCb);
+                noteRow.appendChild(noteLabel);
+                noteLi.appendChild(noteRow);
+                notesUl.appendChild(noteLi);
+
+                noteCb.addEventListener('change', () => {
+                    if (noteCb.checked) {
+                        exportState.selectedPaths.add(noteNode.path);
+                    } else {
+                        exportState.selectedPaths.delete(noteNode.path);
+                    }
+                    syncParentCheckboxState(chapterCb);
+                    updateExportCounter();
+                });
+            });
+            chapterLi.appendChild(notesUl);
+
+            chapterCb.addEventListener('change', () => {
+                const noteCbs = notesUl.querySelectorAll('.export-checkbox-note');
+                noteCbs.forEach((cb) => {
+                    cb.checked = chapterCb.checked;
+                    if (chapterCb.checked) {
+                        exportState.selectedPaths.add(cb.dataset.path);
+                    } else {
+                        exportState.selectedPaths.delete(cb.dataset.path);
+                    }
+                });
+                updateExportCounter();
+            });
+
+            ul.appendChild(chapterLi);
+        });
+
+        elements.exportTree.appendChild(ul);
+        updateExportCounter();
+    }
+
+    function syncParentCheckboxState(parentCb) {
+        const parentLi = parentCb.closest('.export-node');
+        if (!parentLi) return;
+        const childCbs = parentLi.querySelectorAll(':scope > .export-sublist .export-checkbox-note');
+        if (childCbs.length === 0) return;
+        let checked = 0;
+        childCbs.forEach((cb) => { if (cb.checked) checked++; });
+        if (checked === 0) {
+            parentCb.checked = false;
+            parentCb.indeterminate = false;
+        } else if (checked === childCbs.length) {
+            parentCb.checked = true;
+            parentCb.indeterminate = false;
+        } else {
+            parentCb.checked = false;
+            parentCb.indeterminate = true;
+        }
+    }
+
+    function updateExportCounter() {
+        const count = exportState.selectedPaths.size;
+        if (elements.exportCounter) {
+            elements.exportCounter.textContent = `已选 ${count} 篇`;
+        }
+        if (elements.exportConfirmBtn) {
+            elements.exportConfirmBtn.disabled = count === 0 || exportState.exporting;
+        }
+    }
+
+    function selectAllExport() {
+        if (exportState.exporting) return;
+        exportState.allPaths.forEach((p) => exportState.selectedPaths.add(p));
+        if (elements.exportTree) {
+            elements.exportTree.querySelectorAll('.export-checkbox').forEach((cb) => {
+                cb.checked = true;
+                cb.indeterminate = false;
+            });
+        }
+        updateExportCounter();
+    }
+
+    function clearExport() {
+        if (exportState.exporting) return;
+        exportState.selectedPaths.clear();
+        if (elements.exportTree) {
+            elements.exportTree.querySelectorAll('.export-checkbox').forEach((cb) => {
+                cb.checked = false;
+                cb.indeterminate = false;
+            });
+        }
+        updateExportCounter();
+    }
+
+    /**
+     * 正文标题降级：把正文里已有的 ATX 标题（#~######）整体下移 3 级，
+     * 保证导出文档大纲唯一由「书H1 / 章H2 / 笔记H3」三层构成，
+     * 让 Obsidian/Typora/VSCode 的目录识别稳定可控。
+     * Setext 标题（下一行 ===/---）也一并转成降级后的 ATX。
+     *
+     * 代码块（``` 或 ~~~ 围栏）内的内容不降级，避免污染代码注释/字符串里的 #。
+     */
+    function downgradeHeadings(body) {
+        // 按围栏代码块分段：偶数段为代码块（不处理），奇数段为正文（降级）
+        const segments = body.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g);
+        return segments.map((seg, idx) => {
+            // 围栏代码块本身（idx 为奇数）原样返回
+            if (idx % 2 === 1) return seg;
+            let out = seg;
+            // 1) Setext H1（===）→ ATX 降 3 级 = ####
+            out = out.replace(/^(.+)[ \t]*\n=+[ \t]*$/gm, (m, title) => '#### ' + title.trim());
+            // 2) Setext H2（---）→ ATX 降 3 级 = #####
+            out = out.replace(/^(.+)[ \t]*\n-+[ \t]*$/gm, (m, title) => '##### ' + title.trim());
+            // 3) ATX 标题整体降 3 级，超过 6 级截断到 6 级
+            out = out.replace(/^(#{1,6})\s+/gm, (m, hashes) => {
+                const newLevel = Math.min(hashes.length + 3, 6);
+                return '#'.repeat(newLevel) + ' ';
+            });
+            return out;
+        }).join('');
+    }
+
+    async function fetchNoteRaw(path) {
+        return await fetchJson('notes/' + encodeURI(path));
+    }
+
+    /**
+     * 限流并发抓取，避免一次拉几十个文件压垮静态服务器或浏览器连接池。
+     */
+    async function fetchAllWithConcurrency(paths, onProgress) {
+        const results = new Map();
+        let index = 0;
+        let done = 0;
+        const total = paths.length;
+        async function worker() {
+            while (index < paths.length) {
+                const current = paths[index++];
+                try {
+                    const text = await fetchNoteRaw(current);
+                    results.set(current, text || '');
+                } catch (err) {
+                    // 单篇失败不阻断整体导出，写入错误占位（用引用块而非 H1，避免污染大纲）
+                    results.set(current, `> ⚠️ 本篇笔记加载失败：${err && err.message ? err.message : '网络错误'}（路径：${current}）\n`);
+                }
+                done++;
+                if (onProgress) onProgress(done, total);
+            }
+        }
+        const workers = [];
+        for (let i = 0; i < Math.min(EXPORT_CONCURRENCY, paths.length); i++) {
+            workers.push(worker());
+        }
+        await Promise.all(workers);
+        return results;
+    }
+
+    /**
+     * 按章→笔记顺序拼装单个 md。
+     * 顶部生成可点击目录，每个条目锚点 = 笔记标题 slug。
+     * selectedChapters 是 state.currentBookTree 的子集（chapters 列表）。
+     *
+     * 锚点一致性：先一次性扫描建立 path→anchor 映射，TOC 与正文都查表，
+     * 避免 slugify 双调用导致 TOC 链接与正文锚点错位。
+     */
+    function assembleMarkdown(bookTitle, selectedChapters, rawMap) {
+        const lines = [];
+        lines.push(`# ${bookTitle}`);
+        lines.push('');
+        lines.push(`> 由豪书斋阅读器离线导出 · ${new Date().toLocaleString('zh-CN')}`);
+        lines.push('');
+
+        // 1) 一次性建立 path → anchor 映射（去重发生在这一步，TOC/正文仅查表）
+        const anchorMap = new Map();
+        const anchorSet = new Set();
+        const slugify = (text) => {
+            // 兼容主流本地阅读器锚点：保留中文/字母/数字/连字符，其余转 -
+            const slug = String(text || '')
+                .trim()
+                .toLowerCase()
+                .replace(/[\s<>{}\[\]|\\^`*#+!$%&=()~,，。、；：""''！？·—…]+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+            let base = slug || 'note';
+            let final = base;
+            let n = 2;
+            while (anchorSet.has(final)) {
+                final = `${base}-${n++}`;
+            }
+            anchorSet.add(final);
+            return final;
+        };
+        selectedChapters.forEach((chapterNode) => {
+            (chapterNode.children || []).forEach((noteNode) => {
+                if (!noteNode.path || !rawMap.has(noteNode.path)) return;
+                const noteTitle = noteNode.title || noteNode.event || '未命名笔记';
+                anchorMap.set(noteNode.path, slugify(noteTitle));
+            });
+        });
+
+        // 2) 顶部目录
+        const tocLines = [];
+        tocLines.push('## 目录');
+        tocLines.push('');
+        selectedChapters.forEach((chapterNode) => {
+            (chapterNode.children || []).forEach((noteNode) => {
+                if (!noteNode.path || !rawMap.has(noteNode.path)) return;
+                const noteTitle = noteNode.title || noteNode.event || '未命名笔记';
+                const anchor = anchorMap.get(noteNode.path);
+                tocLines.push(`- [${noteTitle}](#${anchor})`);
+            });
+        });
+        lines.push(...tocLines);
+        lines.push('');
+        lines.push('---');
+        lines.push('');
+
+        // 3) 正文
+        selectedChapters.forEach((chapterNode) => {
+            const chapterNotes = (chapterNode.children || []).filter((n) => n.path && rawMap.has(n.path));
+            if (chapterNotes.length === 0) return;
+            lines.push(`## ${chapterNode.title || '未命名章节'}`);
+            lines.push('');
+            chapterNotes.forEach((noteNode) => {
+                const raw = rawMap.get(noteNode.path) || '';
+                const { body } = parseFrontmatter(raw);
+                const noteTitle = noteNode.title || noteNode.event || '未命名笔记';
+                const anchor = anchorMap.get(noteNode.path);
+                lines.push(`<a id="${anchor}"></a>`);
+                lines.push(`### ${noteTitle}`);
+                lines.push('');
+                lines.push(downgradeHeadings(body.replace(/\s+$/, '')));
+                lines.push('');
+                lines.push('---');
+                lines.push('');
+            });
+        });
+
+        return lines.join('\n');
+    }
+
+    function triggerDownload(filename, content) {
+        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        // 释放时机：click 触发后浏览器仍需异步读取 Blob（移动端可能弹下载确认），
+        // 延后到下一个宏任务再 revoke，既避免过早释放导致下载空文件，又尽快回收内存。
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+            if (a.parentNode) a.parentNode.removeChild(a);
+        }, 0);
+    }
+
+    function sanitizeFilename(name) {
+        return String(name || 'export')
+            .replace(/[\\/:*?"<>|]/g, '_')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 80) || 'export';
+    }
+
+    async function performExport() {
+        if (exportState.exporting) return;
+        const selected = Array.from(exportState.selectedPaths);
+        if (selected.length === 0) return;
+
+        exportState.exporting = true;
+        if (elements.exportConfirmBtn) elements.exportConfirmBtn.disabled = true;
+        if (elements.exportSelectAllBtn) elements.exportSelectAllBtn.disabled = true;
+        if (elements.exportClearBtn) elements.exportClearBtn.disabled = true;
+        if (elements.exportCancelBtn) elements.exportCancelBtn.textContent = '关闭';
+        if (elements.exportProgress) elements.exportProgress.hidden = false;
+        if (elements.exportProgressFill) elements.exportProgressFill.style.width = '0%';
+        if (elements.exportProgressText) elements.exportProgressText.textContent = `正在抓取笔记 0/${selected.length}…`;
+
+        try {
+            const rawMap = await fetchAllWithConcurrency(selected, (done, total) => {
+                if (elements.exportProgressFill) {
+                    const pct = Math.round((done / total) * 80);
+                    elements.exportProgressFill.style.width = pct + '%';
+                }
+                if (elements.exportProgressText) {
+                    elements.exportProgressText.textContent = `正在抓取笔记 ${done}/${total}…`;
+                }
+            });
+            if (elements.exportProgressText) elements.exportProgressText.textContent = '正在拼装文档…';
+            if (elements.exportProgressFill) elements.exportProgressFill.style.width = '90%';
+            // 让进度文本有机会渲染，避免大书同步拼装时 UI 假死
+            // 用 setTimeout(0) 而非 rAF：浏览器下两者都能让出一帧让 UI 渲染，
+            // 但 setTimeout 不依赖 rAF polyfill，测试环境（jsdom）也能自动推进。
+            await new Promise((r) => setTimeout(r, 0));
+
+            // 只保留被选中的章节/笔记子树（用归一化后的 chapters + 入口快照，防御 await 期间 state 变化）
+            const selectedSet = new Set(selected);
+            const bookTreeSnapshot = normalizeChaptersForExport(state.currentBookTree || []);
+            const selectedChapters = bookTreeSnapshot.map((chapterNode) => {
+                const newNotes = (chapterNode.children || []).filter((n) => n.path && selectedSet.has(n.path));
+                return Object.assign({}, chapterNode, { children: newNotes });
+            }).filter((ch) => ch.children.length > 0);
+
+            const md = assembleMarkdown(state.currentBook || '豪书斋', selectedChapters, rawMap);
+            const filename = sanitizeFilename(state.currentBook || 'export') + '.md';
+            triggerDownload(filename, md);
+
+            if (elements.exportProgressFill) elements.exportProgressFill.style.width = '100%';
+            if (elements.exportProgressText) elements.exportProgressText.textContent = `导出完成，共 ${selected.length} 篇笔记 → ${filename}`;
+        } catch (err) {
+            if (elements.exportProgressText) elements.exportProgressText.textContent = '导出失败：' + (err && err.message ? err.message : '未知错误');
+            console.error('[豪书斋] 离线导出失败', err);
+        } finally {
+            exportState.exporting = false;
+            if (elements.exportConfirmBtn) elements.exportConfirmBtn.disabled = exportState.selectedPaths.size === 0;
+            if (elements.exportSelectAllBtn) elements.exportSelectAllBtn.disabled = false;
+            if (elements.exportClearBtn) elements.exportClearBtn.disabled = false;
+            if (elements.exportCancelBtn) elements.exportCancelBtn.textContent = '取消';
+        }
+    }
+
+    function initOfflineExport() {
+        if (elements.offlineExportBtn) {
+            elements.offlineExportBtn.addEventListener('click', openExportModal);
+        }
+        if (elements.exportClose) {
+            elements.exportClose.addEventListener('click', closeExportModal);
+        }
+        if (elements.exportCancelBtn) {
+            elements.exportCancelBtn.addEventListener('click', closeExportModal);
+        }
+        if (elements.exportOverlay) {
+            elements.exportOverlay.addEventListener('click', (event) => {
+                if (event.target === elements.exportOverlay) closeExportModal();
+            });
+        }
+        if (elements.exportSelectAllBtn) {
+            elements.exportSelectAllBtn.addEventListener('click', selectAllExport);
+        }
+        if (elements.exportClearBtn) {
+            elements.exportClearBtn.addEventListener('click', clearExport);
+        }
+        if (elements.exportConfirmBtn) {
+            elements.exportConfirmBtn.addEventListener('click', performExport);
         }
     }
 
@@ -1479,7 +1997,9 @@
 
     function handleKeyDown(event) {
         if (event.key === 'Escape') {
-            if (elements.settingsPanel && elements.settingsPanel.classList.contains('open')) {
+            if (elements.exportOverlay && elements.exportOverlay.classList.contains('open')) {
+                closeExportModal();
+            } else if (elements.settingsPanel && elements.settingsPanel.classList.contains('open')) {
                 closeSettings();
             } else if (elements.modalOverlay && elements.modalOverlay.classList.contains('open')) {
                 closeModal();
@@ -1555,6 +2075,10 @@
         document.body.classList.remove('immersive-mode', 'ui-hidden');
         document.body.dataset.view = 'home';
         document.body.style.overflow = '';
+        // bfcache 恢复兜底：若仍处于整屏全屏状态，一并退出
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            exitBrowserFullscreen();
+        }
     }
 
     function init() {
@@ -1571,6 +2095,7 @@
         initReaderTap();
         initAutoScroll();
         initImmersive();
+        initOfflineExport();
 
         if (elements.bookshelfSearchInput) {
             elements.bookshelfSearchInput.addEventListener('input', handleBookshelfSearch);

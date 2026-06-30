@@ -620,3 +620,56 @@
   3. **MD 是唯一真源**：SSG HTML 不需要单独维护，跑 `build_site.py` 自动从 `output/` 的 MD 重新渲染；MD 改了 SSG 自动同步。
   4. **缓存必须 bump**：SW cacheFirst 资源变更时必须升级 `CACHE_NAME`，否则手机端会持续看到旧 SSG（BUG-018 教训的延续）。
   5. **bleach 净化是底线**：构建期把 MD 渲染成 HTML 时必须经过 bleach 白名单净化，避免历史 MD 中可能藏的 `<script>` 注入到 SSG 页面。
+
+## 移动端沉浸模式丢失整屏全屏（BUG-021 副作用回归）
+
+- **编号**：BUG-036
+- **首次出现**：2026-06-29
+- **类型**：兼容性 / UI
+- **环境**：移动端浏览器（Chrome、夸克、UC 等），小米浏览器需特殊处理
+- **现象**：用户点击"沉浸"按钮后，仅浏览器视口内全屏（body 隐藏 UI），但浏览器地址栏和底部操作栏仍可见；此前是整个屏幕全屏（地址栏/操作栏自动隐藏）。
+- **根因**：BUG-021 修复"沉浸模式强制横屏"时，**彻底移除了 Fullscreen API**（requestFullscreen / exitFullscreen 及 webkit 前缀），改为纯 CSS 沉浸（`body.immersive-mode` + `body.ui-hidden` 隐藏内部 UI）。副作用是丢失了"隐藏浏览器 chrome（地址栏/操作栏）"的能力，沉浸模式从"整屏全屏"退化为"视口内全屏"。
+- **修复**（BUG-021 修正版，重新引入 Fullscreen API 但加三重护栏）：
+  1. `src/web/static-site/js/app.js` 的 `enterImmersiveMode` 重新调用 `requestFullscreen`（含 `webkitRequestFullscreen` 前缀）实现整屏全屏；`exitImmersiveMode` 对应调用 `exitFullscreen`。
+  2. **不调用 `screen.orientation.lock`**——这是 BUG-021 强制横屏的真正根因之一，本次严格保持禁用。
+  3. **小米浏览器 UA 跳过 Fullscreen API**：新增 `isXiaomiBrowser()` 检测 `MiuiBrowser` 关键字，小米浏览器 `requestFullscreen` 会强制横屏（BUG-021 现象），故仅用纯 CSS 沉浸。
+  4. **Fullscreen 失败时 fallback 到纯 CSS 沉浸**：保留 `body.immersive-mode` + `body.ui-hidden`，`.catch` 静默回退，不影响用户进入沉浸。
+  5. `resetViewState`（bfcache 恢复兜底）补充：若仍处于 Fullscreen 状态则退出，避免 bfcache 恢复后卡在全屏。
+  6. `src/web/static-site/sw.js` 与 `site/sw.js` bump `CACHE_NAME` v7→v8，规避手机端旧 app.js 缓存。
+- **涉及文件**：
+  - `src/web/static-site/js/app.js`（沉浸模式函数重写 + resetViewState 全屏退出兜底）
+  - `src/web/static-site/sw.js`、`site/sw.js`（CACHE_NAME v8）
+  - `site/js/app.js`（由 `build_site.py` 自动同步）
+- **回归测试**：
+  - `tests/test_reader_features.js` 测试11：断言从"不调用 Fullscreen API"改为"调用 Fullscreen API + 不调用 orientation.lock + 含 isXiaomiBrowser/MiuiBrowser"
+  - `tests/run_regression_suite.sh` 第3步：同步更新为"调用 Fullscreen + 小米 UA 跳过"两个断言
+- **教训**：
+  1. **bug 修复要区分"问题 API"与"问题 API 的滥用方式"**：BUG-021 把 Fullscreen API 整体禁用是过度反应，真正的根因是 `orientation.lock` + 小米浏览器的 `requestFullscreen` 副作用。正确做法是禁用 orientation.lock、对问题浏览器 UA 跳过、其余浏览器正常使用 Fullscreen API。
+  2. **副作用回归要主动追踪**：BUG-021 修复后丢失"整屏全屏"是可预见的副作用，但当时未补"整屏全屏能力"的回归断言，导致用户再次反馈才发现。修复副作用类 bug 时应同步评估被牺牲的能力是否需要替代方案。
+  3. **小米浏览器是国产兼容性重灾区**：其 `requestFullscreen` 行为与标准不符（强制横屏），UA 识别 + 跳过是务实方案。
+
+## GitHub Actions 部署 workflow 语法错误 + SSG 依赖缺失
+
+- **编号**：BUG-037
+- **首次出现**：2026-06-29
+- **类型**：构建 / 部署
+- **环境**：GitHub Actions（push to master 触发 `branch-cleanup.yml`）
+- **现象**：用户反馈 GitHub Pages 部署"偶现"失败，错误信息：`Invalid workflow file: .github/workflows/branch-cleanup.yml#L1 (Line: 38, Col: 17): Unrecognized named-value: 'github'`。
+- **复现规律**：并非真正偶现——仅 `push` 事件触发时报错；`workflow_dispatch` 手动触发不报错。根因是 `github.event.inputs.mode` 在 push 事件下 `inputs` 为空，深层嵌套访问失败导致整个 `github` 命名值在 `permissions` 字段上下文被标为未识别。
+- **根因**（两个独立问题）：
+  1. **`branch-cleanup.yml` 第 36、38 行**：`environment` 和 `permissions.contents` 字段使用 `github.event.inputs.mode == 'execute' && ... `，GitHub Actions 在 `permissions` 字段的表达式上下文中无法可靠解析 `github.event.inputs` 的深层嵌套访问。
+  2. **`pages.yml` / `deploy-modelscope.yml` 的 `pip install pyyaml`**：commit `ae56541` 引入的 SSG 章节页（BUG-035）依赖 `markdown` + `bleach`，但这两个部署 workflow 只装 `pyyaml`，导致 `build_site.py` 静默跳过 SSG 生成（打印告警但不报错），SSG 功能无法部署到 GitHub Pages / ModelScope。不报错但功能缺失，更隐蔽。
+- **修复**：
+  1. `branch-cleanup.yml` 第 36、38 行：`github.event.inputs.mode` → `inputs.mode`。`inputs` 是 workflow_dispatch 的官方推荐上下文，push 事件下 `inputs.mode` 为 null，`null == 'execute'` 为 false，安全回退到默认值（environment 为 ''，permissions.contents 为 'read'）。文件第 60 行原本就用 `inputs.mode`，本次修复消除了文件内不一致。
+  2. `pages.yml` 第 42 行、`deploy-modelscope.yml` 第 27 行：`pip install pyyaml` → `pip install -r requirements.txt`，与 `regression.yml` 第 38 行保持一致，确保 SSG 依赖完整。
+- **涉及文件**：
+  - `.github/workflows/branch-cleanup.yml`（第 36、38 行表达式上下文修正）
+  - `.github/workflows/pages.yml`（依赖安装改为 requirements.txt）
+  - `.github/workflows/deploy-modelscope.yml`（依赖安装改为 requirements.txt）
+- **回归测试**：
+  - 本次未新增 workflow 语法 lint 脚本（GitHub 自带 yaml 解析校验，本地无等价工具；可后续考虑加 `actionlint`）
+  - 通过本地模拟 `pages.yml` 完整步骤（`pip install -r requirements.txt` → `check_book_structure --strict` → `check_duplicates` → `build_site.py` → 校验 `site/data/index.json`）验证 SSG 生成 873 个 HTML
+- **教训**：
+  1. **`github.event.inputs` 在 `permissions`/`environment` 字段不可靠**：GitHub Actions 表达式上下文有限制，访问 workflow_dispatch inputs 应优先用 `inputs` 上下文（官方推荐），它在所有事件类型下都可安全求值（非 dispatch 事件下为 null）。
+  2. **新增功能依赖必须同步更新所有 workflow 的依赖安装步骤**：BUG-035 在 `requirements.txt` 加了 `markdown`/`bleach`，但只更新了 `regression.yml`，遗漏了 `pages.yml` 和 `deploy-modelscope.yml`。`build_site.py` 的"静默跳过 + 打印告警"容错策略反而掩盖了这个问题（不报错但功能缺失）。新增构建依赖时，应 grep 所有 workflow 的 `pip install` 并统一更新。
+  3. **"偶现失败"要查触发事件差异**：用户报"偶现"时，第一步应对比成功/失败两次的触发事件类型（push vs workflow_dispatch vs schedule），事件类型差异往往就是根因。

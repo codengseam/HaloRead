@@ -104,6 +104,10 @@ async function buildDom() {
         addEventListener() {}, removeEventListener() {},
     }));
 
+    // CSS.escape polyfill（jsdom 部分版本缺失，loadNote 高亮路径用到）
+    if (!window.CSS) window.CSS = {};
+    if (!window.CSS.escape) window.CSS.escape = (s) => String(s).replace(/[^a-zA-Z0-9_\u4e00-\u9fa5\-]/g, (c) => '\\' + c);
+
     // 注入 app.js
     const appCode = fs.readFileSync(path.join(SITE_DIR, 'js/app.js'), 'utf-8');
     const appScript = document.createElement('script');
@@ -446,14 +450,22 @@ async function runTest() {
         dom.window.close();
     }
 
-    console.log('\n=== 测试11：沉浸模式不触发系统全屏/不锁定方向（防横屏回归） ===');
+    console.log('\n=== 测试11：沉浸模式调用 Fullscreen API 但不锁定方向，小米浏览器跳过（BUG-036） ===');
     {
         const appText = fs.readFileSync(path.join(SITE_DIR, 'js/app.js'), 'utf-8');
-        // 关键回归断言：不得调用任何可能触发方向变化或系统全屏的 API
+        // BUG-021 教训修正：重新引入 Fullscreen API 实现"整屏全屏"（隐藏浏览器地址栏/操作栏），
+        // 但必须满足三个安全约束：
+        //   1. 不调用 screen.orientation.lock / lockOrientation（强制横屏根因）
+        //   2. 小米浏览器 UA 识别跳过 Fullscreen API（小米 requestFullscreen 会强制横屏）
+        //   3. Fullscreen 失败时 fallback 到纯 CSS 沉浸（body.immersive-mode + ui-hidden）
         assert(!/screen\.orientation\.lock/.test(appText), '不调用 screen.orientation.lock');
         assert(!/lockOrientation/.test(appText), '不调用旧版 lockOrientation');
-        assert(!/requestFullscreen|webkitRequestFullscreen|msRequestFullscreen/.test(appText), '不调用 requestFullscreen 系列');
-        assert(!/exitFullscreen|webkitExitFullscreen|msExitFullscreen/.test(appText), '不调用 exitFullscreen 系列');
+        // BUG-036：重新引入 Fullscreen API（与 BUG-021 不同，此处允许调用）
+        assert(/requestFullscreen|webkitRequestFullscreen/.test(appText), '调用 requestFullscreen 系列实现整屏全屏');
+        assert(/exitFullscreen|webkitExitFullscreen/.test(appText), '调用 exitFullscreen 系列退出整屏全屏');
+        // 小米 UA 跳过是关键回归约束（防止 BUG-021 强制横屏重现）
+        assert(/isXiaomiBrowser/.test(appText), '含 isXiaomiBrowser 检测函数');
+        assert(/MiuiBrowser/.test(appText), '小米浏览器 UA 识别使用 MiuiBrowser 关键字');
         assert(appText.includes('toggleImmersiveMode'), '含 toggleImmersiveMode 函数');
         assert(appText.includes('enterImmersiveMode'), '含 enterImmersiveMode 函数');
         assert(appText.includes('exitImmersiveMode'), '含 exitImmersiveMode 函数');
@@ -601,6 +613,467 @@ async function runTest() {
         newNoteBtn.click();
         await new Promise((r) => setTimeout(r, 10));
         assert(scrollIntoViewCalled, '点击“阅读”按钮后滚动到书架区');
+
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试19：离线下载入口与 DOM 结构 ===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        // 设置面板内含离线下载入口
+        const offlineExportBtn = document.getElementById('offlineExportBtn');
+        assert(offlineExportBtn !== null, '设置面板内存在 #offlineExportBtn 按钮');
+        assert(offlineExportBtn.textContent.includes('导出'), '按钮文案含「导出」');
+
+        // 导出 modal 骨架
+        const exportOverlay = document.getElementById('exportOverlay');
+        const exportTree = document.getElementById('exportTree');
+        const exportConfirmBtn = document.getElementById('exportConfirmBtn');
+        const exportSelectAllBtn = document.getElementById('exportSelectAllBtn');
+        const exportClearBtn = document.getElementById('exportClearBtn');
+        const exportCounter = document.getElementById('exportCounter');
+        const exportProgress = document.getElementById('exportProgress');
+        assert(exportOverlay !== null, '存在 #exportOverlay');
+        assert(exportTree !== null, '存在 #exportTree');
+        assert(exportConfirmBtn !== null, '存在 #exportConfirmBtn');
+        assert(exportSelectAllBtn !== null, '存在 #exportSelectAllBtn');
+        assert(exportClearBtn !== null, '存在 #exportClearBtn');
+        assert(exportCounter !== null, '存在 #exportCounter');
+        assert(exportProgress !== null, '存在 #exportProgress');
+        assert(!exportOverlay.classList.contains('open'), '初始 modal 未打开');
+        assert(exportConfirmBtn.disabled === true, '初始导出按钮 disabled（未选笔记）');
+
+        // 点击入口打开 modal
+        offlineExportBtn.click();
+        assert(exportOverlay.classList.contains('open'), '点击入口后 modal 打开');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 2000);
+        const noteCbs = exportTree.querySelectorAll('.export-checkbox-note');
+        assert(noteCbs.length > 0, '已打开书籍时复选树渲染出笔记条目');
+        assert(exportCounter.textContent.includes('已选 0 篇'), '初始计数为 0');
+
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试20：离线下载不调用危险系统 API（防横屏回归，BUG-021/036） ===');
+    {
+        const appText = fs.readFileSync(path.join(SITE_DIR, 'js/app.js'), 'utf-8');
+        // BUG-021 教训：移动端阅读器不得调用 orientation.lock（强制横屏根因）
+        // BUG-036 修正：允许 Fullscreen API（用于在线沉浸整屏全屏），但必须有小米 UA 跳过护栏
+        assert(!/screen\.orientation\.lock/.test(appText), '导出代码不调用 screen.orientation.lock');
+        assert(!/lockOrientation/.test(appText), '导出代码不调用 lockOrientation');
+        // Fullscreen API 已在 BUG-036 重新引入，此处不再禁止，改由测试11 验证三重护栏
+        assert(/isXiaomiBrowser/.test(appText), '含 isXiaomiBrowser 检测（小米 UA 跳过 Fullscreen）');
+        assert(/MiuiBrowser/.test(appText), '小米浏览器 UA 识别使用 MiuiBrowser 关键字');
+        // 导出只允许用 Blob + a[download] 触发下载
+        assert(appText.includes('new Blob('), '使用 Blob 构造下载内容');
+        assert(appText.includes('URL.createObjectURL'), '使用 URL.createObjectURL 生成下载链接');
+        assert(/a\.download\s*=/.test(appText), '使用 a.download 触发文件下载');
+        // 必须含并发限流，避免一次拉几十个文件压垮浏览器
+        assert(appText.includes('EXPORT_CONCURRENCY'), '导出含并发限流常量 EXPORT_CONCURRENCY');
+        // 必须含标题降级函数
+        assert(appText.includes('function downgradeHeadings'), '含 downgradeHeadings 函数');
+    }
+
+    console.log('\n=== 测试21：单章/多章/全本选择与计数联动 ===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 2000);
+        const noteCbs = Array.from(exportTree.querySelectorAll('.export-checkbox-note'));
+        const totalNotes = noteCbs.length;
+        assert(totalNotes > 0, '本书至少有 1 篇笔记可选');
+
+        // 单章：勾选第一个笔记
+        noteCbs[0].checked = true;
+        noteCbs[0].dispatchEvent(new window.Event('change', { bubbles: true }));
+        assert(document.getElementById('exportCounter').textContent === '已选 1 篇', '勾选 1 篇后计数为 1');
+        assert(document.getElementById('exportConfirmBtn').disabled === false, '勾选后导出按钮启用');
+
+        // 清空
+        document.getElementById('exportClearBtn').click();
+        assert(document.getElementById('exportCounter').textContent === `已选 0 篇`, '清空后计数归 0');
+        assert(document.getElementById('exportConfirmBtn').disabled === true, '清空后导出按钮 disabled');
+        assert(noteCbs.every((cb) => cb.checked === false), '清空后所有笔记复选框未选中');
+
+        // 全选
+        document.getElementById('exportSelectAllBtn').click();
+        assert(document.getElementById('exportCounter').textContent === `已选 ${totalNotes} 篇`, `全选后计数为 ${totalNotes}`);
+        assert(noteCbs.every((cb) => cb.checked === true), '全选后所有笔记复选框选中');
+
+        // 多章：取消第一个，保留其余
+        noteCbs[0].checked = false;
+        noteCbs[0].dispatchEvent(new window.Event('change', { bubbles: true }));
+        assert(document.getElementById('exportCounter').textContent === `已选 ${totalNotes - 1} 篇`, `取消首篇后计数为 ${totalNotes - 1}`);
+
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试22：导出 Markdown 三级标题层级与正文标题降级 ===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        // 拦截下载：把 Blob 内容存到 captured，阻止真实下载
+        let captured = null;
+        const origBlob = window.Blob;
+        window.Blob = function (parts, opts) {
+            captured = { content: parts.join(''), type: opts && opts.type };
+            return { size: captured.content.length, type: captured.type };
+        };
+        window.URL.createObjectURL = () => 'blob:fake';
+        window.URL.revokeObjectURL = () => {};
+        // 阻止 a.click 真实触发导航
+        const origCreateElement = document.createElement.bind(document);
+        document.createElement = function (tag) {
+            const el = origCreateElement(tag);
+            if (tag.toLowerCase() === 'a') {
+                el.click = () => {};
+            }
+            return el;
+        };
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 2000);
+        const noteCbs = Array.from(exportTree.querySelectorAll('.export-checkbox-note'));
+
+        // 只选前 2 篇做单章+多章混合验证
+        const pickCount = Math.min(2, noteCbs.length);
+        for (let i = 0; i < pickCount; i++) {
+            noteCbs[i].checked = true;
+            noteCbs[i].dispatchEvent(new window.Event('change', { bubbles: true }));
+        }
+
+        document.getElementById('exportConfirmBtn').click();
+        await waitFor(() => captured !== null, 3000);
+
+        assert(captured !== null, '导出触发并捕获到 Blob 内容');
+        assert(captured.type === 'text/markdown;charset=utf-8', 'Blob 类型为 markdown');
+
+        const md = captured.content;
+        // 第一行必须是书名 H1
+        assert(/^# .+/.test(md.split('\n')[0]), '文档首行为书名 H1');
+        // 含目录段
+        assert(md.includes('## 目录'), '文档含「## 目录」段');
+        // 含可点击目录条目
+        assert(/\- \[.+\]\(#.+\)/.test(md), '目录含可点击锚点条目');
+        // 章节用 H2
+        assert(/^## .+/m.test(md), '文档含章节 H2');
+        // 笔记标题用 H3 + 锚点
+        assert(/<a id="[^"]+"><\/a>\n### .+/m.test(md), '笔记标题为 H3 且前置锚点');
+        // 三级层级唯一：所有 ### 必须紧跟在 <a id> 后（正文 H3 已降级）
+        const h3Lines = md.split('\n').filter((l) => /^###\s/.test(l));
+        const anchoredH3 = md.split('\n').filter((l, i, arr) => /^###\s/.test(l) && i > 0 && /<a id="[^"]+"><\/a>/.test(arr[i - 1]));
+        assert(h3Lines.length === anchoredH3.length, `所有 H3 均为笔记标题（共 ${h3Lines.length} 个，全部前置锚点），正文 H3 已降级`);
+
+        // 关键：TOC 锚点与正文锚点必须一一对应（防 slugify 双调用 bug 回归）
+        const tocAnchors = [...md.matchAll(/^\- \[.+?\]\(#([^)]+)\)/gm)].map((m) => m[1]);
+        const bodyAnchors = [...md.matchAll(/<a id="([^"]+)"><\/a>/g)].map((m) => m[1]);
+        assert(tocAnchors.length === bodyAnchors.length, `TOC 锚点数(${tocAnchors.length}) === 正文锚点数(${bodyAnchors.length})`);
+        assert(tocAnchors.every((a, i) => a === bodyAnchors[i]), 'TOC 锚点与正文锚点一一对应且顺序一致（防 slugify 双调用 bug）');
+
+        // 还原
+        window.Blob = origBlob;
+        document.createElement = origCreateElement;
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试23：downgradeHeadings 代码块内 # 不被误降级 ===');
+    {
+        // 通过端到端验证：构造一篇含代码块的笔记，导出后检查代码块内 # 注释保持原样
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        let captured = null;
+        const origBlob = window.Blob;
+        window.Blob = function (parts, opts) {
+            captured = { content: parts.join(''), type: opts && opts.type };
+            return { size: captured.content.length, type: captured.type };
+        };
+        window.URL.createObjectURL = () => 'blob:fake';
+        window.URL.revokeObjectURL = () => {};
+        const origCreateElement = document.createElement.bind(document);
+        document.createElement = function (tag) {
+            const el = origCreateElement(tag);
+            if (tag.toLowerCase() === 'a') el.click = () => {};
+            return el;
+        };
+
+        // 拦截 fetch，给第一篇笔记注入含代码块的正文
+        const origFetch = window.fetch;
+        window.fetch = async (url) => {
+            const u = new URL(url, window.location.href);
+            const pathname = u.pathname.replace(/^\/HaloRead\//, '/');
+            if (pathname.includes('/notes/') && pathname.endsWith('.md')) {
+                const relPath = decodeURI(pathname.replace(/^.*\/notes\//, ''));
+                // 只对第一篇笔记注入代码块测试内容
+                const firstLeaf = document.querySelector('.reader-view .tree-leaf');
+                if (firstLeaf && relPath === firstLeaf.dataset.path) {
+                    const body = '正文标题测试\n\n## 二级标题\n\n### 三级标题\n\n```python\n# 这是代码注释，不应被降级\nx = 1\n```\n\n```\n---\n```\n\n正文末尾。';
+                    return Promise.resolve({
+                        ok: true, status: 200,
+                        headers: { get: (n) => n.toLowerCase() === 'content-type' ? 'text/markdown' : null },
+                        json: async () => body, text: async () => body,
+                        clone: function () { return this; }
+                    });
+                }
+                const fs = require('fs');
+                const body = fs.readFileSync(path.join(SITE_DIR, 'notes', relPath), 'utf-8');
+                return Promise.resolve({
+                    ok: true, status: 200,
+                    headers: { get: (n) => n.toLowerCase() === 'content-type' ? 'text/markdown' : null },
+                    json: async () => body, text: async () => body,
+                    clone: function () { return this; }
+                });
+            }
+            return origFetch(url);
+        };
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 2000);
+        const noteCbs = Array.from(exportTree.querySelectorAll('.export-checkbox-note'));
+        // 只选第一篇（注入了代码块的）
+        noteCbs[0].checked = true;
+        noteCbs[0].dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        document.getElementById('exportConfirmBtn').click();
+        await waitFor(() => captured !== null, 3000);
+
+        const md = captured.content;
+        // 代码块内的 # 注释保持原样
+        assert(md.includes('# 这是代码注释，不应被降级'), '代码块内 # 注释未被降级');
+        assert(!md.includes('#### 这是代码注释'), '代码块内 # 未被误转为 H4');
+        // 正文标题被降级
+        assert(/####\s+二级标题/.test(md), '正文 H2 降级为 H4');
+        assert(/#####\s+三级标题/.test(md), '正文 H3 降级为 H5');
+        // 围栏代码块内的 --- 不被误转为 Setext
+        assert(md.includes('```\n---\n```'), '代码块内 --- 未被误转为 Setext H2');
+
+        window.Blob = origBlob;
+        document.createElement = origCreateElement;
+        window.fetch = origFetch;
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试24：导出中 UI 状态机（防重入/不可关闭/进度推进） ===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        let capturedCount = 0;
+        const origBlob = window.Blob;
+        window.Blob = function (parts, opts) {
+            capturedCount++;
+            return { size: parts.join('').length, type: opts && opts.type };
+        };
+        window.URL.createObjectURL = () => 'blob:fake';
+        window.URL.revokeObjectURL = () => {};
+        const origCreateElement = document.createElement.bind(document);
+        document.createElement = function (tag) {
+            const el = origCreateElement(tag);
+            if (tag.toLowerCase() === 'a') el.click = () => {};
+            return el;
+        };
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 2000);
+        const noteCbs = Array.from(exportTree.querySelectorAll('.export-checkbox-note'));
+        noteCbs[0].checked = true;
+        noteCbs[0].dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        const confirmBtn = document.getElementById('exportConfirmBtn');
+        const cancelBtn = document.getElementById('exportCancelBtn');
+        const closeBtn = document.getElementById('exportClose');
+        const selectAllBtn = document.getElementById('exportSelectAllBtn');
+
+        // 用 fetch gate 阻塞 performExport 在 fetchAllWithConcurrency 阶段，
+        // 这样能稳定观察"导出中"状态（mock fetch 太快会一气呵成跳过中间态）
+        let fetchGateResolve;
+        const fetchGate = new Promise((r) => { fetchGateResolve = r; });
+        const origFetch = window.fetch;
+        window.fetch = async (url) => {
+            const u = new URL(url, window.location.href);
+            if (u.pathname.includes('/notes/') && u.pathname.endsWith('.md')) {
+                await fetchGate;
+            }
+            return origFetch(url);
+        };
+
+        // 触发导出
+        confirmBtn.click();
+        // 让 performExport 推进到 fetchAllWithConcurrency 的 await fetch 处
+        await new Promise((r) => setTimeout(r, 30));
+        assert(confirmBtn.disabled === true, '导出中确认按钮 disabled');
+        assert(selectAllBtn.disabled === true, '导出中全选按钮 disabled');
+        assert(cancelBtn.textContent === '关闭', '导出中取消按钮文案为「关闭」');
+
+        // 导出中点击关闭/取消/遮罩不应关闭 modal
+        closeBtn.click();
+        assert(document.getElementById('exportOverlay').classList.contains('open'), '导出中点击关闭按钮不关闭 modal');
+        cancelBtn.click();
+        assert(document.getElementById('exportOverlay').classList.contains('open'), '导出中点击取消按钮不关闭 modal');
+
+        // 释放 gate，让导出完成
+        fetchGateResolve();
+        await waitFor(() => capturedCount > 0, 3000);
+        await new Promise((r) => setTimeout(r, 100));
+        // 完成后：取消文案恢复，确认按钮恢复（仍有选中则 enabled）
+        assert(cancelBtn.textContent === '取消', '完成后取消按钮文案恢复「取消」');
+        assert(selectAllBtn.disabled === false, '完成后全选按钮恢复 enabled');
+        assert(capturedCount === 1, `仅触发一次下载（防重入，actual=${capturedCount})`);
+
+        // 完成后可关闭
+        closeBtn.click();
+        assert(!document.getElementById('exportOverlay').classList.contains('open'), '完成后可关闭 modal');
+
+        window.fetch = origFetch;
+
+        window.Blob = origBlob;
+        document.createElement = origCreateElement;
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试25：单篇 fetch 失败不阻断整体导出 ===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        let captured = null;
+        const origBlob = window.Blob;
+        window.Blob = function (parts, opts) {
+            captured = { content: parts.join(''), type: opts && opts.type };
+            return { size: captured.content.length, type: captured.type };
+        };
+        window.URL.createObjectURL = () => 'blob:fake';
+        window.URL.revokeObjectURL = () => {};
+        const origCreateElement = document.createElement.bind(document);
+        document.createElement = function (tag) {
+            const el = origCreateElement(tag);
+            if (tag.toLowerCase() === 'a') el.click = () => {};
+            return el;
+        };
+
+        // 拦截 fetch：第二篇笔记抛错
+        const origFetch = window.fetch;
+        let failedPath = null;
+        window.fetch = async (url) => {
+            const u = new URL(url, window.location.href);
+            const pathname = u.pathname.replace(/^\/HaloRead\//, '/');
+            if (pathname.includes('/notes/') && pathname.endsWith('.md')) {
+                const relPath = decodeURI(pathname.replace(/^.*\/notes\//, ''));
+                const noteCbs = Array.from(document.querySelectorAll('.export-checkbox-note'));
+                if (noteCbs.length >= 2 && relPath === noteCbs[1].dataset.path) {
+                    failedPath = relPath;
+                    throw new Error('模拟网络错误');
+                }
+                const fs = require('fs');
+                const body = fs.readFileSync(path.join(SITE_DIR, 'notes', relPath), 'utf-8');
+                return Promise.resolve({
+                    ok: true, status: 200,
+                    headers: { get: (n) => n.toLowerCase() === 'content-type' ? 'text/markdown' : null },
+                    json: async () => body, text: async () => body,
+                    clone: function () { return this; }
+                });
+            }
+            return origFetch(url);
+        };
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 2000);
+        const noteCbs = Array.from(exportTree.querySelectorAll('.export-checkbox-note'));
+        // 选前 2 篇（第二篇会失败）
+        noteCbs[0].checked = true;
+        noteCbs[0].dispatchEvent(new window.Event('change', { bubbles: true }));
+        noteCbs[1].checked = true;
+        noteCbs[1].dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        document.getElementById('exportConfirmBtn').click();
+        await waitFor(() => captured !== null, 3000);
+
+        assert(captured !== null, '单篇失败仍完成整体导出');
+        assert(failedPath !== null, '确实触发了失败分支');
+        // 失败占位用引用块而非 H1，不污染大纲
+        assert(captured.content.includes('⚠️ 本篇笔记加载失败'), '失败占位含错误提示');
+        assert(!/^# 加载失败/m.test(captured.content), '失败占位不用 H1（不污染大纲）');
+        // 失败笔记仍出现在 TOC（标题来自 tree，不依赖 fetch）
+        const tocAnchors = [...captured.content.matchAll(/^\- \[.+?\]\(#([^)]+)\)/gm)].map((m) => m[1]);
+        assert(tocAnchors.length === 2, `TOC 仍含 2 篇笔记（actual=${tocAnchors.length}）`);
+
+        window.Blob = origBlob;
+        document.createElement = origCreateElement;
+        window.fetch = origFetch;
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试26：章节级复选框联动与 indeterminate 半选态 ===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 2000);
+
+        const chapterCbs = Array.from(exportTree.querySelectorAll('.export-checkbox-chapter'));
+        assert(chapterCbs.length > 0, '存在章节级复选框');
+
+        const firstChapterCb = chapterCbs[0];
+        const firstChapterLi = firstChapterCb.closest('.export-node');
+        const noteCbsInChapter = firstChapterLi.querySelectorAll('.export-checkbox-note');
+        const notesCount = noteCbsInChapter.length;
+        assert(notesCount > 0, '首章节有笔记');
+
+        // 勾选章节 → 自动勾选其下所有笔记
+        firstChapterCb.checked = true;
+        firstChapterCb.dispatchEvent(new window.Event('change', { bubbles: true }));
+        assert(Array.from(noteCbsInChapter).every((cb) => cb.checked), '勾选章节后其下所有笔记被勾选');
+        assert(document.getElementById('exportCounter').textContent === `已选 ${notesCount} 篇`, `章节勾选后计数为 ${notesCount}`);
+
+        // 取消一个笔记 → 章节变为 indeterminate
+        if (notesCount >= 2) {
+            noteCbsInChapter[0].checked = false;
+            noteCbsInChapter[0].dispatchEvent(new window.Event('change', { bubbles: true }));
+            assert(firstChapterCb.indeterminate === true, '部分取消后章节复选框为 indeterminate');
+            assert(firstChapterCb.checked === false, '部分取消后章节复选框 checked=false');
+        }
+
+        // 再勾选剩余 → 章节恢复 checked
+        if (notesCount >= 2) {
+            noteCbsInChapter[0].checked = true;
+            noteCbsInChapter[0].dispatchEvent(new window.Event('change', { bubbles: true }));
+            assert(firstChapterCb.indeterminate === false, '全选后章节 indeterminate=false');
+            assert(firstChapterCb.checked === true, '全选后章节 checked=true');
+        }
+
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试27：Escape 键关闭导出 modal + 未开书时禁用态 ===');
+    {
+        const { dom, window, document } = await buildDom();
+        // 等 init 完成（书架渲染）后再点击，确保 initOfflineExport 已绑定事件
+        await waitFor(() => document.querySelectorAll('.bookshelf-grid .book-card').length > 0, 2000);
+
+        // 未开书时打开导出 modal
+        const offlineExportBtn = document.getElementById('offlineExportBtn');
+        offlineExportBtn.click();
+        const exportOverlay = document.getElementById('exportOverlay');
+        assert(exportOverlay.classList.contains('open'), '未开书时 modal 仍可打开');
+        assert(document.getElementById('exportConfirmBtn').disabled === true, '未开书时导出按钮 disabled');
+        assert(document.getElementById('exportSelectAllBtn').disabled === true, '未开书时全选按钮 disabled');
+        assert(document.getElementById('exportBookTip').textContent.includes('打开一本书'), '未开书时提示「打开一本书」');
+
+        // Escape 键关闭导出 modal
+        document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        assert(!exportOverlay.classList.contains('open'), 'Escape 键关闭导出 modal');
 
         dom.window.close();
     }

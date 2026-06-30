@@ -33,9 +33,9 @@ jobs:
   governance:
     runs-on: ubuntu-latest
     # execute 模式需要额外权限 + 审批环境
-    environment: ${{ github.event.inputs.mode == 'execute' && 'branch-cleanup-execute' || '' }}
+    environment: ${{ inputs.mode == 'execute' && 'branch-cleanup-execute' || '' }}
     permissions:
-      contents: ${{ github.event.inputs.mode == 'execute' && 'write' || 'read' }}
+      contents: ${{ inputs.mode == 'execute' && 'write' || 'read' }}
     steps:
       - uses: actions/checkout@v4
         with:
