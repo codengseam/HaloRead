@@ -109,13 +109,20 @@ def _collect_anchors(entries: list[dict], shards: list[Path]) -> dict[str, list[
 
 
 def check_date_descending(entries: list[dict]) -> list[str]:
-    """核心 P1：所有 H2 沉淀按阅读顺序（分片文件名排序 + 分片内行号）日期倒序排列。"""
+    """核心 P1：所有 H2 沉淀按阅读顺序（分片文件名降序 + 分片内行号升序）日期倒序排列。
+
+    阅读顺序定义：最新月份分片在前（如 2026-07.md 早于 2026-06.md），
+    同分片内按 H2 出现顺序（h2_start 升序，即文件从上到下）。
+    该顺序下日期必须严格倒序（新→旧），否则报 P1。
+    """
     errors = []
     if not entries:
         return errors
 
-    # 按阅读顺序排序：分片文件名升序，同分片内按 h2_start（行内偏移）升序
-    ordered = sorted(entries, key=lambda x: (x["shard"], x["h2_start"]))
+    # 按阅读顺序排序：分片文件名降序（最新月份在前），同分片内按 h2_start 升序
+    # 利用 Python 稳定排序：先按 h2_start 升序，再按 shard 降序
+    ordered = sorted(entries, key=lambda x: x["h2_start"])
+    ordered = sorted(ordered, key=lambda x: x["shard"], reverse=True)
     prev = ordered[0]
     for cur in ordered[1:]:
         if cur["date"] > prev["date"]:

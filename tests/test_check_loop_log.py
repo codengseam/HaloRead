@@ -144,8 +144,12 @@ def test_date_not_descending_fails(tmp_path):
     assert run(strict=False) == 1
 
 
-def test_date_not_descending_across_shards_fails(tmp_path):
-    """跨分片日期乱序（新月份分片排在旧月份之后）应导致核心校验失败。"""
+def test_date_descending_across_shards_passes(tmp_path):
+    """跨分片正常情况（新月份分片日期晚于旧月份分片）应通过核心校验。
+
+    阅读顺序为分片文件名降序（2026-07.md 在前，2026-06.md 在后），
+    因此 07-01 → 06-25 是合法倒序，不应报 P1。
+    """
     h1, h2 = "2026-06-25 六月沉淀", "2026-07-01 七月沉淀"
     a1, a2 = _anchor("2026-06-25", h1), _anchor("2026-07-01", h2)
     _setup(
@@ -161,6 +165,35 @@ def test_date_not_descending_across_shards_fails(tmp_path):
 **教训标签**：`#lesson: git_hygiene`
 """,
             "2026-07.md": f"""<a id="{a2}"></a>
+
+## {h2}
+
+正文。
+
+**教训标签**：`#lesson: git_hygiene`
+""",
+        },
+    )
+    assert run(strict=False) == 0
+
+
+def test_date_not_descending_across_shards_fails(tmp_path):
+    """真正的跨分片乱序：旧月份分片里混入了比新月份分片更新的日期，应报 P1。"""
+    h1, h2 = "2026-07-01 七月沉淀", "2026-07-05 误入六月的七月日期"
+    a1, a2 = _anchor("2026-07-01", h1), _anchor("2026-07-05", h2)
+    _setup(
+        tmp_path,
+        _make_main(),
+        {
+            "2026-07.md": f"""<a id="{a1}"></a>
+
+## {h1}
+
+正文。
+
+**教训标签**：`#lesson: git_hygiene`
+""",
+            "2026-06.md": f"""<a id="{a2}"></a>
 
 ## {h2}
 
