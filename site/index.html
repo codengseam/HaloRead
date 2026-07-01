@@ -189,9 +189,36 @@
                 <label class="settings-label">自动阅读速度 <span id="autoScrollSpeedVal">50</span> 行/分</label>
                 <input type="range" id="autoScrollSpeedRange" min="24" max="100" step="1" value="50">
             </div>
+            <div class="settings-group">
+                <button type="button" id="offlineExportBtn" class="btn-secondary settings-export-btn">离线导出笔记</button>
+            </div>
             <button type="button" id="resetSettingsBtn" class="btn-secondary settings-reset">恢复默认</button>
         </div>
     </aside>
+
+    <div id="exportOverlay" class="modal-overlay" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+            <div class="modal-header">
+                <h2 id="exportTitle">离线导出</h2>
+                <button id="exportClose" class="modal-close" type="button" aria-label="关闭">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="exportBookTip" class="export-book-tip"></div>
+                <div id="exportTree" class="export-tree"></div>
+                <div class="export-actions">
+                    <button type="button" id="exportSelectAllBtn" class="btn-secondary">全选</button>
+                    <button type="button" id="exportClearBtn" class="btn-secondary">清空</button>
+                    <span id="exportCounter">已选 0 篇</span>
+                    <button type="button" id="exportConfirmBtn" class="btn-primary" disabled>确认导出</button>
+                    <button type="button" id="exportCancelBtn" class="btn-secondary">取消</button>
+                </div>
+                <div id="exportProgress" hidden>
+                    <div class="export-progress-bar"><div id="exportProgressFill"></div></div>
+                    <span id="exportProgressText">准备中…</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="modalOverlay" class="modal-overlay" aria-hidden="true">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
