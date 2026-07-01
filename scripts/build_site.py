@@ -207,6 +207,45 @@ def _category_sort_key(category: str) -> tuple[int, str]:
     return (50, category)
 
 
+# ============ 四栏展示分类（王立群"琢磨事/人/钱"框架 + 认识世界）============
+# 原 11 类映射到 4 大栏 + 二级，前端 tab 用四栏，通讯录式二级锚点跳转。
+# 参考：docs/loop_log/2026-06.md 首页分类改造方案
+
+DISPLAY_TAXONOMY: dict[str, dict[str, Any]] = {
+    "ren":     {"full": "观人察己", "short": "人", "desc": "琢磨人", "subs": ["修己", "养生", "礼仪"]},
+    "shi":     {"full": "经事致用", "short": "事", "desc": "琢磨事", "subs": ["技能", "职场升学"]},
+    "cai":     {"full": "货殖生财", "short": "财", "desc": "琢磨钱", "subs": []},
+    "shijian": {"full": "鉴往知今", "short": "世", "desc": "认识世界", "subs": ["经", "史"]},
+}
+
+# 原 category -> (display_category_key, display_subcategory)
+# 争议点已确认：经->世鉴/经，升学->事功/职场升学，商->货殖（无二级）
+DISPLAY_CATEGORY_MAP: dict[str, tuple[str, str]] = {
+    "经": ("shijian", "经"),
+    "史": ("shijian", "史"),
+    "心": ("ren", "修己"),
+    "学": ("ren", "修己"),
+    "养生": ("ren", "养生"),
+    "礼": ("ren", "礼仪"),
+    "技": ("shi", "技能"),
+    "职场": ("shi", "职场升学"),
+    "升学": ("shi", "职场升学"),
+    "财": ("cai", ""),
+    "商": ("cai", ""),
+}
+
+DISPLAY_CATEGORY_ORDER = ["ren", "shi", "cai", "shijian"]
+
+
+def _to_display_category(category: str) -> tuple[str, str]:
+    """原 category -> (display_category_key, display_subcategory)。
+
+    未映射的分类兜底归入"其他"（display_category="other"，无二级），
+    保证新书也能正常显示。
+    """
+    return DISPLAY_CATEGORY_MAP.get(category, ("other", ""))
+
+
 def _ensure_sage_portrait_thumbnails(images_dir: Path, max_width: int = 400) -> None:
     """为圣贤堂头像生成缩略图，减少首屏图片体积。
 
@@ -771,6 +810,7 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
         meta = _load_book_meta(book_dir, book_name)
         chapter_count = len(book_trees[book_name])
         note_count = sum(len(ch["children"]) for ch in book_trees[book_name])
+        display_cat_key, display_sub = _to_display_category(meta["category"])
         books_array.append(
             {
                 "id": book_name,
@@ -783,6 +823,8 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
                 "chapter_count": chapter_count,
                 "note_count": note_count,
                 "tree": book_trees[book_name],
+                "display_category": display_cat_key,
+                "display_subcategory": display_sub,
             }
         )
 
@@ -821,6 +863,8 @@ def build_site(output_dir: str = "output", site_dir: str = "site") -> Path:
         "books": books_array,
         "categories": categories,
         "tree": tree,
+        "display_taxonomy": DISPLAY_TAXONOMY,
+        "display_category_order": DISPLAY_CATEGORY_ORDER,
     }
 
     index_path = data_dir / "index.json"

@@ -3,6 +3,7 @@
 
     const SETTINGS_KEY = 'reader-settings';
     const DEFAULT_SETTINGS = {
+        skin: 'classical',
         theme: 'day',
         font: 'serif',
         fontSize: 18,
@@ -28,6 +29,8 @@
     const state = {
         booksData: [],
         categories: [],
+        displayTaxonomy: {},
+        displayCategoryOrder: [],
         treeData: [],
         notesIndex: {},
         flatNotes: [],
@@ -40,7 +43,8 @@
         bookshelfQuery: '',
         searchMode: false,
         searchIndexLoaded: false,
-        searchNotes: []
+        searchNotes: [],
+        scrollObserver: null
     };
 
     const elements = {
@@ -49,7 +53,12 @@
         bookshelfGrid: document.getElementById('bookshelfGrid'),
         categoryTabs: document.getElementById('categoryTabs'),
         bookshelfSearchInput: document.getElementById('bookshelfSearchInput'),
+        indexBar: document.getElementById('indexBar'),
+        skinBtns: document.getElementById('skinBtns'),
         heroStats: document.getElementById('heroStats'),
+        heroEyebrow: document.getElementById('heroEyebrow'),
+        heroSlogan: document.getElementById('heroSlogan'),
+        heroDesc: document.getElementById('heroDesc'),
         treeNav: document.getElementById('treeNav'),
         reader: document.getElementById('reader'),
         readerWallpaper: document.querySelector('.reader-wallpaper'),
@@ -65,6 +74,7 @@
         sidebarOverlay: document.getElementById('sidebarOverlay'),
         toolbarChapter: document.getElementById('toolbarChapter'),
         settingsBtn: document.getElementById('settingsBtn'),
+        settingsBtnHeader: document.getElementById('settingsBtnHeader'),
         settingsBtnBottom: document.getElementById('settingsBtnBottom'),
         settingsPanel: document.getElementById('settingsPanel'),
         settingsOverlay: document.getElementById('settingsOverlay'),
@@ -362,65 +372,126 @@
     }
 
     /* ============ 首页 / 书架 ============ */
+    // 阿拉伯数字 → 简练中文计数
+    function cnNum(n) {
+        if (n <= 0) return '零';
+        var digits = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+        if (n < 10) return digits[n];
+        if (n < 20) return '十' + (n % 10 ? digits[n % 10] : '');
+        if (n < 100) {
+            var t = Math.floor(n / 10), o = n % 10;
+            return digits[t] + '十' + (o ? digits[o] : '');
+        }
+        return String(n);
+    }
+
+    // 书脊配色：按一级栏分色
+    var spinePalette = {
+        ren:     { bg: '#6b4226', fg: '#f4ecda' },
+        shi:     { bg: '#34404a', fg: '#eef0f2' },
+        cai:     { bg: '#83261c', fg: '#f7eed8' },
+        shijian: { bg: '#2e2620', fg: '#e6dcc4' },
+        other:   { bg: '#555', fg: '#eee' }
+    };
+
+    // 各栏名言 / 导语（全部 tab 用默认 Hero 文案）
+    var heroQuotes = {
+        all: { eyebrow: '— 卷帙浩繁 · 开卷有益 —', title: '豪书斋', slogan: '读古人书<span class="dot">·</span>悟今世事', desc: '取王立群「琢磨事、人、钱」之框架，益以「认识世界」一脉，分四部以归列专栏。左图右史，开卷了然；以古鉴今，知行合一。' },
+        ren: { eyebrow: '— 人鉴 —', title: '观人察己', slogan: '知人者智<span class="dot">·</span>自知者明', desc: '《道德经》曰：「知人者智，自知者明。」此部收心、学、养生、礼仪之学，助人先修己身，再观世态。' },
+        shi: { eyebrow: '— 事功 —', title: '经事致用', slogan: '君子务本<span class="dot">·</span>本立而道生', desc: '《论语》曰：「君子务本，本立而道生。」此部收技能、职场、升学之篇，以古训为根基，练成事之能。' },
+        cai: { eyebrow: '— 货殖 —', title: '货殖生财', slogan: '取之有度<span class="dot">·</span>用之有节', desc: '《史记·货殖列传》：「天下熙熙，皆为利来；天下攘攘，皆为利往。」此部收财、商之道，重稳健生财，而非逐利忘义。' },
+        shijian: { eyebrow: '— 世鉴 —', title: '鉴往知今', slogan: '以史为鉴<span class="dot">·</span>可以知兴替', desc: '《资治通鉴》曰：「鉴于往事，有资于治道。」此部收经史之卷，读古以观今，知兴替、明得失。' }
+    };
+
     function renderHeroStats(stats) {
         if (!stats) {
             elements.heroStats.innerHTML = '<span>正在统计书目…</span>';
             return;
         }
-        elements.heroStats.innerHTML = `
-            <div class="stat"><span class="stat-value">${stats.books || 0}</span><span class="stat-label">部典籍</span></div>
-            <div class="stat"><span class="stat-value">${stats.notes || 0}</span><span class="stat-label">篇笔记</span></div>
-            <div class="stat"><span class="stat-value">${stats.categories || 0}</span><span class="stat-label">个分类</span></div>
-        `;
+        elements.heroStats.innerHTML =
+            '<div class="hero-stat"><span class="num">' + (stats.books || 0) + '</span><span class="lbl">卷专栏</span></div>' +
+            '<div class="hero-stat"><span class="num">' + (state.displayCategoryOrder.length || 4) + '</span><span class="lbl">部归类</span></div>' +
+            '<div class="hero-stat"><span class="num">' + (stats.notes || 0) + '</span><span class="lbl">篇笔记</span></div>';
     }
 
+    // 四栏 Tab：单字 ↔ 四字文言动效
     function renderCategoryTabs() {
-        const container = elements.categoryTabs;
+        var container = elements.categoryTabs;
         container.innerHTML = '';
 
-        const allBtn = document.createElement('button');
-        allBtn.className = 'category-tab' + (state.selectedCategory === 'all' ? ' active' : '');
-        allBtn.textContent = '全部';
-        allBtn.dataset.category = 'all';
-        allBtn.type = 'button';
-        allBtn.role = 'tab';
-        allBtn.setAttribute('aria-selected', state.selectedCategory === 'all' ? 'true' : 'false');
-        allBtn.addEventListener('click', () => selectCategory('all'));
-        container.appendChild(allBtn);
+        var order = ['all'].concat(state.displayCategoryOrder);
+        order.forEach(function (cat, i) {
+            if (i > 0) {
+                var d = document.createElement('span');
+                d.className = 'tab-divider';
+                container.appendChild(d);
+            }
+            var el = document.createElement('a');
+            el.className = 'tab' + (state.selectedCategory === cat ? ' active' : '');
+            el.dataset.category = cat;
+            el.href = 'javascript:void(0)';
+            el.setAttribute('role', 'tab');
+            el.setAttribute('aria-selected', state.selectedCategory === cat ? 'true' : 'false');
 
-        state.categories.forEach((cat) => {
-            const btn = document.createElement('button');
-            btn.className = 'category-tab' + (state.selectedCategory === cat ? ' active' : '');
-            btn.textContent = cat;
-            btn.dataset.category = cat;
-            btn.type = 'button';
-            btn.role = 'tab';
-            btn.setAttribute('aria-selected', state.selectedCategory === cat ? 'true' : 'false');
-            btn.addEventListener('click', () => selectCategory(cat));
-            container.appendChild(btn);
+            if (cat === 'all') {
+                el.innerHTML = '<span class="tab-short">全部</span>';
+            } else {
+                var t = state.displayTaxonomy[cat] || {};
+                var count = state.booksData.filter(function (b) { return b.display_category === cat; }).length;
+                el.innerHTML =
+                    '<span class="tab-short">' + (t.short || cat) + '</span>' +
+                    '<span class="tab-full">' + (t.full || cat) + '</span>' +
+                    '<span class="tab-count">' + count + '</span>';
+            }
+            el.addEventListener('click', function () { selectCategory(cat); });
+            container.appendChild(el);
         });
+        var sp = document.createElement('span');
+        sp.className = 'tab-spacer';
+        container.appendChild(sp);
     }
 
     function selectCategory(category) {
         state.selectedCategory = category;
+        renderHeroContent(category);
         renderCategoryTabs();
         renderBookshelf();
     }
 
+    function renderHeroContent(category) {
+        var q = heroQuotes[category] || heroQuotes.all;
+        if (elements.heroEyebrow) elements.heroEyebrow.innerHTML = q.eyebrow;
+        if (elements.heroSlogan) elements.heroSlogan.innerHTML = q.slogan;
+        if (elements.heroDesc) elements.heroDesc.textContent = q.desc;
+        var hero = document.getElementById('hero');
+        if (category === 'all') {
+            if (elements.heroTitle) {
+                elements.heroTitle.textContent = q.title;
+                elements.heroTitle.style.display = '';
+            }
+            if (elements.heroStats) elements.heroStats.style.display = '';
+            hero.classList.remove('category-hero');
+        } else {
+            if (elements.heroTitle) elements.heroTitle.style.display = 'none';
+            if (elements.heroStats) elements.heroStats.style.display = 'none';
+            hero.classList.add('category-hero');
+        }
+    }
+
     function filterBooks() {
-        let books = state.booksData;
+        var books = state.booksData;
 
         if (state.selectedCategory !== 'all') {
-            books = books.filter((book) => book.category === state.selectedCategory);
+            books = books.filter(function (book) { return book.display_category === state.selectedCategory; });
         }
 
-        const query = state.bookshelfQuery.trim().toLowerCase();
+        var query = state.bookshelfQuery.trim().toLowerCase();
         if (query) {
-            books = books.filter((book) => {
-                const title = (book.title || '').toLowerCase();
-                const author = (book.author || '').toLowerCase();
-                const category = (book.category || '').toLowerCase();
-                const description = (book.description || '').toLowerCase();
+            books = books.filter(function (book) {
+                var title = (book.title || '').toLowerCase();
+                var author = (book.author || '').toLowerCase();
+                var category = (book.category || '').toLowerCase();
+                var description = (book.description || '').toLowerCase();
                 return title.includes(query) || author.includes(query) || category.includes(query) || description.includes(query);
             });
         }
@@ -428,67 +499,182 @@
         return books;
     }
 
+    // 根据当前 tab 生成分组结构
+    function buildGroups(cat) {
+        var books = filterBooks();
+        if (cat === 'all') {
+            return state.displayCategoryOrder.map(function (c) {
+                var t = state.displayTaxonomy[c] || {};
+                return {
+                    key: c,
+                    label: t.full || c,
+                    subLabel: t.desc || '',
+                    books: books.filter(function (b) { return b.display_category === c; })
+                };
+            }).filter(function (g) { return g.books.length > 0; });
+        }
+        var t = state.displayTaxonomy[cat] || {};
+        if (!t.subs || t.subs.length === 0) {
+            return [{ key: cat, label: t.full || cat, subLabel: t.desc || '', books: books }];
+        }
+        return t.subs.map(function (sub) {
+            return {
+                key: cat + '__' + sub,
+                label: sub,
+                subLabel: subDesc(sub),
+                books: books.filter(function (b) { return b.display_subcategory === sub; })
+            };
+        }).filter(function (g) { return g.books.length > 0; });
+    }
+
+    function subDesc(s) {
+        var m = {
+            '修己': '修心立身', '养生': '颐养天年', '礼仪': '待人接物',
+            '技能': '立身之技', '职场升学': '进阶之道',
+            '经': '大道之源', '史': '鉴往知今'
+        };
+        return m[s] || '';
+    }
+
+    // 通讯录式二级索引条
+    function renderIndexBar(groups) {
+        var bar = elements.indexBar;
+        if (!bar) return;
+        if (groups.length <= 1) {
+            bar.classList.add('empty');
+            bar.innerHTML = '';
+            return;
+        }
+        bar.classList.remove('empty');
+        var html = '<span class="index-label">门类</span>';
+        groups.forEach(function (g, i) {
+            html += '<a class="index-tag' + (i === 0 ? ' active' : '') + '" href="javascript:void(0)" data-i="' + i + '">' + g.label + '</a>';
+        });
+        bar.innerHTML = html;
+        bar.querySelectorAll('.index-tag').forEach(function (tag) {
+            tag.addEventListener('click', function (e) {
+                e.preventDefault();
+                var idx = parseInt(tag.dataset.i, 10);
+                var node = document.getElementById('group-' + groups[idx].key);
+                if (node) {
+                    node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setActiveIndex(idx);
+                }
+            });
+        });
+    }
+
+    function setActiveIndex(i) {
+        if (!elements.indexBar) return;
+        elements.indexBar.querySelectorAll('.index-tag').forEach(function (t, idx) {
+            t.classList.toggle('active', idx === i);
+        });
+    }
+
+    // 动态计算分组标题吸顶位置（app-header + 四栏tab + 二级索引条 + 安全边距）
+    function updateStickyOffset() {
+        var header = document.querySelector('.app-header');
+        var tabs = document.querySelector('.tabs');
+        var index = document.querySelector('.index-bar');
+        var top = 0;
+        if (header) top += header.getBoundingClientRect().height;
+        if (tabs) top += tabs.getBoundingClientRect().height;
+        if (index && index.offsetParent) top += index.getBoundingClientRect().height;
+        top += 8; // 安全边距
+        document.documentElement.style.setProperty('--group-sticky-top', top + 'px');
+        return top;
+    }
+
+    function getStickyOffset() {
+        var val = getComputedStyle(document.documentElement).getPropertyValue('--group-sticky-top');
+        return parseFloat(val) || 130;
+    }
+
+    // 滚动联动高亮当前分组索引
+    function bindScrollSpy(groups) {
+        if (state.scrollObserver) state.scrollObserver.disconnect();
+        if (groups.length <= 1) return;
+        var offset = updateStickyOffset();
+        var nodes = groups.map(function (g) { return document.getElementById('group-' + g.key); });
+        var rootMargin = '-' + offset + 'px 0px -65% 0px';
+        state.scrollObserver = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (en.isIntersecting) {
+                    var idx = nodes.indexOf(en.target);
+                    if (idx >= 0) setActiveIndex(idx);
+                }
+            });
+        }, { rootMargin: rootMargin, threshold: 0 });
+        nodes.forEach(function (n) { if (n) state.scrollObserver.observe(n); });
+    }
+
     function renderBookshelf() {
-        const container = elements.bookshelfGrid;
+        var container = elements.bookshelfGrid;
         container.innerHTML = '';
 
-        const books = filterBooks();
+        var groups = buildGroups(state.selectedCategory);
 
-        if (books.length === 0) {
-            const empty = document.createElement('div');
+        if (groups.length === 0 || groups.every(function (g) { return g.books.length === 0; })) {
+            var empty = document.createElement('div');
             empty.className = 'empty-state';
             empty.textContent = state.bookshelfQuery ? '未找到匹配的书籍' : '书架暂无书籍';
             container.appendChild(empty);
+            if (elements.indexBar) { elements.indexBar.classList.add('empty'); elements.indexBar.innerHTML = ''; }
             return;
         }
 
-        books.forEach((book) => {
-            const card = document.createElement('button');
-            card.className = 'book-card';
-            card.type = 'button';
-            card.dataset.bookId = book.id;
+        renderIndexBar(groups);
 
-            const cover = document.createElement('div');
-            cover.className = 'book-cover';
-            cover.textContent = book.cover || '📖';
-            card.appendChild(cover);
+        var stickyOffset = getStickyOffset();
+        groups.forEach(function (g) {
+            var group = document.createElement('section');
+            group.className = 'book-group';
+            group.id = 'group-' + g.key;
+            group.style.scrollMarginTop = stickyOffset + 'px';
 
-            const info = document.createElement('div');
-            info.className = 'book-info';
+            var head = document.createElement('div');
+            head.className = 'group-head';
+            head.innerHTML =
+                '<span class="group-bar"></span>' +
+                '<h2 class="group-title">' + g.label + '</h2>' +
+                (g.subLabel ? '<span class="group-sub">· ' + g.subLabel + '</span>' : '') +
+                '<span class="group-count">凡 <b>' + cnNum(g.books.length) + '</b> 卷</span>';
+            group.appendChild(head);
 
-            const category = document.createElement('div');
-            category.className = 'book-category';
-            category.textContent = book.category || '未分类';
-            info.appendChild(category);
+            var rule = document.createElement('div');
+            rule.className = 'scroll-rule';
+            group.appendChild(rule);
 
-            const title = document.createElement('div');
-            title.className = 'book-title';
-            title.textContent = book.title || book.id;
-            info.appendChild(title);
-
-            if (book.author) {
-                const author = document.createElement('div');
-                author.className = 'book-author';
-                author.textContent = book.author;
-                info.appendChild(author);
-            }
-
-            if (book.description) {
-                const desc = document.createElement('div');
-                desc.className = 'book-description';
-                desc.textContent = book.description;
-                info.appendChild(desc);
-            }
-
-            const stats = document.createElement('div');
-            stats.className = 'book-stats';
-            stats.textContent = `章节 ${book.chapter_count || 0} · 笔记 ${book.note_count || 0}`;
-            info.appendChild(stats);
-
-            card.appendChild(info);
-            card.addEventListener('click', () => openBook(book.id));
-            container.appendChild(card);
+            var list = document.createElement('div');
+            list.className = 'book-list';
+            g.books.forEach(function (b) {
+                var pal = spinePalette[b.display_category] || spinePalette.other;
+                var row = document.createElement('a');
+                row.className = 'book';
+                row.href = 'javascript:void(0)';
+                row.innerHTML =
+                    '<div class="spine" style="--spine-bg:' + pal.bg + ';--spine-fg:' + pal.fg + '">' +
+                        '<span class="spine-tag">' + (b.category || '书') + '</span>' +
+                    '</div>' +
+                    '<div class="book-body">' +
+                        '<div class="book-title">' + (b.title || b.id) + '</div>' +
+                        '<div class="book-sub">' +
+                            (b.author ? '<span class="book-author">' + b.author + '</span>' : '<span class="book-author">佚名</span>') +
+                            '<span class="sep">·</span>' + (b.description || '') +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="book-aside">' +
+                        '<span class="orig-tag">' + (b.category || '书') + '</span>' +
+                        '<span class="notes"><b>' + (b.note_count || 0) + '</b><em>则</em></span>' +
+                    '</div>';
+                row.addEventListener('click', function () { openBook(b.id); });
+                list.appendChild(row);
+            });
+            group.appendChild(list);
+            container.appendChild(group);
         });
+
+        bindScrollSpy(groups);
     }
 
     function handleBookshelfSearch(event) {
@@ -727,6 +913,8 @@
     function applyIndexData(data) {
         state.booksData = data.books || [];
         state.categories = data.categories || [];
+        state.displayTaxonomy = data.display_taxonomy || {};
+        state.displayCategoryOrder = data.display_category_order || [];
         state.treeData = data.tree || [];
         state.flatNotes = flattenTree(state.treeData);
         state.searchMode = false;
@@ -740,6 +928,7 @@
                 INDEX_META_KEY,
                 (data) => {
                     applyIndexData(data);
+                    renderHeroContent(state.selectedCategory);
                     renderHeroStats(data.stats);
                     renderCategoryTabs();
                     renderBookshelf();
@@ -801,12 +990,16 @@
 
     /* ============ 阅读设置 ============ */
     const VALID_WALLPAPERS = ['none', 'bamboo', 'landscape'];
+    const VALID_SKINS = ['classical', 'modern'];
 
     function normalizeSettings(settings) {
         const s = Object.assign({}, settings);
         // 已删除的壁纸回退到无
         if (!VALID_WALLPAPERS.includes(s.wallpaper)) {
             s.wallpaper = 'none';
+        }
+        if (!VALID_SKINS.includes(s.skin)) {
+            s.skin = 'classical';
         }
         return s;
     }
@@ -851,6 +1044,7 @@
 
     function applySettings(settings) {
         const s = normalizeSettings(settings);
+        document.body.setAttribute('data-skin', s.skin);
         document.body.setAttribute('data-theme', s.theme);
         document.body.setAttribute('data-font', s.font);
         document.body.setAttribute('data-wallpaper', s.wallpaper);
@@ -859,6 +1053,9 @@
         document.documentElement.style.setProperty('--reader-line-height', String(s.lineHeight));
         document.documentElement.style.setProperty('--reader-paragraph-spacing', s.paragraphSpacing + 'em');
         document.documentElement.style.setProperty('--reader-wallpaper-opacity', String(s.wallpaperOpacity));
+
+        // 古典皮肤需要 webfont，现代皮肤用系统字体
+        updateFontLink(s.skin);
 
         if (elements.fontSizeRange) elements.fontSizeRange.value = s.fontSize;
         if (elements.lineHeightRange) elements.lineHeightRange.value = s.lineHeight;
@@ -874,6 +1071,11 @@
         if (elements.fontBtns) {
             elements.fontBtns.querySelectorAll('button').forEach((btn) => {
                 btn.classList.toggle('active', btn.dataset.font === s.font);
+            });
+        }
+        if (elements.skinBtns) {
+            elements.skinBtns.querySelectorAll('button').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.skin === s.skin);
             });
         }
         if (elements.themeBtns) {
@@ -906,6 +1108,18 @@
         elements.readerWallpaper.style.height = elements.reader.scrollHeight + 'px';
     }
 
+    // 古典皮肤动态加载 webfont（思源宋体/马善政楷体/站酷小薇），现代皮肤用系统字体不加载
+    function updateFontLink(skin) {
+        var link = document.getElementById('fontLink');
+        if (!link) return;
+        if (skin === 'classical') {
+            link.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700;900&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&display=swap';
+            link.disabled = false;
+        } else {
+            link.disabled = true;
+        }
+    }
+
     function openSettings() {
         pauseAutoScroll();
         elements.settingsPanel.classList.add('open');
@@ -923,12 +1137,9 @@
         const settings = loadSettings();
         applySettings(settings);
 
-        if (elements.settingsBtn) {
-            elements.settingsBtn.addEventListener('click', openSettings);
-        }
-        if (elements.settingsBtnBottom) {
-            elements.settingsBtnBottom.addEventListener('click', openSettings);
-        }
+        [elements.settingsBtn, elements.settingsBtnHeader, elements.settingsBtnBottom].forEach(function(btn) {
+            if (btn) btn.addEventListener('click', openSettings);
+        });
         if (elements.settingsClose) {
             elements.settingsClose.addEventListener('click', closeSettings);
         }
@@ -942,6 +1153,17 @@
                 if (!btn) return;
                 const s = loadSettings();
                 s.font = btn.dataset.font;
+                saveSettings(s);
+                applySettings(s);
+            });
+        }
+
+        if (elements.skinBtns) {
+            elements.skinBtns.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-skin]');
+                if (!btn) return;
+                const s = loadSettings();
+                s.skin = btn.dataset.skin;
                 saveSettings(s);
                 applySettings(s);
             });
@@ -1091,7 +1313,7 @@
             return true;
         }
         // 排除书架卡片、目录叶子、章末导航按钮、搜索结果、代码块等可交互/可滚动元素
-        if (target.closest('a, button, input, textarea, select, pre, code, .book-card, .tree-leaf, .chapter-btn, .search-result-title')) {
+        if (target.closest('a, button, input, textarea, select, pre, code, .book, .tree-leaf, .chapter-btn, .search-result-title')) {
             return true;
         }
         // 弹层打开时不翻页
@@ -2127,7 +2349,7 @@
         if (elements.backBtn) {
             elements.backBtn.addEventListener('click', backToHome);
         }
-        const brandLockup = document.querySelector('.brand-lockup');
+        const brandLockup = document.querySelector('.brand-lock');
         if (brandLockup) {
             brandLockup.addEventListener('click', backToHome);
         }
@@ -2161,6 +2383,11 @@
         }
 
         document.addEventListener('keydown', handleKeyDown);
+        var resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(updateStickyOffset, 100);
+        });
 
         // 从 bfcache 恢复时（如手机系统返回后再进），强制重置视图状态，避免白屏
         window.addEventListener('pageshow', (event) => {
