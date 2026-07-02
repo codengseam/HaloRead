@@ -50,6 +50,9 @@ async function buildDom() {
     // index.html 已自带 <script src="js/app.js" defer>，测试时手动注入单实例，
     // 避免 jsdom 把外部脚本也加载进来导致 app.js 双实例、事件监听器重复注册。
     html = html.replace(/<script[^>]*src="js\/app\.js"[^>]*>\s*<\/script>/, '');
+    // jsdom 加载 Google Fonts 可能因网络抖动超时，测试阶段移除
+    html = html.replace(/<link[^>]*fonts\.googleapis\.com[^>]*>/g, '');
+    html = html.replace(/<link[^>]*fonts\.gstatic\.com[^>]*>/g, '');
     const dom = new JSDOM(html, {
         url: 'http://localhost:8080/',
         runScripts: 'dangerously',
@@ -129,8 +132,8 @@ async function buildDom() {
 }
 
 async function enterReader(document, window) {
-    await waitFor(() => document.querySelectorAll('.bookshelf-grid .book-card').length > 0, 5000);
-    const card = document.querySelector('.bookshelf-grid .book-card');
+    await waitFor(() => document.querySelectorAll('.bookshelf-list .book').length > 0, 5000);
+    const card = document.querySelector('.bookshelf-list .book');
     card.click();
     await waitFor(() => document.querySelectorAll('.reader-view .tree-leaf').length > 0, 5000);
     const leaf = document.querySelector('.reader-view .tree-leaf');
@@ -610,7 +613,7 @@ async function runTest() {
     console.log('\n=== 测试18：首页“阅读”按钮跳转书架区（回归测试） ===');
     {
         const { dom, window, document } = await buildDom();
-        await waitFor(() => document.querySelectorAll('.bookshelf-grid .book-card').length > 0, 5000);
+        await waitFor(() => document.querySelectorAll('.bookshelf-list .book').length > 0, 5000);
 
         const newNoteBtn = document.getElementById('newNoteBtn');
         const bookshelf = document.getElementById('bookshelf');
@@ -1072,7 +1075,7 @@ async function runTest() {
     {
         const { dom, window, document } = await buildDom();
         // 等 init 完成（书架渲染）后再点击，确保 initOfflineExport 已绑定事件
-        await waitFor(() => document.querySelectorAll('.bookshelf-grid .book-card').length > 0, 5000);
+        await waitFor(() => document.querySelectorAll('.bookshelf-list .book').length > 0, 5000);
 
         // 未开书时打开导出 modal
         const offlineExportBtn = document.getElementById('offlineExportBtn');

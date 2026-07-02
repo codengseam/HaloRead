@@ -2,7 +2,7 @@
  * 豪书斋 Service Worker
  * 缓存策略：核心资源预缓存 + 数据/笔记运行时缓存
  */
-const CACHE_NAME = 'halo-read-v11'; // 2026-07-02 首页分类固定为「人/事/财/世」四类并加缓存破坏参数
+const CACHE_NAME = 'halo-read-v11'; // 2026-07-01 首页分类重构为四栏（人/事/财/世）+ BUG-042 修复，bump 规避旧版缓存
 const PRECACHE_ASSETS = [
     './',
     './index.html',
