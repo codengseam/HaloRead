@@ -22,6 +22,7 @@ from src.utils.quality import (
     check_numeric_facts,
     check_sublimation_quota,
 )
+from src.utils.consistency import check_consistency
 
 # 内联跳转引用（必须清理）
 INLINE_REF_PATTERNS = [
@@ -686,16 +687,25 @@ def run_content_quality_checks(content: str, archetype: str = "narrative") -> Co
     # 5. 灵魂维度（content-quality.md §9.2/9.3/9.4 自动部分；§9.1 三问仍需人工）
     details["soul"] = _check_soul_dimension(content, cliches_result)
 
+    # 6. 一致性维度（consistency-rules.md §2，前后矛盾/数据交叉矛盾/实体不一致）
+    # v1.2 新增：补齐"前后矛盾"检测缺口，纯规则无需 LLM
+    consistency_report = check_consistency(content, archetype=archetype)
+    details["consistency"] = [
+        f"[{issue.severity}] {issue.message}" for issue in consistency_report.issues
+    ]
+
     for key in details:
         issues.extend(details[key])
 
-    # 计分：从 100 起扣
+    # 计分：从 100 起扣（六维度，v1.2 新增 consistency 维度）
     score = 100
-    score -= min(20, len(details["truth"]) * 5)      # 真实性问题每项扣 5 分，上限 20
-    score -= min(20, len(details["readability"]) * 2) # 可读性问题每项扣 2 分，上限 20
-    score -= min(10, len(details["sequence"]) * 5)    # 顺序问题每项扣 5 分，上限 10
-    score -= min(15, len(details["citation"]) * 3)    # 引用问题每项扣 3 分，上限 15
-    score -= min(15, len(details["soul"]) * 3)        # 灵魂问题每项扣 3 分，上限 15
+    score -= min(20, len(details["truth"]) * 5)            # 真实性问题每项扣 5 分，上限 20
+    score -= min(20, len(details["readability"]) * 2)      # 可读性问题每项扣 2 分，上限 20
+    score -= min(10, len(details["sequence"]) * 5)         # 顺序问题每项扣 5 分，上限 10
+    score -= min(15, len(details["citation"]) * 3)         # 引用问题每项扣 3 分，上限 15
+    score -= min(15, len(details["soul"]) * 3)             # 灵魂问题每项扣 3 分，上限 15
+    # 一致性维度：用 ConsistencyReport.score（0-10）的反向作为扣分（10 分制）
+    score -= (10 - consistency_report.score)
     score = max(0, score)
 
     return ContentQualityReport(
@@ -717,9 +727,14 @@ def format_report(report: ContentQualityReport) -> str:
         "### 问题分布",
     ]
     for category, items in report.details.items():
-        label = {"truth": "真实性", "readability": "可读性", "sequence": "顺序", "citation": "引用克制"}.get(
-            category, category
-        )
+        label = {
+            "truth": "真实性",
+            "readability": "可读性",
+            "sequence": "顺序",
+            "citation": "引用克制",
+            "soul": "灵魂",
+            "consistency": "一致性",
+        }.get(category, category)
         lines.append(f"\n#### {label}（{len(items)} 项）")
         if items:
             for item in items:
