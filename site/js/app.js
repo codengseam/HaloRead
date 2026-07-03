@@ -492,10 +492,11 @@
             card.className = 'book-card';
             card.href = 'javascript:void(0)';
             card.innerHTML =
-                '<div class="book-cover">' + (b.cover_emoji || '📖') + '</div>' +
+                '<div class="book-cover">' +
+                    '<div class="book-cover-title">' + (b.title || b.id) + '</div>' +
+                '</div>' +
                 '<div class="book-info">' +
                     '<div class="book-category">' + (b.display_subcategory || b.category || '书') + '</div>' +
-                    '<div class="book-title">' + (b.title || b.id) + '</div>' +
                     (b.author ? '<div class="book-author">' + b.author + '</div>' : '') +
                     '<div class="book-description">' + (b.description || '') + '</div>' +
                     '<div class="book-stats">' + (b.note_count || 0) + ' 篇笔记</div>' +
