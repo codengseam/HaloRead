@@ -53,12 +53,9 @@
         bookshelfGrid: document.getElementById('bookshelfGrid'),
         categoryTabs: document.getElementById('categoryTabs'),
         bookshelfSearchInput: document.getElementById('bookshelfSearchInput'),
-        indexBar: document.getElementById('indexBar'),
+        brandLockup: document.getElementById('brandLockup'),
         skinBtns: document.getElementById('skinBtns'),
         heroStats: document.getElementById('heroStats'),
-        heroEyebrow: document.getElementById('heroEyebrow'),
-        heroSlogan: document.getElementById('heroSlogan'),
-        heroDesc: document.getElementById('heroDesc'),
         treeNav: document.getElementById('treeNav'),
         reader: document.getElementById('reader'),
         readerWallpaper: document.querySelector('.reader-wallpaper'),
@@ -409,46 +406,35 @@
             return;
         }
         elements.heroStats.innerHTML =
-            '<div class="hero-stat"><span class="num">' + (stats.books || 0) + '</span><span class="lbl">卷专栏</span></div>' +
-            '<div class="hero-stat"><span class="num">' + (state.displayCategoryOrder.length || 4) + '</span><span class="lbl">部归类</span></div>' +
-            '<div class="hero-stat"><span class="num">' + (stats.notes || 0) + '</span><span class="lbl">篇笔记</span></div>';
+            '<div class="stat"><span class="stat-value">' + (stats.books || 0) + '</span><span class="stat-label">部典籍</span></div>' +
+            '<div class="stat"><span class="stat-value">' + (stats.notes || 0) + '</span><span class="stat-label">篇笔记</span></div>' +
+            '<div class="stat"><span class="stat-value">' + (state.displayCategoryOrder.length || 4) + '</span><span class="stat-label">个分类</span></div>';
     }
 
-    // 四栏 Tab：单字 ↔ 四字文言动效
+    // 四栏 Tab：全部 + 人/事/财/世
     function renderCategoryTabs() {
         var container = elements.categoryTabs;
         container.innerHTML = '';
 
         var order = ['all'].concat(state.displayCategoryOrder);
-        order.forEach(function (cat, i) {
-            if (i > 0) {
-                var d = document.createElement('span');
-                d.className = 'tab-divider';
-                container.appendChild(d);
-            }
-            var el = document.createElement('a');
-            el.className = 'tab' + (state.selectedCategory === cat ? ' active' : '');
+        order.forEach(function (cat) {
+            var el = document.createElement('button');
+            el.className = 'category-tab' + (state.selectedCategory === cat ? ' active' : '');
             el.dataset.category = cat;
-            el.href = 'javascript:void(0)';
             el.setAttribute('role', 'tab');
             el.setAttribute('aria-selected', state.selectedCategory === cat ? 'true' : 'false');
+            el.type = 'button';
 
             if (cat === 'all') {
-                el.innerHTML = '<span class="tab-short">全部</span>';
+                el.textContent = '全部';
             } else {
                 var t = state.displayTaxonomy[cat] || {};
                 var count = state.booksData.filter(function (b) { return b.display_category === cat; }).length;
-                el.innerHTML =
-                    '<span class="tab-short">' + (t.short || cat) + '</span>' +
-                    '<span class="tab-full">' + (t.full || cat) + '</span>' +
-                    '<span class="tab-count">' + count + '</span>';
+                el.innerHTML = t.short + '<span class="tab-count">' + count + '</span>';
             }
             el.addEventListener('click', function () { selectCategory(cat); });
             container.appendChild(el);
         });
-        var sp = document.createElement('span');
-        sp.className = 'tab-spacer';
-        container.appendChild(sp);
     }
 
     function selectCategory(category) {
@@ -459,22 +445,10 @@
     }
 
     function renderHeroContent(category) {
-        var q = heroQuotes[category] || heroQuotes.all;
-        if (elements.heroEyebrow) elements.heroEyebrow.innerHTML = q.eyebrow;
-        if (elements.heroSlogan) elements.heroSlogan.innerHTML = q.slogan;
-        if (elements.heroDesc) elements.heroDesc.textContent = q.desc;
-        var hero = document.getElementById('hero');
-        if (category === 'all') {
-            if (elements.heroTitle) {
-                elements.heroTitle.textContent = q.title;
-                elements.heroTitle.style.display = '';
-            }
-            if (elements.heroStats) elements.heroStats.style.display = '';
-            hero.classList.remove('category-hero');
-        } else {
-            if (elements.heroTitle) elements.heroTitle.style.display = 'none';
-            if (elements.heroStats) elements.heroStats.style.display = 'none';
-            hero.classList.add('category-hero');
+        // 图一 Hero 固定展示，分类切换时不改变文案
+        var hero = document.querySelector('.hero');
+        if (hero) {
+            hero.classList.toggle('category-hero', category !== 'all');
         }
     }
 
@@ -499,182 +473,36 @@
         return books;
     }
 
-    // 根据当前 tab 生成分组结构
-    function buildGroups(cat) {
-        var books = filterBooks();
-        if (cat === 'all') {
-            return state.displayCategoryOrder.map(function (c) {
-                var t = state.displayTaxonomy[c] || {};
-                return {
-                    key: c,
-                    label: t.full || c,
-                    subLabel: t.desc || '',
-                    books: books.filter(function (b) { return b.display_category === c; })
-                };
-            }).filter(function (g) { return g.books.length > 0; });
-        }
-        var t = state.displayTaxonomy[cat] || {};
-        if (!t.subs || t.subs.length === 0) {
-            return [{ key: cat, label: t.full || cat, subLabel: t.desc || '', books: books }];
-        }
-        return t.subs.map(function (sub) {
-            return {
-                key: cat + '__' + sub,
-                label: sub,
-                subLabel: subDesc(sub),
-                books: books.filter(function (b) { return b.display_subcategory === sub; })
-            };
-        }).filter(function (g) { return g.books.length > 0; });
-    }
-
-    function subDesc(s) {
-        var m = {
-            '修己': '修心立身', '养生': '颐养天年', '礼仪': '待人接物',
-            '技能': '立身之技', '职场升学': '进阶之道',
-            '经': '大道之源', '史': '鉴往知今'
-        };
-        return m[s] || '';
-    }
-
-    // 通讯录式二级索引条
-    function renderIndexBar(groups) {
-        var bar = elements.indexBar;
-        if (!bar) return;
-        if (groups.length <= 1) {
-            bar.classList.add('empty');
-            bar.innerHTML = '';
-            return;
-        }
-        bar.classList.remove('empty');
-        var html = '<span class="index-label">门类</span>';
-        groups.forEach(function (g, i) {
-            html += '<a class="index-tag' + (i === 0 ? ' active' : '') + '" href="javascript:void(0)" data-i="' + i + '">' + g.label + '</a>';
-        });
-        bar.innerHTML = html;
-        bar.querySelectorAll('.index-tag').forEach(function (tag) {
-            tag.addEventListener('click', function (e) {
-                e.preventDefault();
-                var idx = parseInt(tag.dataset.i, 10);
-                var node = document.getElementById('group-' + groups[idx].key);
-                if (node) {
-                    node.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    setActiveIndex(idx);
-                }
-            });
-        });
-    }
-
-    function setActiveIndex(i) {
-        if (!elements.indexBar) return;
-        elements.indexBar.querySelectorAll('.index-tag').forEach(function (t, idx) {
-            t.classList.toggle('active', idx === i);
-        });
-    }
-
-    // 动态计算分组标题吸顶位置（app-header + 四栏tab + 二级索引条 + 安全边距）
-    function updateStickyOffset() {
-        var header = document.querySelector('.app-header');
-        var tabs = document.querySelector('.tabs');
-        var index = document.querySelector('.index-bar');
-        var top = 0;
-        if (header) top += header.getBoundingClientRect().height;
-        if (tabs) top += tabs.getBoundingClientRect().height;
-        if (index && index.offsetParent) top += index.getBoundingClientRect().height;
-        top += 8; // 安全边距
-        document.documentElement.style.setProperty('--group-sticky-top', top + 'px');
-        return top;
-    }
-
-    function getStickyOffset() {
-        var val = getComputedStyle(document.documentElement).getPropertyValue('--group-sticky-top');
-        return parseFloat(val) || 130;
-    }
-
-    // 滚动联动高亮当前分组索引
-    function bindScrollSpy(groups) {
-        if (state.scrollObserver) state.scrollObserver.disconnect();
-        if (groups.length <= 1) return;
-        var offset = updateStickyOffset();
-        var nodes = groups.map(function (g) { return document.getElementById('group-' + g.key); });
-        var rootMargin = '-' + offset + 'px 0px -65% 0px';
-        state.scrollObserver = new IntersectionObserver(function (entries) {
-            entries.forEach(function (en) {
-                if (en.isIntersecting) {
-                    var idx = nodes.indexOf(en.target);
-                    if (idx >= 0) setActiveIndex(idx);
-                }
-            });
-        }, { rootMargin: rootMargin, threshold: 0 });
-        nodes.forEach(function (n) { if (n) state.scrollObserver.observe(n); });
-    }
-
     function renderBookshelf() {
         var container = elements.bookshelfGrid;
         container.innerHTML = '';
 
-        var groups = buildGroups(state.selectedCategory);
+        var books = filterBooks();
 
-        if (groups.length === 0 || groups.every(function (g) { return g.books.length === 0; })) {
+        if (books.length === 0) {
             var empty = document.createElement('div');
             empty.className = 'empty-state';
             empty.textContent = state.bookshelfQuery ? '未找到匹配的书籍' : '书架暂无书籍';
             container.appendChild(empty);
-            if (elements.indexBar) { elements.indexBar.classList.add('empty'); elements.indexBar.innerHTML = ''; }
             return;
         }
 
-        renderIndexBar(groups);
-
-        var stickyOffset = getStickyOffset();
-        groups.forEach(function (g) {
-            var group = document.createElement('section');
-            group.className = 'book-group';
-            group.id = 'group-' + g.key;
-            group.style.scrollMarginTop = stickyOffset + 'px';
-
-            var head = document.createElement('div');
-            head.className = 'group-head';
-            head.innerHTML =
-                '<span class="group-bar"></span>' +
-                '<h2 class="group-title">' + g.label + '</h2>' +
-                (g.subLabel ? '<span class="group-sub">· ' + g.subLabel + '</span>' : '') +
-                '<span class="group-count">凡 <b>' + cnNum(g.books.length) + '</b> 卷</span>';
-            group.appendChild(head);
-
-            var rule = document.createElement('div');
-            rule.className = 'scroll-rule';
-            group.appendChild(rule);
-
-            var list = document.createElement('div');
-            list.className = 'book-list';
-            g.books.forEach(function (b) {
-                var pal = spinePalette[b.display_category] || spinePalette.other;
-                var row = document.createElement('a');
-                row.className = 'book';
-                row.href = 'javascript:void(0)';
-                row.innerHTML =
-                    '<div class="spine" style="--spine-bg:' + pal.bg + ';--spine-fg:' + pal.fg + '">' +
-                        '<span class="spine-tag">' + (b.category || '书') + '</span>' +
-                    '</div>' +
-                    '<div class="book-body">' +
-                        '<div class="book-title">' + (b.title || b.id) + '</div>' +
-                        '<div class="book-sub">' +
-                            (b.author ? '<span class="book-author">' + b.author + '</span>' : '<span class="book-author">佚名</span>') +
-                            '<span class="sep">·</span>' + (b.description || '') +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="book-aside">' +
-                        '<span class="orig-tag">' + (b.category || '书') + '</span>' +
-                        '<span class="notes"><b>' + (b.note_count || 0) + '</b><em>则</em></span>' +
-                    '</div>';
-                row.addEventListener('click', function () { openBook(b.id); });
-                list.appendChild(row);
-            });
-            group.appendChild(list);
-            container.appendChild(group);
+        books.forEach(function (b) {
+            var card = document.createElement('a');
+            card.className = 'book-card';
+            card.href = 'javascript:void(0)';
+            card.innerHTML =
+                '<div class="book-cover">' + (b.cover_emoji || '📖') + '</div>' +
+                '<div class="book-info">' +
+                    '<div class="book-category">' + (b.display_subcategory || b.category || '书') + '</div>' +
+                    '<div class="book-title">' + (b.title || b.id) + '</div>' +
+                    (b.author ? '<div class="book-author">' + b.author + '</div>' : '') +
+                    '<div class="book-description">' + (b.description || '') + '</div>' +
+                    '<div class="book-stats">' + (b.note_count || 0) + ' 篇笔记</div>' +
+                '</div>';
+            card.addEventListener('click', function () { openBook(b.id); });
+            container.appendChild(card);
         });
-
-        bindScrollSpy(groups);
     }
 
     function handleBookshelfSearch(event) {
@@ -2349,9 +2177,8 @@
         if (elements.backBtn) {
             elements.backBtn.addEventListener('click', backToHome);
         }
-        const brandLockup = document.querySelector('.brand-lock');
-        if (brandLockup) {
-            brandLockup.addEventListener('click', backToHome);
+        if (elements.brandLockup) {
+            elements.brandLockup.addEventListener('click', backToHome);
         }
         if (elements.refreshBtn) {
             elements.refreshBtn.addEventListener('click', async () => {
@@ -2386,7 +2213,6 @@
         var resizeTimer;
         window.addEventListener('resize', function() {
             clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(updateStickyOffset, 100);
         });
 
         // 从 bfcache 恢复时（如手机系统返回后再进），强制重置视图状态，避免白屏
