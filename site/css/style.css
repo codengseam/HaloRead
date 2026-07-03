@@ -781,7 +781,7 @@ body[data-view="reader"] .brand-header {
 
 .book-cover-title {
     font-family: var(--font-serif);
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--ink);
     text-align: center;
@@ -798,6 +798,13 @@ body[data-view="reader"] .brand-header {
     flex-direction: column;
     gap: 6px;
     flex: 1;
+}
+
+.book-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
 }
 
 .book-category {
@@ -835,9 +842,6 @@ body[data-view="reader"] .brand-header {
 .book-stats {
     font-size: 12px;
     color: var(--ink-muted);
-    margin-top: auto;
-    padding-top: 12px;
-    border-top: 1px solid var(--divider);
 }
 
 .empty-state {

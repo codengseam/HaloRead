@@ -496,10 +496,12 @@
                     '<div class="book-cover-title">' + (b.title || b.id) + '</div>' +
                 '</div>' +
                 '<div class="book-info">' +
-                    '<div class="book-category">' + (b.display_subcategory || b.category || '书') + '</div>' +
+                    '<div class="book-meta">' +
+                        '<div class="book-category">' + (b.display_subcategory || b.category || '书') + '</div>' +
+                        '<div class="book-stats">' + (b.note_count || 0) + ' 篇笔记</div>' +
+                    '</div>' +
                     (b.author ? '<div class="book-author">' + b.author + '</div>' : '') +
                     '<div class="book-description">' + (b.description || '') + '</div>' +
-                    '<div class="book-stats">' + (b.note_count || 0) + ' 篇笔记</div>' +
                 '</div>';
             card.addEventListener('click', function () { openBook(b.id); });
             container.appendChild(card);
