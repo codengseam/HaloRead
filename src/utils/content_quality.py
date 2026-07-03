@@ -151,6 +151,9 @@ KNOWLEDGE_TERMS_WHITELIST = [
     "WSGI", "ASGI", "HTML", "CSS", "JSON", "XML", "DOM", "URL",
     # 通用标识/业务术语(全栈专栏质检阶段补,2026-06)
     "ID",
+    # 紫微斗数课专栏拼音/英文译名(2026-07:防御性扩展,subagent 偶尔裸写 Ziwei/DouShu 等译名时不误报;
+    # 纯中文星曜名如紫微/天府/化禄/擎羊不触发中英混杂检查,无需入表)
+    "Ziwei", "DouShu", "ZiweiDou", "PurpleStar", "Polestar",
 ]
 
 # 现代职场专栏中过于敏感、易误报的 AI 味模式（由 check_soft_ai_pattern 等专项接管）
