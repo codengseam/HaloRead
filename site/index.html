@@ -25,30 +25,20 @@
     </script>
 </head>
 <body data-theme="day" data-skin="classical" data-font="serif" data-view="home">
-    <!-- 首页品牌头 + 四栏 Tab（合并吸顶） -->
-    <header class="app-header" id="appHeader">
-        <div class="brand-row">
-            <div class="brand-lock">
-                <div class="seal" aria-label="豪">豪</div>
-                <div class="brand-text">
-                    <span class="brand-name">豪书斋</span>
-                    <span class="brand-motto">读古人书 · 悟今世事</span>
-                </div>
-            </div>
-            <div class="brand-right">
-                <a class="nav-link nav-saints" href="./demos/saints_hall.html" target="_blank" rel="noopener" aria-label="进入圣贤堂">
-                    <span class="nav-saints-icon" aria-hidden="true">圣</span>
-                    <span class="nav-text-full">圣贤堂</span>
-                    <span class="nav-text-short">圣贤</span>
-                </a>
-                <button class="icon-btn settings-btn" id="settingsBtnHeader" type="button" aria-label="阅读设置">⚙</button>
-                <button class="btn-primary" id="newNoteBtn" type="button">
-                    <span class="nav-text-full">开始阅读</span>
-                    <span class="nav-text-short">阅读</span>
-                </button>
+    <header class="brand-header">
+        <div class="brand-lockup" id="brandLockup">
+            <div class="brand-badge" aria-label="豪">豪</div>
+            <div class="brand-text">
+                <span class="brand-name">豪书斋</span>
+                <span class="brand-motto">读古人书，悟今世事</span>
             </div>
         </div>
-        <nav class="tabs" id="categoryTabs" role="tablist" aria-label="分类筛选"></nav>
+        <nav class="brand-actions" aria-label="主导航">
+            <a class="nav-link" href="#bookshelf">书架</a>
+            <a class="nav-link nav-saints" href="./demos/saints_hall.html" target="_blank" rel="noopener">圣贤堂</a>
+            <a class="nav-link" href="#" id="newNoteLink">生成新笔记</a>
+            <button class="btn-primary" id="newNoteBtn" type="button">开始阅读</button>
+        </nav>
     </header>
 
     <!-- 阅读器工具栏（首页隐藏） -->
@@ -70,40 +60,36 @@
     </header>
 
     <main class="page-main">
-        <!-- 首页 / 书架视图 -->
         <section class="home-view" id="homeView">
-            <section class="hero" id="hero">
-                <div class="hero-seal" aria-hidden="true">斋</div>
-                <div class="hero-eyebrow" id="heroEyebrow">— 卷帙浩繁 · 开卷有益 —</div>
-                <h1 class="hero-title" id="heroTitle">豪书斋</h1>
-                <div class="hero-slogan" id="heroSlogan">读古人书<span class="dot">·</span>悟今世事</div>
-                <p class="hero-desc" id="heroDesc">取王立群「琢磨事、人、钱」之框架，益以「认识世界」一脉，分四部以归列专栏。左图右史，开卷了然；以古鉴今，知行合一。</p>
-                <div class="hero-stats" id="heroStats">
-                    <span>正在统计书目…</span>
+            <section class="hero">
+                <div class="hero-inner">
+                    <h1 class="hero-title">深读一部经典，看见千年人心</h1>
+                    <p class="hero-subtitle">从《资治通鉴》到历代典籍，用现代视角重讲古人故事。</p>
+                    <div class="hero-stats" id="heroStats">
+                        <span>正在统计书目…</span>
+                    </div>
+                    <div class="hero-cta">
+                        <a href="#bookshelf" class="btn-primary">浏览书架</a>
+                    </div>
                 </div>
             </section>
 
             <section class="bookshelf-section" id="bookshelf">
                 <div class="bookshelf-header">
                     <h2 class="bookshelf-title">书架</h2>
-                    <div class="bookshelf-search">
-                        <input type="text" id="bookshelfSearchInput" placeholder="搜索书名、作者、分类…" autocomplete="off">
+                    <div class="bookshelf-controls">
+                        <div class="category-tabs" id="categoryTabs" role="tablist" aria-label="分类筛选">
+                            <button class="category-tab active" data-category="all" role="tab" aria-selected="true" type="button">全部</button>
+                        </div>
+                        <div class="bookshelf-search">
+                            <input type="text" id="bookshelfSearchInput" placeholder="搜索书名、作者、分类…" autocomplete="off">
+                        </div>
                     </div>
                 </div>
-
-                <!-- 通讯录式二级索引条（动态生成） -->
-                <div class="index-bar" id="indexBar"></div>
-
-                <!-- 分组列表（动态生成） -->
-                <div class="bookshelf-list" id="bookshelfGrid">
-                    <div class="empty-state">正在从藏经阁取书…</div>
+                <div class="bookshelf-grid" id="bookshelfGrid">
+                    <div class="empty-state">正在加载书架…</div>
                 </div>
             </section>
-
-            <div class="colophon">
-                <span class="colophon-seal">豪书斋</span>
-                <div class="colophon-text">己读之书 · 皆为鉴镜</div>
-            </div>
         </section>
 
         <!-- 阅读视图 -->

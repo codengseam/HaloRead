@@ -230,6 +230,8 @@ DISPLAY_CATEGORY_MAP: dict[str, tuple[str, str]] = {
     "技": ("shi", "技能"),
     "职场": ("shi", "职场升学"),
     "升学": ("shi", "职场升学"),
+    "驾": ("shi", "技能"),
+    "子": ("ren", "修己"),
     "财": ("cai", ""),
     "商": ("cai", ""),
 }
