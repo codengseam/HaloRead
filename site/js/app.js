@@ -939,16 +939,10 @@
         elements.readerWallpaper.style.height = elements.reader.scrollHeight + 'px';
     }
 
-    // 古典皮肤动态加载 webfont（思源宋体/马善政楷体/站酷小薇），现代皮肤用系统字体不加载
+    // 已移除 Google Fonts 依赖：全部使用系统字体栈，保证各浏览器/网络环境渲染一致。
+    // 保留空函数以避免旧版设置数据触发异常。
     function updateFontLink(skin) {
-        var link = document.getElementById('fontLink');
-        if (!link) return;
-        if (skin === 'classical') {
-            link.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700;900&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&display=swap';
-            link.disabled = false;
-        } else {
-            link.disabled = true;
-        }
+        // no-op
     }
 
     function openSettings() {
