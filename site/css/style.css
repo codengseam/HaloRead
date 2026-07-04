@@ -38,19 +38,19 @@
     --divider: #e6dcc4;
     --shadow: rgba(60, 40, 20, 0.10);
 
-    /* fallback 字体（古典默认） */
-    --font-sans: "Noto Serif SC", serif;
-    --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
-    --font-kai: "Ma Shan Zheng", "KaiTi", "STKaiti", cursive;
-    --font-display: "ZCOOL XiaoWei", serif;
+    /* 系统字体优先，移除 Google Fonts 依赖，保证各浏览器/网络环境渲染一致 */
+    --font-sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --font-serif: "Source Han Serif SC", "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+    --font-kai: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif;
+    --font-display: "Source Han Serif SC", "Songti SC", "STSong", "Noto Serif SC", serif;
 }
 
 /* ============ 古典皮肤：标题/书名用宋体/楷体，正文用系统无衬线 ============ */
 body[data-skin="classical"] {
-    --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
-    --font-kai: "Ma Shan Zheng", "KaiTi", "STKaiti", cursive;
-    --font-display: "ZCOOL XiaoWei", serif;
-    --font-sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --font-serif: "Source Han Serif SC", "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+    --font-kai: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif;
+    --font-display: "Source Han Serif SC", "Songti SC", "STSong", "Noto Serif SC", serif;
+    --font-sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 /* 古典 · 白天（默认）：宣纸米黄底、墨黑文字、朱砂红强调 */

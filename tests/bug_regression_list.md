@@ -862,3 +862,28 @@
   1. **跨层 archetype 白名单必须统一管理**：BUG-029（生成层）和 BUG-044（质检层）是同一根因的两次发作——archetype 白名单散落在 4 个文件（prompts.py / workflow.py / consistency.py / content_quality.py），各层独立维护导致漂移。**建议：把 _VALID_ARCHETYPES 提取为单一信源（如 src/utils/archetypes.py），各层 import 复用。**
   2. **fiction 桶质检路由策略应与生成层解耦**：生成层 fiction 仍回落 narrative（因 prompts/fiction/ 未建），但质检层 fiction 按 modern 分支处理（因 fiction 内容是现代商战小说，无古籍年份/字号结构）。两层路由策略可以不同，关键是从内容特征出发而非从 prompt 文件存在性出发。
   3. **测试断言"未落地"会过期**：原 `test_fiction_archetype_not_yet_supported_raises` 断言 fiction raise，但 fiction 桶实际已落盘（洛克菲勒 32 章），测试与生产事实脱节。**测试断言"未落地"类用例必须在落地时同步更新，否则会阻塞合理修复。**
+
+## 微信内置浏览器与外部浏览器渲染不一致（Google Fonts 加载失败导致）
+
+- **编号**：BUG-045
+- **首次出现**：2026-07-04
+- **类型**：兼容性
+- **环境**：微信内置浏览器（正确） vs 外部浏览器（Chrome/Safari/系统浏览器，异常）
+- **现象**：同一页面在微信中显示正常（图一），在外部浏览器中排版错乱、文字也明显不同；用户已多次刷新/换浏览器/重启，微信始终正常，外部浏览器始终异常。
+- **根因**：页面依赖 Google Fonts（`fonts.googleapis.com`）加载在线字体。微信内置浏览器在特定网络环境下能加载 Google Fonts，外部浏览器（尤其国产浏览器/移动网络）被拦截或超时失败，导致字体回退到不同系统默认字体，行高、字重、换行均出现差异；同时 `app.js` 中的 `updateFontLink` 会动态改字体链接，进一步放大不一致。
+- **修复**：
+  1. 彻底移除 Google Fonts 引用：`src/web/static-site/index.html` 删除 `preconnect` 与 `fonts.googleapis.com` 样式表；`css/style.css` 全部改用系统字体栈。
+  2. 系统字体栈按平台分层兜底：
+     - 无衬线：`-apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif`
+     - 宋体/楷体：`"Source Han Serif SC", "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif` 等
+  3. `src/web/static-site/js/app.js` 中 `updateFontLink(skin)` 改为空函数（no-op），避免旧设置数据触发异常，同时不再请求任何外部字体资源。
+- **涉及文件**：`src/web/static-site/index.html`、`src/web/static-site/css/style.css`、`src/web/static-site/js/app.js`
+- **回归测试**：
+  - `bash tests/run_regression_suite.sh`：36 / 0 / 0 通过
+  - `python scripts/check_book_structure.py --output output --strict`：0 问题
+  - `python -m pytest -q`：658 passed, 19 skipped
+  - 浏览器/真机验收：微信、Chrome、Safari、系统浏览器同一页面文字与排版一致
+- **教训/沉淀**：
+  1. **在线字体是跨浏览器/跨网络稳定性的高危外部依赖**：Google Fonts 在国内各浏览器、各网络环境下可达性不一致，必须视为不可靠依赖。追求"极致稳定"时应默认禁用在线字体。
+  2. **系统字体栈是中文阅读器的最佳稳定基线**：iOS 用 PingFang、macOS 用 Hiragino、Windows 用 Microsoft YaHei、Android 用 Noto Sans SC，配合 `-apple-system` 与 `sans-serif` 兜底，能在不加载任何外部资源的前提下保证可读与风格统一。
+  3. **动态字体加载函数必须同步清理**：只改 CSS 不够，JS 中如果有根据皮肤切换字体链接的逻辑，必须改为 no-op 或删除，否则旧设置/旧缓存仍可能触发外部请求。
