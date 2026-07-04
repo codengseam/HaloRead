@@ -862,3 +862,48 @@
   1. **跨层 archetype 白名单必须统一管理**：BUG-029（生成层）和 BUG-044（质检层）是同一根因的两次发作——archetype 白名单散落在 4 个文件（prompts.py / workflow.py / consistency.py / content_quality.py），各层独立维护导致漂移。**建议：把 _VALID_ARCHETYPES 提取为单一信源（如 src/utils/archetypes.py），各层 import 复用。**
   2. **fiction 桶质检路由策略应与生成层解耦**：生成层 fiction 仍回落 narrative（因 prompts/fiction/ 未建），但质检层 fiction 按 modern 分支处理（因 fiction 内容是现代商战小说，无古籍年份/字号结构）。两层路由策略可以不同，关键是从内容特征出发而非从 prompt 文件存在性出发。
   3. **测试断言"未落地"会过期**：原 `test_fiction_archetype_not_yet_supported_raises` 断言 fiction raise，但 fiction 桶实际已落盘（洛克菲勒 32 章），测试与生产事实脱节。**测试断言"未落地"类用例必须在落地时同步更新，否则会阻塞合理修复。**
+
+## 正文引用与文末参考来源未做双向匹配
+
+- **编号**：BUG-045
+- **首次出现**：2026-07-04
+- **类型**：内容质量
+- **现象**：正文行内引用 `——《史记·项羽本纪》` 但文末 `## 参考来源` 未列《史记》；或反向，文末列了正文从未引用的来源。原 `check_citations` 只查"引用标记是否存在"，不查双向匹配，导致书名硬漏与文末堆砌凑数两类问题无法自动检出。
+- **根因**：`src/utils/quality.py:check_citations` 仅做存在性检查（`if "《" not in content and "原文" not in content`），未做正文-文末集合差集校验；论文级 skill 的 bibliography 双向匹配思路此前未迁移到讲书场景。loop_log 2026-07 紫微斗数课、2026-06 重庆初中数学教研均提到"跨章引用真实性需 Grep 核验"，但一直是手工 Grep，未自动化。
+- **修复**：新增 `src/utils/quality.py:check_citation_bidirectional(content)` 函数，三级匹配：
+  - **P0**：正文引《X》但文末连书名都未列（书名硬漏，无可争议）
+  - **P1**：正文引《X·Y》但文末《X》下未列《Y》篇名（篇名缺失，可争议——讲书文末常省略篇名只写书名）
+  - **P2**：文末列《X》但正文从未引《X》（文末多列未引，提示堆砌凑数）
+  - 复用 `src/utils/sources.py:extract_references_structured` 解析文末结构化文献，避免重复实现
+  - 仅匹配破折号引导的尾注式引用 `——《X·Y》`（讲书文体标准格式，见 content-quality.md §5.2）
+- **涉及文件**：`src/utils/quality.py`（新增 `check_citation_bidirectional` 与 `_INLINE_CITE_RE`）、`.trae/skills/deep-reading/content-quality.md`（§5.4 新增双向匹配规则）、`.trae/skills/content-review/rules/consistency-rules.md`（§五 关系表加一行）
+- **回归测试**：
+  - `tests/test_quality.py::test_check_citation_bidirectional_*`：P0/P1/P2/全匹配通过 四组
+  - `tests/run_regression_suite.sh` 第 14 步：双向匹配 self-test 冒烟
+- **教训/沉淀**：
+  1. **论文 skill 的 bibliography 双向匹配思路可迁移到讲书场景**，但匹配策略要按讲书文体分级（书名硬漏 P0 / 篇名缺失 P1 / 文末多列 P2），不能照搬论文级 DOI/格式校验——讲书"参考来源"是中文书名+篇名+对应内容点，无 APA/IEEE 格式规范。
+  2. **手工 Grep 核验模式应沉淀为自动检测**：loop_log 2026-07 紫微斗数课与 2026-06 重庆初中数学教研都依赖"跨章引用真实性 Grep 核验"，但一直靠人工发起，本次终于把它沉淀为 `check_citation_bidirectional` 自动检测器。
+  3. **质检函数应复用现有解析能力**：`check_citation_bidirectional` 复用 `sources.py:extract_references_structured` 解析文末来源，不在 quality.py 内重复实现文献解析逻辑（单一信源哲学）。
+
+## 史料层累争议人物未自动检测漏交代
+
+- **编号**：BUG-046
+- **首次出现**：2026-07-04
+- **类型**：内容质量
+- **现象**：涉及苏秦/鬼谷子/老子/孙子等史料层累争议人物时，文中提及但未交代层累背景（如马王堆帛书对苏秦年代的修订、《鬼谷子》成书年代争议）。`content-quality.md §2.1` 有"史料层累必须交代"规则但无自动检测，靠 LLM 主观审，漏报率高。fiction 桶"实"的部分史实写错（如塔贝尔篇数错、油桶/油井身份错）是同类问题——应核对未核对。
+- **根因**：`consistency-rules.md` 此前仅检测"前后矛盾"（§2.1-2.4 查 A 与 B 打架），不检测"应交代未交代"的缺失型问题；论文级 skill 的 limitation 诚实性评审框架未迁移到讲书场景。
+- **修复**：新增 `src/utils/consistency.py:check_historical_layering(content, archetype)` 检测器：
+  - 维护 `HISTORICAL_LAYERING_FIGURES` 争议人物清单（苏秦/鬼谷子/老子/孙子），每人单独配置层累关键词
+  - 仅 narrative 桶检测（modern/knowledge/fiction 通常无史料层累场景）
+  - 仅当人物在正文中出现 ≥3 次才检查（避免顺带提及的硬性误报）
+  - 上下文 50 字符内含层累提示词（出土/帛书/修订/争议/成书/层累等）视为已交代
+  - P1 级别，与现有 P1 共享上限 6 分
+  - 接入 `check_consistency` 主入口的 narrative 分支，details 字典加 `historical_layering` 键，`format_consistency_report` 加标签
+- **涉及文件**：`src/utils/consistency.py`（新增检测器 + 接入主入口 + 报告格式化）、`.trae/skills/content-review/rules/consistency-rules.md`（§2.5 新增史料层累小节，原 §2.5 顺延为 §2.6，§三 评分规则加 P1 列表，§五 关系表加一行）、`.trae/skills/deep-reading/content-quality.md`（§2.1 加自动检测提示）
+- **回归测试**：
+  - `tests/test_consistency.py::test_check_historical_layering_*`：漏交代/已交代/modern 跳过/顺带提及豁免 四组
+  - `tests/run_regression_suite.sh` 第 14 步：史料层累 self-test 冒烟
+- **教训/沉淀**：
+  1. **论文 skill 的 limitation 诚实性评审思路可迁移到讲书的"史料层累诚实性"检测**，但检测对象不同——论文查 limitation 章节是否诚实，讲书查争议人物是否交代层累背景。框架可复用，规则集必须按讲书场景重写。
+  2. **"应交代未交代"是缺失型问题，与"前后矛盾"不同**：consistency-rules.md §2.1-2.4 查"A 与 B 打架"（矛盾），§2.5 查"应交代未交代"（缺失），两类需分开设计检测逻辑。前者用集合差集/数学验证，后者用关键词上下文窗口。
+  3. **争议人物清单需专家校验**：本次初版只挑 4 个高发争议人物（苏秦/鬼谷子/老子/孙子），后续可按 bug 复发情况扩展（如《尚书·泰誓》今古文争议、《山海经》成书年代争议）。每个争议人物单独配置层累关键词，避免一刀切误报。

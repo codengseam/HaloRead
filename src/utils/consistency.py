@@ -1,10 +1,11 @@
 """一致性检测工具：检测 AI 生成内容的前后矛盾、数据交叉矛盾、实体不一致。
 
-四类检测（详见 .trae/skills/content-review/rules/consistency-rules.md）：
+五类检测（详见 .trae/skills/content-review/rules/consistency-rules.md）：
 1. 数值交叉矛盾（numeric_cross）：年龄-年份/在位时长/损失-剩余的数学矛盾
 2. 同事件异值（same_event_diff_value）：同引文异字数/同战役异兵力/同典故异出处
 3. 实体别名冲突（entity_alias）：字号/谥号/籍贯冲突
 4. 时间线倒置（timeline_inversion）：年份逆序且无倒叙标注
+5. 史料层累诚实性（historical_layering）：争议人物/典籍应交代未交代层累背景
 
 设计原则：
 - 纯规则，无需 LLM，结果可复现（与 check_char_count.py 同一信源哲学）
@@ -27,7 +28,7 @@ from src.utils.quality import _cn_to_int, _strip_punct_for_char_count, strip_fro
 class ConsistencyIssue:
     """单个一致性问题。"""
 
-    type: str  # "numeric_cross" | "same_event_diff_value" | "entity_alias" | "timeline_inversion"
+    type: str  # "numeric_cross" | "same_event_diff_value" | "entity_alias" | "timeline_inversion" | "historical_layering"
     severity: str  # "P0" | "P1" | "P2"
     message: str
     snippet: str
@@ -691,14 +692,102 @@ def check_timeline_inversion(content: str) -> List[ConsistencyIssue]:
     return issues
 
 
+# --- 5. 史料层累诚实性（historical_layering，BUG-046） -----------------------
+#
+# 设计目标：补齐 content-quality.md §2.1「史料层累必须交代」规则无自动检测的缺口。
+# 论文级 skill 的 limitation 诚实性评审思路迁移到讲书场景，但检测对象不同——
+# 论文查 limitation 章节，讲书查争议人物是否交代层累背景。
+#
+# 检测对象：史料层累争议人物/典籍（有出土文献修订/作者争议/成书年代争议）
+# 检测逻辑：正文中该人物出现 ≥3 次（主要人物）且上下文 50 字符内无层累提示词 → 报 P1
+# 误报防护：
+#   - 仅 narrative 桶检测（modern/knowledge 通常无史料层累场景）
+#   - 仅当人物出现 ≥3 次才检查（避免顺带提及的硬性误报）
+#   - 上下文 50 字符内含层累提示词即视为已交代
+
+# 争议人物清单 + 对应的层累提示词（每个争议人物单独配置，避免一刀切）
+# 数据源：content-quality.md §2.1 + §8.2.1 已有的人工规则
+HISTORICAL_LAYERING_FIGURES: Dict[str, List[str]] = {
+    # 苏秦：马王堆帛书《战国纵横家书》对其年代/事迹有重大修订
+    "苏秦": ["帛书", "战国纵横家书", "马王堆", "出土", "修订", "层累", "争议", "传统记载"],
+    # 鬼谷子：《鬼谷子》成书年代/作者争议（汉初集成 vs 战国鬼谷子亲著）
+    "鬼谷子": ["成书", "作者争议", "年代争议", "集成", "汉初", "层累", "争议", "托名"],
+    # 老子：李耳 vs 老聃，《道德经》成书年代争议（春秋 vs 战国）
+    "老子": ["成书", "年代争议", "李耳", "老聃", "层累", "争议", "战国", "春秋", "太史儋"],
+    # 孙子：孙武 vs 孙膑，《孙子兵法》作者归属争议（直到银雀山汉简同墓出土才定论）
+    "孙子": ["孙武", "孙膑", "银雀山", "汉简", "作者争议", "归属", "层累", "争议", "同墓出土"],
+}
+
+# 上下文窗口大小（前后各 N 字符）
+_LAYERING_CONTEXT_WINDOW = 50
+# 触发检测的最小出现次数（避免顺带提及的硬性误报）
+_LAYERING_MIN_MENTIONS = 3
+
+
+def check_historical_layering(content: str, archetype: str = "narrative") -> List[ConsistencyIssue]:
+    """检测史料层累争议人物应交代未交代（BUG-046）。
+
+    仅对 narrative 桶检测。仅当争议人物在正文中出现 ≥3 次才检查。
+    若该人物所有出现位置的上下文（前后各 50 字符）均无层累提示词，报 P1。
+
+    详见 consistency-rules.md §2.5。
+    """
+    # archetype 合法性校验（与 check_consistency 主入口一致）
+    if archetype not in ("narrative", "modern", "knowledge", "fiction"):
+        raise ValueError(
+            f"archetype 必须是 narrative/modern/knowledge/fiction 之一，收到：{archetype!r}"
+        )
+    # 仅 narrative 桶检测（modern/knowledge/fiction 通常无史料层累场景）
+    if archetype != "narrative":
+        return []
+
+    body = strip_frontmatter(content)
+    issues: List[ConsistencyIssue] = []
+
+    for figure, layering_keywords in HISTORICAL_LAYERING_FIGURES.items():
+        # 找出该人物在正文中的所有出现位置
+        positions = [m.start() for m in re.finditer(re.escape(figure), body)]
+        if len(positions) < _LAYERING_MIN_MENTIONS:
+            continue  # 顺带提及，不强制交代
+
+        # 检查每个出现位置的上下文是否有层累提示词
+        has_layering_mention = False
+        for pos in positions:
+            ctx_start = max(0, pos - _LAYERING_CONTEXT_WINDOW)
+            ctx_end = min(len(body), pos + len(figure) + _LAYERING_CONTEXT_WINDOW)
+            context = body[ctx_start:ctx_end]
+            if any(kw in context for kw in layering_keywords):
+                has_layering_mention = True
+                break  # 任意一处交代了层累即视为合格
+        if has_layering_mention:
+            continue
+
+        # 全部出现位置都未交代层累 → 报 P1
+        lines = [_line_of(body, p) for p in positions]
+        snippet = (
+            f"「{figure}」在正文中出现 {len(positions)} 次（主要人物），"
+            f"但所有出现位置的上下文（前后各 {_LAYERING_CONTEXT_WINDOW} 字符）"
+            f"均未含层累提示词（{', '.join(layering_keywords[:4])} 等）"
+        )
+        issues.append(ConsistencyIssue(
+            type="historical_layering",
+            severity="P1",
+            message=f"史料层累漏交代：{snippet}",
+            snippet=snippet,
+            locations=lines[:3],  # 最多列前 3 个行号，避免刷屏
+        ))
+
+    return issues
+
+
 # --- 主入口 ------------------------------------------------------------------
 
 def check_consistency(content: str, archetype: str = "narrative") -> ConsistencyReport:
     """运行完整一致性检测，返回报告。
 
     按 archetype 路由：
-    - narrative：四类全检（古籍有时间线/年份/字号等结构化声明）
-    - modern/knowledge/fiction：跳过时间线倒置（现代文/小说无年份序列），其余仍检
+    - narrative：五类全检（古籍有时间线/年份/字号等结构化声明 + 史料层累场景）
+    - modern/knowledge/fiction：跳过时间线倒置与史料层累（现代文/小说无年份序列/无史料层累场景），其余仍检
       fiction 桶是"七实三虚"小说（如洛克菲勒商战），无古籍年份序列/字号结构，
       按 modern 分支处理（与 content_quality.py 路由一致）。
     """
@@ -714,12 +803,14 @@ def check_consistency(content: str, archetype: str = "narrative") -> Consistency
     issues.extend(check_entity_alias_conflict(content))
     if archetype == "narrative":
         issues.extend(check_timeline_inversion(content))
+        issues.extend(check_historical_layering(content, archetype))
 
     details: Dict[str, List[ConsistencyIssue]] = {
         "numeric_cross": [],
         "same_event_diff_value": [],
         "entity_alias": [],
         "timeline_inversion": [],
+        "historical_layering": [],
     }
     for issue in issues:
         if issue.type in details:
@@ -735,6 +826,7 @@ def format_consistency_report(report: ConsistencyReport) -> str:
         "same_event_diff_value": "同事件异值",
         "entity_alias": "实体别名冲突",
         "timeline_inversion": "时间线倒置",
+        "historical_layering": "史料层累漏交代",
     }
     lines = [
         "## 一致性检测报告",

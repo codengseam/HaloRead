@@ -4,6 +4,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+# 延迟导入 sources.py 避免循环依赖（quality 是底层模块，sources 仅用于双向匹配）
+def _import_sources():
+    try:
+        from src.utils import sources as _sources
+        return _sources
+    except Exception:
+        return None
+
 # 显性 AI 套路句式
 AI_PATTERNS_EXPLICIT = [
     r"我们可以看到",
@@ -627,3 +635,134 @@ def check_chapter_title_soul(title: str) -> dict:
         score = min(5, score + good_hits)
 
     return {"score": max(0, min(5, score)), "reasons": reasons if reasons else ["无扣分"]}
+
+
+# --- 正文引用 ↔ 文末参考来源 双向匹配（BUG-045） ---------------------------
+#
+# 设计目标：补齐现有 check_citations 只查"引用标记是否存在"的缺口，
+# 做正文行内引用 ↔ 文末 ## 参考来源 的双向集合匹配。
+# 匹配策略按讲书文体分级（不照搬论文级 DOI/格式校验）：
+#   P0：正文引《X》但文末连书名都未列（书名硬漏，无可争议）
+#   P1：正文引《X·Y》但文末《X》下未列《Y》篇名（篇名缺失，可争议——
+#       讲书文末常省略篇名只写书名，故仅 P1 提示）
+#   P2：文末列《X·Y》但正文从未引《X》（文末多列未引，提示堆砌凑数）
+# 复用 src/utils/sources.py:extract_references_structured 解析文末结构化文献，
+# 避免在 quality.py 内重复实现文献解析逻辑。
+
+# 正文行内引用模式：——《书名·篇名》或 ——《书名》
+# 仅匹配破折号引导的尾注式引用（讲书文体标准格式，见 content-quality.md §5.2）
+# 不匹配「《X》里讲过」式内嵌引用（与文末来源对应关系弱，且 §5.2 行内密度规则已覆盖）
+_INLINE_CITE_RE = re.compile(r"—《([^》]+)》")
+
+
+def check_citation_bidirectional(content: str) -> dict:
+    """检测正文行内引用与文末参考来源的双向匹配（BUG-045）。
+
+    三级匹配（详见上方模块注释）：
+    - P0：正文引《X》但文末未列《X》书名（书名硬漏）
+    - P1：正文引《X·Y》但文末《X》下未列《Y》篇名（篇名缺失）
+    - P2：文末列《X》但正文从未引《X》（文末多列未引）
+
+    Args:
+        content: 完整 Markdown 内容（含 frontmatter 与文末 ## 参考来源）
+
+    Returns:
+        {
+            "issues": [
+                {"severity": "P0"|"P1"|"P2", "type": str, "message": str, "snippet": str},
+                ...
+            ],
+            "summary": {"p0": int, "p1": int, "p2": int}
+        }
+    """
+    issues: List[dict] = []
+
+    # 1. 提取正文行内引用（限定在 frontmatter 之后、## 参考来源 之前）
+    body = strip_frontmatter(content)
+    # 切掉文末参考来源段（避免文末条目里的《XX》被误算作正文行内引用）
+    body_inline = body
+    for header in ("## 参考来源", "## 参考文献", "## 来源", "## 参考资料"):
+        idx = body_inline.find(header)
+        if idx != -1:
+            body_inline = body_inline[:idx]
+            break
+
+    inline_refs: List[dict] = []  # [{book, chapter, raw}]
+    seen_inline: set = set()
+    for m in _INLINE_CITE_RE.finditer(body_inline):
+        raw = m.group(1).strip()
+        if raw in seen_inline:
+            continue
+        seen_inline.add(raw)
+        if "·" in raw:
+            parts = raw.split("·", 1)
+            book = parts[0].strip()
+            chapter = parts[1].strip()
+        else:
+            book = raw
+            chapter = ""
+        inline_refs.append({"book": book, "chapter": chapter, "raw": raw})
+
+    # 2. 提取文末参考来源（复用 sources.py）
+    end_refs: List[dict] = []
+    sources_mod = _import_sources()
+    if sources_mod is not None and hasattr(sources_mod, "extract_references_structured"):
+        end_refs = sources_mod.extract_references_structured(content)
+
+    # 3. 无文末来源或无正文行内引用时，跳过双向匹配（由 check_citations 兜底存在性）
+    if not end_refs or not inline_refs:
+        return {"issues": issues, "summary": {"p0": 0, "p1": 0, "p2": 0}}
+
+    end_books = {r.get("book", "").strip() for r in end_refs if r.get("book")}
+    end_book_chapters = {
+        (r.get("book", "").strip(), r.get("chapter", "").strip())
+        for r in end_refs
+        if r.get("book") and r.get("chapter")
+    }
+
+    # 4. P0：正文引《X》但文末连书名都未列
+    for ref in inline_refs:
+        book = ref["book"]
+        if book and book not in end_books:
+            issues.append({
+                "severity": "P0",
+                "type": "missing_book",
+                "message": f"正文行内引用《{ref['raw']}》，但文末参考来源未列《{book}》",
+                "snippet": f"正文：—《{ref['raw']}》 / 文末：未列《{book}》",
+            })
+
+    # 5. P1：正文引《X·Y》但文末《X》下未列《Y》篇名
+    #    仅当文末有《X》书名（即 P0 未触发）才检查篇名缺失
+    for ref in inline_refs:
+        book = ref["book"]
+        chapter = ref["chapter"]
+        if not book or not chapter:
+            continue
+        if book not in end_books:
+            continue  # 已在 P0 报过
+        if (book, chapter) not in end_book_chapters:
+            issues.append({
+                "severity": "P1",
+                "type": "missing_chapter",
+                "message": f"正文引《{book}·{chapter}》，文末列了《{book}》但未列《{chapter}》篇名",
+                "snippet": f"正文：—《{book}·{chapter}》 / 文末：《{book}》下未见《{chapter}》",
+            })
+
+    # 6. P2：文末列《X》但正文从未引《X》
+    inline_books = {r["book"] for r in inline_refs if r["book"]}
+    for ref in end_refs:
+        book = ref.get("book", "").strip()
+        if book and book not in inline_books:
+            issues.append({
+                "severity": "P2",
+                "type": "unreferenced_source",
+                "message": f"文末参考来源列了《{book}》，但正文未出现行内引用《{book}》",
+                "snippet": f"文末：《{book}》 / 正文：未见 —《{book}...》 行内引用",
+            })
+
+    summary = {
+        "p0": sum(1 for i in issues if i["severity"] == "P0"),
+        "p1": sum(1 for i in issues if i["severity"] == "P1"),
+        "p2": sum(1 for i in issues if i["severity"] == "P2"),
+    }
+    return {"issues": issues, "summary": summary}

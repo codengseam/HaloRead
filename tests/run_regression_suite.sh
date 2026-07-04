@@ -46,14 +46,14 @@ echo "=== HaloRead 回归测试集 ==="
 echo ""
 
 # ---------- 1. 合并冲突标记检查（BUG-011） ----------
-echo "[1/13] 合并冲突标记检查"
+echo "[1/14] 合并冲突标记检查"
 CONFLICTS=$(grep -rn "^<<<<<<< HEAD\|^>>>>>>> origin/master" \
     --include="*.py" --include="*.yml" --include="*.md" --include="*.js" \
     --include="*.css" --include="*.html" . 2>/dev/null | grep -v node_modules | grep -v "/.git/" | wc -l)
 step "无合并冲突标记残留 (found=$CONFLICTS)" "$([ "$CONFLICTS" = "0" ] && echo 1 || echo 0)"
 
 # ---------- 2. app.js 语法检查（BUG-003/008） ----------
-echo "[2/13] app.js 语法检查"
+echo "[2/14] app.js 语法检查"
 if node --check site/js/app.js 2>/dev/null; then
     step "site/js/app.js 语法正确" 1
 else
@@ -61,7 +61,7 @@ else
 fi
 
 # ---------- 3. 沉浸模式关键代码 + 防横屏 + 整屏全屏（BUG-003/020/036 回归） ----------
-echo "[3/13] 沉浸模式回归检查"
+echo "[3/14] 沉浸模式回归检查"
 APP_JS="site/js/app.js"
 HAS_TOGGLE=$(grep -c "toggleImmersiveMode" "$APP_JS" 2>/dev/null || true)
 HAS_ENTER=$(grep -c "enterImmersiveMode" "$APP_JS" 2>/dev/null || true)
@@ -85,7 +85,7 @@ step "小米浏览器 UA 跳过 Fullscreen (BUG-036, found=$HAS_XIAOMI_CHECK)" \
     "$([ "$HAS_XIAOMI_CHECK" -ge 1 ] && echo 1 || echo 0)"
 
 # ---------- 4. 构建站点（BUG-011/004） ----------
-echo "[4/13] 构建静态站点"
+echo "[4/14] 构建静态站点"
 if python3 scripts/build_site.py --output output --site site >/dev/null 2>&1; then
     step "build_site.py 执行成功" 1
 else
@@ -99,7 +99,7 @@ step "index.json 含 stats.notes 且 >0（BUG-012）" \
     "$(python3 -c "import json,sys; d=json.load(open('site/data/index.json')); sys.exit(0 if d.get('stats',{}).get('notes',0)>0 else 1)" 2>/dev/null && echo 1 || echo 0)"
 
 # ---------- 5. 阅读器功能 e2e（BUG-002/003/008） ----------
-echo "[5/13] 阅读器功能 e2e (jsdom)"
+echo "[5/14] 阅读器功能 e2e (jsdom)"
 if [ -d node_modules/jsdom ]; then
     if node tests/test_reader_features.js >/dev/null 2>&1; then
         step "test_reader_features.js 全部通过" 1
@@ -111,7 +111,7 @@ else
 fi
 
 # ---------- 6. 书籍结构严格校验（BUG-017，合并前必须清零 P0/P1/P2） ----------
-echo "[6/13] 书籍结构严格校验"
+echo "[6/14] 书籍结构严格校验"
 if python3 scripts/check_book_structure.py --output output --strict >/dev/null 2>&1; then
     step "check_book_structure.py --strict 通过" 1
 else
@@ -119,7 +119,7 @@ else
 fi
 
 # ---------- 7. 重复文件检查（BUG-005，数据质量，告警） ----------
-echo "[7/13] 重复文件检查"
+echo "[7/14] 重复文件检查"
 if python3 scripts/check_duplicates.py >/dev/null 2>&1; then
     warn "check_duplicates.py 通过" 1
 else
@@ -127,7 +127,7 @@ else
 fi
 
 # ---------- 8. 章节排序检查（BUG-004/009，数据质量，告警） ----------
-echo "[8/13] 章节排序检查"
+echo "[8/14] 章节排序检查"
 if python3 scripts/check_chapter_order.py >/dev/null 2>&1; then
     warn "check_chapter_order.py 通过" 1
 else
@@ -135,7 +135,7 @@ else
 fi
 
 # ---------- 9. HTTP 冒烟测试 ----------
-echo "[9/13] HTTP 冒烟测试"
+echo "[9/14] HTTP 冒烟测试"
 python3 -m http.server 8092 --bind 127.0.0.1 --directory site >/dev/null 2>&1 &
 SERVER_PID=$!
 sleep 1
@@ -180,7 +180,7 @@ if [ -n "$SSG_SAMPLE" ]; then
 fi
 
 # ---------- 10. 分支治理脚本冒烟（BUG-023） ----------
-echo "[10/13] 分支治理脚本冒烟 (BUG-023)"
+echo "[10/14] 分支治理脚本冒烟 (BUG-023)"
 if [ -f scripts/branch_governance.py ]; then
     step "branch_governance.py 存在" 1
 else
@@ -202,7 +202,7 @@ python3 scripts/branch_governance.py --mode execute --pattern "trae/agent-*" --n
 step "execute 无 --yes 时拒绝执行 (rc!=0)" "$([ "$?" -ne "0" ] && echo 1 || echo 0)"
 
 # ---------- 11. loop_log 结构校验 ----------
-echo "[11/13] loop_log 结构校验"
+echo "[11/14] loop_log 结构校验"
 if python3 scripts/check_loop_log.py >/dev/null 2>&1; then
     step "check_loop_log.py 通过" 1
 else
@@ -210,7 +210,7 @@ else
 fi
 
 # ---------- 12. plan-review skill 路径契约（BUG-031） ----------
-echo "[12/13] plan-review skill 路径契约 (BUG-031)"
+echo "[12/14] plan-review skill 路径契约 (BUG-031)"
 PLAN_REVIEW_SKILL=".trae/skills/plan-review/SKILL.md"
 DISPATCH_SKILL=".trae/skills/dispatching-parallel-agents/SKILL.md"
 step "plan-review SKILL.md 存在" "$([ -f "$PLAN_REVIEW_SKILL" ] && echo 1 || echo 0)"
@@ -230,7 +230,7 @@ step "review_plan.py 含 langgraph ImportError 友好提示" \
     "$(grep -q "路径 B（LangGraph 真并行）依赖未就绪" scripts/review_plan.py && echo 1 || echo 0)"
 
 # ---------- 13. 字数事实核对脚本冒烟（BUG-038） ----------
-echo "[13/13] 字数事实核对脚本冒烟 (BUG-038)"
+echo "[13/14] 字数事实核对脚本冒烟 (BUG-038)"
 if [ -f scripts/check_char_count.py ]; then
     step "check_char_count.py 存在" 1
 else
