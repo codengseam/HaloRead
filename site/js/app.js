@@ -1608,6 +1608,11 @@
 
         elements.exportTree.appendChild(ul);
         updateExportCounter();
+
+        // BUG-047：默认展示第一章（弹窗渲染后立即把树滚动到顶部，避免残留上次位置）
+        if (elements.exportTree) {
+            elements.exportTree.scrollTop = 0;
+        }
     }
 
     function syncParentCheckboxState(parentCb) {
