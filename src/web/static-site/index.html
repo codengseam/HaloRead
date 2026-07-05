@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>豪书斋 · 读古人书，悟今世事</title>
-    <link rel="stylesheet" href="css/style.css?v=2026070503">
+    <link rel="stylesheet" href="css/style.css?v=2026070504">
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js" defer></script>
     <script>
         // BUG-046：marked.js CDN 在部分网络/魔搭 iframe/微信内置浏览器下可达性不一致，
@@ -14,14 +14,31 @@
                 var src = event.target && event.target.src;
                 if (src && src.indexOf('marked.min.js') !== -1) {
                     var s = document.createElement('script');
-                    s.src = 'js/vendor/marked.min.js?v=2026070503';
+                    s.src = 'js/vendor/marked.min.js?v=2026070504';
                     s.async = false;
                     document.head.appendChild(s);
                 }
             }, true);
         })();
     </script>
-    <script src="js/app.js?v=2026070503" defer></script>
+    <script src="js/app.js?v=2026070504" defer></script>
+    <script>
+        // 强制清理旧版本 Service Worker，避免缓存幽灵旧版
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                registrations.forEach(function (reg) {
+                    reg.unregister().then(function () {
+                        console.log('[豪书斋] 已注销旧 Service Worker:', reg.scope);
+                    });
+                });
+            }).then(function () {
+                if (navigator.serviceWorker.controller) {
+                    // 旧 SW 还在控制页面，需要刷新一次才能真正生效
+                    window.location.reload();
+                }
+            });
+        }
+    </script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
