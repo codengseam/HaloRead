@@ -1802,7 +1802,7 @@ body[data-view="home"] .bottom-bar {
 }
 
 /* ============ 离线导出弹窗（章节过多时支持滚动 + 默认展示第一章 + 按钮固定底部） ============ */
-/* BUG-047：原 .modal 无 max-height，章节过多时把按钮推出视口；改为 flex 列布局让 .export-tree 独占可滚动区。 */
+/* BUG-048：原 .modal 无 max-height，章节过多时把按钮推出视口；改为 flex 列布局让 .export-tree 独占可滚动区。 */
 #exportOverlay .modal {
     display: flex;
     flex-direction: column;
@@ -2273,7 +2273,7 @@ body[data-view="home"] .bottom-bar {
 }
 
 /* ============ 离线导出弹窗移动端适配 ============ */
-/* BUG-047：窄屏下弹窗更接近全屏，按钮区独立换行不溢出。 */
+/* BUG-048：窄屏下弹窗更接近全屏，按钮区独立换行不溢出。 */
 @media (max-width: 480px) {
     #exportOverlay .modal {
         width: 95%;

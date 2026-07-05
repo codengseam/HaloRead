@@ -951,3 +951,49 @@
   1. 沉浸模式不是简单隐藏 UI，flex 布局在"UI 隐藏/显示"两种状态下的高度分配都要验证；桌面端 sidebar 是流内元素时，改为 column 必须同时约束 sidebar 高度或给 reader 明确 `flex: 1`。
   2. `height: 100vh` 与文档流中的 toolbar/bottom-bar 同时存在时，必出高度溢出；唤出 UI 的状态必须用 `calc` 精确扣除工具栏高度。
   3. 移动端与桌面端的 sidebar 定位策略不同（fixed 抽屉 vs 流内伸缩），同一套沉浸模式 CSS 不能对两者使用相同的 flex-direction。
+
+## 离线导出弹窗章节过多时按钮被推出视口、进度条被裁切
+
+- **编号**：BUG-048
+- **首次出现**：2026-07-05
+- **类型**：UI / 兼容性
+- **环境**：桌面端浏览器、移动端浏览器、章节 ≥ 20 的长书（如 MySQL实战45讲、三国）
+- **现象**：
+  1. 点击「设置 → 离线导出笔记」打开弹窗，章节多时整张弹窗被撑高，全选 / 清空 / 确认导出 / 取消按钮被推出视口，用户无法点击确认导出；只能勾选当前可见部分章节，无法触及底部按钮。
+  2. 即便按钮可见，点击「确认导出」后底部出现红色进度条（朱砂红 `var(--accent)`）和进度文字，但视口高度不足时进度文字被裁切，看不到「导出完成 → xxx.md」完整提示。
+- **根因**：
+  1. `#exportOverlay .modal` 复用了通用 `.modal` 样式，只有 `width: 90% / max-width: 460px`，**没有 `max-height`**，章节列表 `.export-tree` 也没有 `overflow` 约束，整张弹窗随章节线性增长，按钮被推到视口之外。
+  2. `.modal-overlay` 用 `align-items: center` + 自身没有 `overflow`，当视口高度小于 modal 高度时，弹窗上下都被裁切；叠加 `.modal` 的 `overflow: hidden`，进度文字区被切掉。
+  3. `.export-list / .export-row / .export-checkbox / .export-label / .export-sublist` 全套类名都没有 CSS 定义，渲染纯靠浏览器默认样式，行距/对齐/缩进都不可控。
+  4. 弹窗每次重开都残留上次的滚动位置，没有回到第一章。
+- **修复**：
+  1. `#exportOverlay .modal` 改为 `display: flex; flex-direction: column; max-height: 90vh; overflow: hidden`，让弹窗整体不超高。
+  2. `#exportOverlay .modal-body` 改为 `flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0`，作为弹性容器。
+  3. `.export-tree` 设为 `flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch`，独占可滚动区，章节再多也只在它内部滚动。
+  4. `.export-actions` 设为 `flex-shrink: 0` + 上方分隔线，固定在底部不滚动。
+  5. 补齐 `.export-list / .export-row / .export-checkbox / .export-label / .export-sublist / .export-book-tip / .export-progress-bar` 全套样式，章节/笔记分层级，悬停高亮，复选框着色用 `accent-color`。
+  6. `renderExportTree()` 末尾添加 `elements.exportTree.scrollTop = 0`，每次打开默认展示第一章。
+  7. 进度条修复：`.modal-overlay` 改 `align-items: safe center` + `overflow-y: auto`，视口高度不足时整个弹窗顶到顶部并可整体滚动；`#exportProgress` 加虚线分隔 + `display: block`，进度条 6px → 8px，文字加 `word-break: break-all`，长文件名不撑爆容器。
+  8. 新增 `@media (max-width: 480px)` 适配：弹窗宽度 95%、`max-height: 88vh`，按钮两两换行铺满 50%。
+  9. 升级 CSS/JS 版本号 `v=2026070504 → v=2026070506`，SW 缓存名 `halo-read-v13 → halo-read-v15` 触发自动更新。
+- **涉及文件**：
+  - `src/web/static-site/css/style.css`
+  - `src/web/static-site/js/app.js`
+  - `src/web/static-site/index.html`（版本号）
+  - `src/web/static-site/sw.js`（缓存名）
+- **回归测试**：
+  - `tests/run_regression_suite.sh`：36/36 通过
+  - `python scripts/check_book_structure.py --output output --strict`：0 问题
+  - `python -m pytest -q`：658 passed, 19 skipped
+  - 浏览器验收（桌面端 + 移动端模拟）：
+    - 选章节 ≥ 20 的长书（MySQL实战45讲 / 三国）打开导出弹窗，按钮始终可见
+    - 章节列表可上下滚动，全选 / 清空即时反映
+    - 确认导出后进度条 0→100% 完整可见，文字不被裁切
+    - 默认滚动到顶部 = 第一章可见
+    - ≤480px 视口下按钮两两换行不溢出
+- **教训/沉淀**：
+  1. 通用弹窗组件（`.modal`）复用时，对「内容可能无限增长」的场景必须单独覆盖 `max-height` + `overflow`，否则按钮会被撑出视口；这是 modal 模式的反模式，应作为「内容可滚动弹窗」的标准模板沉淀。
+  2. `align-items: center` 在视口小于内容时会让上下都被裁切，弹窗类组件应统一用 `align-items: safe center` + `overflow-y: auto` 兜底。
+  3. 章节树渲染必须显式给 `scrollTop = 0`，不能假设 DOM 重新挂载会自动归零（浏览器会保留滚动位置）。
+  4. 新增类名（`.export-*`）必须配套写 CSS，不能只写 HTML/JS 借浏览器默认样式裸跑，否则行距/对齐/缩进都不可控。
+
