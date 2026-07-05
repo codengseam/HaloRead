@@ -1631,8 +1631,12 @@ body[data-view="home"] .bottom-bar {
     position: fixed;
     inset: 0;
     display: flex;
-    align-items: center;
+    /* safe center：内容超高时自动改为 flex-start，避免上下被裁切 */
+    align-items: safe center;
     justify-content: center;
+    /* 视口高度不足时允许 overlay 自身滚动查看完整 modal */
+    overflow-y: auto;
+    padding: 16px 0;
     background-color: rgba(0, 0, 0, 0.35);
     opacity: 0;
     visibility: hidden;
@@ -1795,6 +1799,171 @@ body[data-view="home"] .bottom-bar {
     justify-content: flex-end;
     gap: 0.75rem;
     margin-top: 1.5rem;
+}
+
+/* ============ 离线导出弹窗（章节过多时支持滚动 + 默认展示第一章 + 按钮固定底部） ============ */
+/* BUG-047：原 .modal 无 max-height，章节过多时把按钮推出视口；改为 flex 列布局让 .export-tree 独占可滚动区。 */
+#exportOverlay .modal {
+    display: flex;
+    flex-direction: column;
+    width: 92%;
+    max-width: 540px;
+    max-height: 90vh;
+    overflow: hidden;
+}
+
+#exportOverlay .modal-header {
+    flex-shrink: 0;
+}
+
+#exportOverlay .modal-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 1rem 1.25rem 1.25rem;
+    overflow: hidden;
+}
+
+.export-book-tip {
+    flex-shrink: 0;
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    color: var(--ink-secondary);
+    background-color: var(--bg-active);
+    border-radius: var(--radius);
+    border-left: 3px solid var(--accent);
+}
+
+.export-tree {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.25rem;
+    margin: 0 -0.25rem 0 0;
+    /* iOS 滚动惯性 */
+    -webkit-overflow-scrolling: touch;
+}
+
+.export-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.export-list > .export-node {
+    margin-bottom: 0.4rem;
+}
+
+.export-sublist {
+    list-style: none;
+    margin: 0.25rem 0 0.5rem 1.4rem;
+    padding: 0;
+    border-left: 1px dashed var(--border);
+}
+
+.export-sublist > .export-node {
+    margin-bottom: 0.15rem;
+}
+
+.export-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.4rem;
+    border-radius: 6px;
+    transition: background-color 0.15s ease;
+}
+
+.export-row-chapter {
+    font-weight: 600;
+    color: var(--ink-primary);
+    font-size: 0.95rem;
+}
+
+.export-row-note {
+    color: var(--ink-secondary);
+    font-size: 0.9rem;
+}
+
+.export-row:hover {
+    background-color: var(--bg-hover);
+}
+
+.export-checkbox {
+    flex-shrink: 0;
+    width: 1.05rem;
+    height: 1.05rem;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.export-checkbox-chapter {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+.export-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.export-actions {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.6rem;
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+}
+
+#exportCounter {
+    flex: 1 1 100%;
+    font-size: 0.82rem;
+    color: var(--ink-muted);
+    text-align: right;
+    margin-bottom: 0.15rem;
+}
+
+#exportProgress {
+    display: block;
+    flex: 1 1 100%;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border);
+}
+
+.export-progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--bg-active);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#exportProgressFill {
+    height: 100%;
+    width: 0%;
+    background-color: var(--accent);
+    transition: width 0.2s ease;
+}
+
+#exportProgressText {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--ink-secondary);
+    word-break: break-all;
+    line-height: 1.4;
 }
 
 /* ============ 搜索结果 ============ */
@@ -2100,6 +2269,50 @@ body[data-view="home"] .bottom-bar {
 
     .hero-subtitle {
         font-size: 10px;
+    }
+}
+
+/* ============ 离线导出弹窗移动端适配 ============ */
+/* BUG-047：窄屏下弹窗更接近全屏，按钮区独立换行不溢出。 */
+@media (max-width: 480px) {
+    #exportOverlay .modal {
+        width: 95%;
+        max-width: none;
+        max-height: 88vh;
+        border-radius: 8px;
+    }
+
+    #exportOverlay .modal-body {
+        padding: 0.85rem 0.9rem 1rem;
+    }
+
+    .export-row-chapter {
+        font-size: 0.92rem;
+    }
+
+    .export-row-note {
+        font-size: 0.85rem;
+    }
+
+    .export-checkbox {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    .export-actions {
+        gap: 0.4rem 0.5rem;
+    }
+
+    .export-actions .btn-primary,
+    .export-actions .btn-secondary {
+        flex: 1 1 calc(50% - 0.3rem);
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+
+    #exportCounter {
+        flex: 1 1 100%;
+        text-align: left;
     }
 }
 
