@@ -38,19 +38,21 @@
     --divider: #e6dcc4;
     --shadow: rgba(60, 40, 20, 0.10);
 
-    /* 系统字体优先，移除 Google Fonts 依赖，保证各浏览器/网络环境渲染一致 */
-    --font-sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-    --font-serif: "Source Han Serif SC", "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
-    --font-kai: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif;
-    --font-display: "Source Han Serif SC", "Songti SC", "STSong", "Noto Serif SC", serif;
+    /* 系统字体优先，移除 Google Fonts 依赖，保证各浏览器/网络环境渲染一致。
+       serif/kai/display 不再依赖 Source Han Serif SC（思源宋体非系统预装），
+       改为按平台优先系统自带宋体/楷体，三端命中一致的实际字体。 */
+    --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --font-serif: "Songti SC", "STSong", "SimSun", "Source Han Serif SC", "Noto Serif SC", serif;
+    --font-kai: "STKaiti", "Kaiti SC", "KaiTi", "KaiTi_GB2312", "Source Han Serif SC", "Noto Serif SC", serif;
+    --font-display: "Songti SC", "STSong", "SimSun", "Source Han Serif SC", "Noto Serif SC", serif;
 }
 
 /* ============ 古典皮肤：标题/书名用宋体/楷体，正文用系统无衬线 ============ */
 body[data-skin="classical"] {
-    --font-serif: "Source Han Serif SC", "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
-    --font-kai: "Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif;
-    --font-display: "Source Han Serif SC", "Songti SC", "STSong", "Noto Serif SC", serif;
-    --font-sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --font-serif: "Songti SC", "STSong", "SimSun", "Source Han Serif SC", "Noto Serif SC", serif;
+    --font-kai: "STKaiti", "Kaiti SC", "KaiTi", "KaiTi_GB2312", "Source Han Serif SC", "Noto Serif SC", serif;
+    --font-display: "Songti SC", "STSong", "SimSun", "Source Han Serif SC", "Noto Serif SC", serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 /* 古典 · 白天（默认）：宣纸米黄底、墨黑文字、朱砂红强调 */
@@ -584,6 +586,71 @@ body[data-view="home"] .page-main {
     display: none;
 }
 
+/* ===== 顶部工具栏 ===== */
+.toolbar {
+    position: relative;
+    flex-shrink: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 56px;
+    padding: 0 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--divider);
+    box-shadow: 0 1px 3px rgba(44, 44, 44, 0.04);
+}
+
+.toolbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.toolbar-brand h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+}
+
+.toolbar-chapter {
+    font-size: 0.85rem;
+    color: var(--ink-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toolbar-search {
+    flex: 1;
+    max-width: 420px;
+    min-width: 0;
+}
+
+.toolbar-search input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-input, #faf8f3);
+    color: var(--ink);
+    font-size: 0.9rem;
+    outline: none;
+}
+
+.toolbar-search input:focus {
+    border-color: var(--accent);
+}
+
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 /* ===== 视图切换：header 互斥显示 ===== */
 body[data-view="home"] .toolbar {
     display: none;
@@ -773,21 +840,21 @@ body[data-view="reader"] .brand-header {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 120px;
-    padding: 16px;
+    height: 76px;
+    padding: 10px 12px;
     background: linear-gradient(135deg, var(--paper) 0%, #f0ece5 100%);
     border-bottom: 1px solid var(--divider);
 }
 
 .book-cover-title {
     font-family: var(--font-serif);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--ink);
     text-align: center;
-    line-height: 1.4;
+    line-height: 1.35;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -1882,6 +1949,7 @@ body[data-view="home"] .bottom-bar {
     }
 
     .toolbar-actions {
+        display: flex;
         gap: 0.25rem;
     }
 
@@ -1982,6 +2050,22 @@ body[data-view="home"] .bottom-bar {
     .bottom-bar {
         display: flex;
     }
+
+    /* 移动端沉浸模式：唤出 UI 时 reader-view 用 column，
+       同时 page-main 扣除 toolbar(56px) + bottom-bar(50px)。 */
+    body.immersive-mode .reader-view {
+        flex-direction: column;
+    }
+
+    body.immersive-mode .reader {
+        flex: 1;
+        min-height: 0;
+        max-height: none;
+    }
+
+    body.immersive-mode:not(.ui-hidden) .page-main {
+        height: calc(100vh - 56px - 50px);
+    }
 }
 
 @media (max-width: 480px) {
@@ -2019,6 +2103,12 @@ body[data-view="home"] .bottom-bar {
 /* 检测处于 iframe/嵌入环境时，给 body 打上的标记类 */
 body.modelscope-embedded {
     /* 隐藏与魔搭平台外壳重复或叠加的自有 UI */
+    /* BUG-046：魔搭创空间 iframe 顶栏约 48px、底栏约 0px，
+       统一预留避免被平台外壳遮挡导致三端布局错位。 */
+    --modelscope-shell-top: 48px;
+    --modelscope-shell-bottom: 0px;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 body.modelscope-embedded .brand-header {
@@ -2103,17 +2193,30 @@ body.immersive-mode .page-main {
     height: 100vh;
 }
 
+/* 沉浸模式下唤出 UI 时，page-main 需要扣除工具栏/底栏所占空间，
+   否则 toolbar + page-main + bottom-bar 总高度会超出视口，
+   导致正文被 bottom-bar 遮挡或整体滚动。 */
+body.immersive-mode:not(.ui-hidden) .page-main {
+    height: calc(100vh - 56px);
+}
+
 body.modelscope-embedded:fullscreen .reader-view,
 body.modelscope-embedded:-webkit-full-screen .reader-view,
 body.immersive-mode .reader-view {
-    flex-direction: column;
     height: 100vh;
     max-height: 100vh;
+}
+
+/* 桌面端保持 row 布局，避免 sidebar 在 column 下无限撑高把 reader 挤成 0。 */
+body.immersive-mode .reader-view {
+    flex-direction: row;
 }
 
 body.modelscope-embedded:fullscreen .reader,
 body.modelscope-embedded:-webkit-full-screen .reader,
 body.immersive-mode .reader {
+    flex: 1;
+    min-height: 0;
     width: 100%;
 }
 

@@ -887,3 +887,67 @@
   1. **在线字体是跨浏览器/跨网络稳定性的高危外部依赖**：Google Fonts 在国内各浏览器、各网络环境下可达性不一致，必须视为不可靠依赖。追求"极致稳定"时应默认禁用在线字体。
   2. **系统字体栈是中文阅读器的最佳稳定基线**：iOS 用 PingFang、macOS 用 Hiragino、Windows 用 Microsoft YaHei、Android 用 Noto Sans SC，配合 `-apple-system` 与 `sans-serif` 兜底，能在不加载任何外部资源的前提下保证可读与风格统一。
   3. **动态字体加载函数必须同步清理**：只改 CSS 不够，JS 中如果有根据皮肤切换字体链接的逻辑，必须改为 no-op 或删除，否则旧设置/旧缓存仍可能触发外部请求。
+
+## 跨端首页渲染不一致与缓存幽灵旧版
+
+- **编号**：BUG-046
+- **首次出现**：2026-07-04
+- **类型**：兼容性 / 缓存 / UI
+- **环境**：微信内置浏览器、外部浏览器（Chrome/Safari/系统浏览器）、魔搭创空间 iframe
+- **现象**：
+  1. 同一页面在微信中显示正常，外部浏览器排版错乱、文字明显不同。
+  2. 用户多次刷新/换浏览器/重启后，外部浏览器仍展示旧版（"浏览书架"按钮仍在、书籍卡片标题栏过大、沉浸按钮消失）。
+  3. 魔搭创空间 iframe 内顶部出现双层导航，自有 toolbar 被平台外壳遮挡。
+  4. 部分网络/魔搭 iframe/微信内置浏览器下 marked.js CDN 加载失败，页面无法进入阅读流程。
+- **根因**：
+  1. 页面依赖 Google Fonts，在国内各浏览器/网络下可达性不一致，失败后的回退字体导致排版差异。
+  2. Service Worker 对首页 HTML 使用 cache-first，旧 SW 一直返回缓存的旧 `index.html`，用户看不到新的 CSS/JS 版本和已删除的按钮。
+  3. `PRECACHE_ASSETS` 不带查询参数，而 `index.html` 引用资源带 `?v=NNN`，严格 `url.href === absolute` 比较会漏判带 `?v=` 的请求，核心资源绕过缓存直接走网络。
+  4. 魔搭平台外壳位于父页面，无法通过本站 CSS/JS 直接隐藏；未给 iframe 内自有 UI 预留平台外壳高度，导致叠加错位。
+  5. marked.js CDN 在部分网络/iframe 下可达性不一致，无本地 fallback。
+- **修复**：
+  1. 彻底移除 Google Fonts 引用，`css/style.css` 全部改用系统字体栈；`js/app.js` 中 `updateFontLink` 改为空函数。
+  2. 首页 hero 区移除"浏览书架"按钮。
+  3. 书籍卡片标题区高度从 120px 降到 76px，`.book-cover-title` 限制 2 行截断。
+  4. `sw.js`：`CACHE_NAME` 升级到 `halo-read-v13`；首页 HTML 改走 network-first；新增 `normalizeUrlForCompare()` 去掉查询参数后再匹配，保证 `?v=NNN` 资源命中缓存。
+  5. `index.html` 增加 marked.js CDN 加载失败回退到本地 `js/vendor/marked.min.js`。
+  6. 魔搭嵌入：给 `body.modelscope-embedded` 预留平台外壳高度，隐藏自有 `brand-header` 与 `bottom-bar`，toolbar 下移避免被遮挡。
+- **涉及文件**：`src/web/static-site/index.html`、`src/web/static-site/css/style.css`、`src/web/static-site/js/app.js`、`src/web/static-site/sw.js`
+- **回归测试**：
+  - `bash tests/run_regression_suite.sh`：36 / 0 / 0 通过
+  - `python scripts/check_book_structure.py --output output --strict`：0 问题
+  - `python -m pytest -q`：658 passed, 19 skipped
+  - 浏览器/真机验收：微信、Chrome、Safari、系统浏览器、魔搭 iframe 文字与排版一致；刷新后"浏览书架"按钮与书籍卡片尺寸已更新
+- **教训/沉淀**：
+  1. 前端关键修复必须同步升级 `CACHE_NAME` 并审视缓存策略，否则手机端会持续看到"幽灵旧版"。
+  2. 带版本号的资源引用要与 SW 的缓存匹配逻辑对齐，查询参数规范化是常见遗漏点。
+  3. iframe/嵌入场景要提前获取平台外壳高度并预留，不能等上线后才发现双层导航。
+  4. 第三方 CDN 在国内/iframe/微信环境下都应视为不可靠依赖，必须有本地 fallback。
+
+## 沉浸模式唤出 UI 后正文渲染异常
+
+- **编号**：BUG-047
+- **首次出现**：2026-07-05
+- **类型**：UI / 兼容性
+- **环境**：桌面端浏览器、移动端浏览器
+- **现象**：阅读页面点击"沉浸"进入沉浸模式后，再点击页面中央唤出 UI，出现两种渲染异常：
+  1. **桌面端**：右侧正文区域完全空白，`.reader` 高度塌陷为 0。
+  2. **移动端**：底部操作栏（bottom-bar）遮挡正文底部，文章最后一行被盖住。
+- **根因**：
+  1. `body.immersive-mode .reader-view` 被设为 `flex-direction: column; height: 100vh`。桌面端 `.sidebar` 不是 fixed 定位，仍是流内 flex 项，目录树撑开后占据全部可用高度，`.reader` 因没有声明 `flex: 1` 被挤压到 `height: 0`。
+  2. `body.immersive-mode .page-main` 被设为 `height: 100vh`，而唤出 UI 时 toolbar（56px）与 bottom-bar（50px）仍在文档流中，`toolbar + page-main + bottom-bar` 总高度超出视口，导致 bottom-bar 覆盖在正文上方。
+- **修复**：
+  1. 桌面端沉浸模式保持 `.reader-view` 为 `row` 布局，避免 sidebar 与 reader 垂直堆叠。
+  2. `.immersive-mode .reader` 统一补充 `flex: 1; min-height: 0`，确保在 flex 布局中占据剩余空间。
+  3. 沉浸模式下唤出 UI 时（`:not(.ui-hidden)`）：桌面端 `.page-main` 高度改为 `calc(100vh - 56px)`；移动端改为 `calc(100vh - 56px - 50px)`，扣除 toolbar 与 bottom-bar。
+  4. 移动端媒体查询中保留 `.reader-view` 为 `column`，并给 `.reader` 设置 `flex: 1; min-height: 0; max-height: none`。
+- **涉及文件**：`src/web/static-site/css/style.css`
+- **回归测试**：
+  - 浏览器验收：桌面端沉浸模式唤出 UI 后 `.reader` 高度正常、正文可见；移动端 bottom-bar 不遮挡正文最后一行
+  - `bash tests/run_regression_suite.sh`
+  - `python scripts/check_book_structure.py --output output --strict`
+  - `python -m pytest -q`
+- **教训/沉淀**：
+  1. 沉浸模式不是简单隐藏 UI，flex 布局在"UI 隐藏/显示"两种状态下的高度分配都要验证；桌面端 sidebar 是流内元素时，改为 column 必须同时约束 sidebar 高度或给 reader 明确 `flex: 1`。
+  2. `height: 100vh` 与文档流中的 toolbar/bottom-bar 同时存在时，必出高度溢出；唤出 UI 的状态必须用 `calc` 精确扣除工具栏高度。
+  3. 移动端与桌面端的 sidebar 定位策略不同（fixed 抽屉 vs 流内伸缩），同一套沉浸模式 CSS 不能对两者使用相同的 flex-direction。
