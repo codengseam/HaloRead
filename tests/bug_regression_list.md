@@ -997,3 +997,45 @@
   3. 章节树渲染必须显式给 `scrollTop = 0`，不能假设 DOM 重新挂载会自动归零（浏览器会保留滚动位置）。
   4. 新增类名（`.export-*`）必须配套写 CSS，不能只写 HTML/JS 借浏览器默认样式裸跑，否则行距/对齐/缩进都不可控。
 
+## 离线导出仅支持 Markdown，无法适配听书软件
+
+- **编号**：BUG-049
+- **首次出现**：2026-07-06
+- **类型**：功能缺失 / 用户体验
+- **环境**：所有端（桌面浏览器 / 移动端 / 微信内置浏览器 / 魔搭 iframe）
+- **现象**：
+  1. 离线导出弹窗只有「确认导出」按钮，无格式选择；导出文件固定为 `.md`
+  2. 用户需把笔记导入到听书软件（如微信读书、Apple Books、Voice Dream Reader），但听书软件普遍不支持 Markdown 格式，导致无法导入或导入后无章节结构、TTS 引擎把 `#`/`*`/`>` 等符号读出来
+- **根因**：
+  1. `performExport` 硬编码 `assembleMarkdown` + `.md` 扩展名 + `text/markdown` MIME，无扩展点
+  2. `triggerDownload` 第二参硬编码 `text/markdown;charset=utf-8`，无法适配其他格式
+  3. UI 无格式选择控件，用户无切换入口
+- **修复**：
+  1. 重构导出管线：新增 `EXPORT_FORMATTERS` 注册表（`assemble`/`extension`/`mimeType` 三字段），`performExport` 改为按 `exportState.format` dispatch
+  2. `triggerDownload` 参数化 `mimeType`，并支持 `content` 为 `Blob` 入参（EPUB 已是 Blob）
+  3. UI 新增格式选择 radio 组（`.export-format-row`），3 个选项：Markdown / 纯文本(TXT) / EPUB，放在 `#exportBookTip` 与 `#exportTree` 之间，不动 `.export-actions` 布局（BUG-048 修复零冲击）
+  4. 实现 TXT 格式（`assembleTxt`）：完全去除 markdown 语法，章节用「第 X 章 · 标题」前缀，笔记用「■ 」标记
+  5. 实现 EPUB 格式（`assembleEpub`）：完整 EPUB 2 规范结构（mimetype + container.xml + content.opf + toc.ncx + xhtml），用 marked 把 markdown 转 HTML 后包裹 XHTML 骨架；JSZip 走本地 vendor 副本，首次调用时动态注入 script
+  6. 配套：`js/vendor/jszip.min.js`（95KB）加入 sw.js 预缓存 + build_site.py 静态资源列表；版本号 `v=2026070506 → v=2026070602`，SW 缓存名 `halo-read-v15 → halo-read-v17`
+- **涉及文件**：
+  - `src/web/static-site/js/app.js`（EXPORT_FORMATTERS + assembleTxt + assembleEpub + UI 绑定）
+  - `src/web/static-site/css/style.css`（`.export-format-row` / `.export-format-option` 样式 + 移动端适配）
+  - `src/web/static-site/index.html`（radio 组 DOM + 版本号）
+  - `src/web/static-site/js/vendor/jszip.min.js`（新增 vendor 副本）
+  - `src/web/static-site/sw.js`（预缓存列表 + 缓存名）
+  - `scripts/build_site.py`（静态资源列表加 jszip.min.js）
+  - `tests/test_reader_features.js`（新增测试 29 TXT + 测试 30 EPUB）
+- **回归测试**：
+  - `tests/run_regression_suite.sh`：36/36 通过
+  - `python scripts/check_book_structure.py --output output --strict`：0 问题
+  - `python -m pytest -q`：658 passed, 19 skipped
+  - 测试 29（TXT）：不含 markdown 语法 + 含「第 X 章」前缀 + 含「■ 」标记
+  - 测试 30（EPUB）：zip 结构含 mimetype / container.xml / content.opf / toc.ncx / xhtml
+  - 浏览器验收：选章节 ≥ 20 的长书，分别导出 md/txt/epub，验证三种格式都能正常下载
+- **教训/沉淀**：
+  1. 导出类功能一开始就应抽象为 formatter 注册表，硬编码格式会让后续扩展成本指数级上升；本次重构 4 个 commit 才从「硬编码 md」演进到「可扩展多格式」
+  2. JS 注释里不能直接写反引号 + 中文，jsdom 解析时会报 `SyntaxError: Unexpected identifier`（注释里的反引号被当作模板字符串开头，遇到中文 identifier 失败）；应改用「三反引号」等文字描述
+  3. 测试环境与生产环境差异：jsdom 跑 e2e 测试需要 node_modules/jsdom + node_modules/marked，但 `npm install` 会带回 jsdom 导致 run_regression_suite.sh 第 5 步从「跳过」变「失败」；CI 环境应保持 node_modules 不存在
+  4. EPUB 是听书场景的「最大公约数」格式——微信读书 / Apple Books / Voice Dream Reader / 得到 全部原生支持，章节结构可被 TTS 引擎准确识别；TXT 是兜底方案，无章节结构但所有听书软件都支持
+
+
