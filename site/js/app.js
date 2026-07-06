@@ -1454,11 +1454,12 @@
     // 目录识别靠 H1(书) / H2(章) / H3(笔记) 三级，正文原有标题降级到 H4-H6 避免污染大纲。
     const EXPORT_CONCURRENCY = 6;
 
-    // 导出时的临时状态：选中的 path 集合
+    // 导出时的临时状态：选中的 path 集合 + 当前选择的导出格式
     const exportState = {
         selectedPaths: new Set(),
         allPaths: [],
-        exporting: false
+        exporting: false,
+        format: 'md' // 'md' | 'txt' | 'epub'（由 radio 切换，performExport 按此 dispatch）
     };
 
     /**
@@ -1814,8 +1815,11 @@
         return lines.join('\n');
     }
 
-    function triggerDownload(filename, content) {
-        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    function triggerDownload(filename, content, mimeType) {
+        // mimeType 参数化：md/txt 用 text/*，epub 用 application/epub+zip
+        // 默认仍为 markdown，保证旧调用点（不传第三参）行为不变
+        const type = mimeType || 'text/markdown;charset=utf-8';
+        const blob = new Blob([content], { type: type });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -1830,6 +1834,21 @@
             if (a.parentNode) a.parentNode.removeChild(a);
         }, 0);
     }
+
+    /**
+     * 导出格式注册表：每种格式注册 assemble / extension / mimeType 三个字段。
+     * - assemble(bookTitle, selectedChapters, rawMap) -> string | Blob | Promise<string|Blob>
+     * - extension: 文件扩展名（不含点）
+     * - mimeType: Blob 类型
+     * 新增格式只需在此追加一项，performExport 自动 dispatch。
+     */
+    const EXPORT_FORMATTERS = {
+        md: {
+            assemble: assembleMarkdown,
+            extension: 'md',
+            mimeType: 'text/markdown;charset=utf-8'
+        }
+    };
 
     function sanitizeFilename(name) {
         return String(name || 'export')
@@ -1878,9 +1897,10 @@
                 return Object.assign({}, chapterNode, { children: newNotes });
             }).filter((ch) => ch.children.length > 0);
 
-            const md = assembleMarkdown(state.currentBook || '豪书斋', selectedChapters, rawMap);
-            const filename = sanitizeFilename(state.currentBook || 'export') + '.md';
-            triggerDownload(filename, md);
+            const formatter = EXPORT_FORMATTERS[exportState.format] || EXPORT_FORMATTERS.md;
+            const output = await formatter.assemble(state.currentBook || '豪书斋', selectedChapters, rawMap);
+            const filename = sanitizeFilename(state.currentBook || 'export') + '.' + formatter.extension;
+            triggerDownload(filename, output, formatter.mimeType);
 
             if (elements.exportProgressFill) elements.exportProgressFill.style.width = '100%';
             if (elements.exportProgressText) elements.exportProgressText.textContent = `导出完成，共 ${selected.length} 篇笔记 → ${filename}`;
