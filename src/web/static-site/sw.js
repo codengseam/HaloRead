@@ -2,12 +2,13 @@
  * 豪书斋 Service Worker
  * 缓存策略：核心资源预缓存 + 数据/笔记运行时缓存
  */
-const CACHE_NAME = 'halo-read-v16'; // 2026-07-06 多格式导出：格式选择 UI + 后续 txt/epub 实现
+const CACHE_NAME = 'halo-read-v17'; // 2026-07-06 多格式导出：新增 EPUB 格式 + JSZip vendor 预缓存
 const PRECACHE_ASSETS = [
     './',
     './index.html',
     './css/style.css',
-    './js/app.js'
+    './js/app.js',
+    './js/vendor/jszip.min.js'
 ];
 
 const CDN_ASSETS = [

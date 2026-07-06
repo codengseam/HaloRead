@@ -1818,8 +1818,9 @@
     function triggerDownload(filename, content, mimeType) {
         // mimeType 参数化：md/txt 用 text/*，epub 用 application/epub+zip
         // 默认仍为 markdown，保证旧调用点（不传第三参）行为不变
+        // content 可以是 string 或 Blob（epub 已是 Blob，避免二次包装）
         const type = mimeType || 'text/markdown;charset=utf-8';
-        const blob = new Blob([content], { type: type });
+        const blob = (content instanceof Blob) ? content : new Blob([content], { type: type });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -1908,6 +1909,185 @@
     }
 
     /**
+     * BUG-049：EPUB 导出。目标场景 = 导出到听书软件 / 阅读器，支持章节跳转。
+     * EPUB 本质是带约定目录结构的 ZIP 包（OCF + OPS）。
+     * 实现：
+     *  1) mimetype 文件必须存在且为 zip 中第一个文件、不压缩
+     *  2) META-INF/container.xml 指向 OEBPS/content.opf
+     *  3) OEBPS/content.opf 含 metadata / manifest / spine
+     *  4) OEBPS/toc.ncx 含 navMap 章节导航
+     *  5) 每篇笔记一个 xhtml 文件
+     *  6) 用 marked 把 markdown 转 HTML 后包裹 XHTML 骨架
+     *  7) JSZip 走本地 vendor 兜底（与 marked.js 同机制），首次调用时动态注入 script
+     */
+    let jszipPromise = null;
+    function loadJSZip() {
+        if (jszipPromise) return jszipPromise;
+        if (typeof window !== 'undefined' && window.JSZip) {
+            jszipPromise = Promise.resolve(window.JSZip);
+            return jszipPromise;
+        }
+        jszipPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'js/vendor/jszip.min.js?v=2026070602';
+            script.onload = () => {
+                if (window.JSZip) resolve(window.JSZip);
+                else reject(new Error('JSZip 加载完成但未挂到 window'));
+            };
+            script.onerror = () => reject(new Error('JSZip 本地副本加载失败，请检查网络或 js/vendor/jszip.min.js'));
+            document.head.appendChild(script);
+        });
+        return jszipPromise;
+    }
+
+    function escapeXml(text) {
+        return String(text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    function mdBodyToXhtml(body) {
+        // marked 已在全局可用（阅读器渲染时已加载）
+        const html = (typeof marked !== 'undefined' && marked.parse)
+            ? marked.parse(body, { breaks: false, gfm: true })
+            : '<pre>' + escapeXml(body) + '</pre>';
+        return html;
+    }
+
+    async function assembleEpub(bookTitle, selectedChapters, rawMap) {
+        const JSZip = await loadJSZip();
+        const zip = new JSZip();
+
+        // 1) mimetype（必须首位、不压缩）
+        zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
+
+        // 2) META-INF/container.xml
+        zip.file('META-INF/container.xml',
+            '<?xml version="1.0" encoding="UTF-8"?>\n' +
+            '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n' +
+            '  <rootfiles>\n' +
+            '    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>\n' +
+            '  </rootfiles>\n' +
+            '</container>\n'
+        );
+
+        // 3) 收集所有笔记，生成 xhtml 文件 + 构建 manifest / spine / navMap
+        const bookId = 'halo-' + Date.now();
+        const items = []; // {id, href, title, chapterTitle}
+        let noteIdx = 0;
+        selectedChapters.forEach((chapterNode, chIdx) => {
+            const chapterNotes = (chapterNode.children || []).filter((n) => n.path && rawMap.has(n.path));
+            chapterNotes.forEach((noteNode, nIdx) => {
+                const raw = rawMap.get(noteNode.path) || '';
+                const { body } = parseFrontmatter(raw);
+                const noteTitle = noteNode.title || noteNode.event || '未命名笔记';
+                const chapterTitle = chapterNode.title || '未命名章节';
+                const id = 'note-' + (noteIdx + 1);
+                const href = 'content/note-' + (noteIdx + 1) + '.xhtml';
+
+                const xhtml =
+                    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+                    '<!DOCTYPE html>\n' +
+                    '<html xmlns="http://www.w3.org/1999/xhtml">\n' +
+                    '<head>\n' +
+                    '  <meta charset="utf-8"/>\n' +
+                    '  <title>' + escapeXml(noteTitle) + '</title>\n' +
+                    '  <link rel="stylesheet" type="text/css" href="../style.css"/>\n' +
+                    '</head>\n' +
+                    '<body>\n' +
+                    '  <h1>' + escapeXml(noteTitle) + '</h1>\n' +
+                    '  <p class="chapter-context">第 ' + (chIdx + 1) + ' 章 · ' + escapeXml(chapterTitle) + '</p>\n' +
+                    mdBodyToXhtml(body) + '\n' +
+                    '</body>\n' +
+                    '</html>\n';
+                zip.file('OEBPS/' + href, xhtml);
+                items.push({ id: id, href: href, title: noteTitle, chapterTitle: chapterTitle });
+                noteIdx++;
+            });
+        });
+
+        if (items.length === 0) {
+            // 兜底：空 EPUB 也至少要有 1 个 spine 项
+            const id = 'note-empty';
+            const href = 'content/note-empty.xhtml';
+            zip.file('OEBPS/' + href,
+                '<?xml version="1.0" encoding="UTF-8"?>\n' +
+                '<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml">\n<head><meta charset="utf-8"/><title>空</title></head>\n<body><p>本书暂无笔记</p></body>\n</html>\n'
+            );
+            items.push({ id: id, href: href, title: '空', chapterTitle: '空' });
+        }
+
+        // 4) OEBPS/style.css
+        zip.file('OEBPS/style.css',
+            'body { font-family: serif; line-height: 1.8; margin: 1em; }\n' +
+            'h1 { font-size: 1.4em; border-bottom: 1px solid #ccc; padding-bottom: 0.3em; }\n' +
+            '.chapter-context { color: #888; font-size: 0.85em; margin-top: -0.5em; }\n' +
+            'blockquote { margin: 1em 0; padding-left: 1em; border-left: 3px solid #aaa; color: #555; }\n' +
+            'pre { background: #f6f6f6; padding: 0.8em; overflow-x: auto; font-size: 0.9em; }\n' +
+            'code { background: #f6f6f6; padding: 0.1em 0.3em; }\n'
+        );
+
+        // 5) OEBPS/content.opf
+        const manifestItems = items.map((it) =>
+            '    <item id="' + escapeXml(it.id) + '" href="' + escapeXml(it.href) + '" media-type="application/xhtml+xml"/>'
+        ).join('\n');
+        const spineItems = items.map((it) =>
+            '    <itemref idref="' + escapeXml(it.id) + '"/>'
+        ).join('\n');
+        zip.file('OEBPS/content.opf',
+            '<?xml version="1.0" encoding="UTF-8"?>\n' +
+            '<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="bookid">\n' +
+            '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">\n' +
+            '    <dc:title>' + escapeXml(bookTitle) + '</dc:title>\n' +
+            '    <dc:creator>豪书斋</dc:creator>\n' +
+            '    <dc:language>zh-CN</dc:language>\n' +
+            '    <dc:identifier id="bookid">' + bookId + '</dc:identifier>\n' +
+            '    <dc:date>' + new Date().toISOString().slice(0, 10) + '</dc:date>\n' +
+            '  </metadata>\n' +
+            '  <manifest>\n' +
+            '    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>\n' +
+            '    <item id="css" href="style.css" media-type="text/css"/>\n' +
+            manifestItems + '\n' +
+            '  </manifest>\n' +
+            '  <spine toc="ncx">\n' + spineItems + '\n  </spine>\n' +
+            '</package>\n'
+        );
+
+        // 6) OEBPS/toc.ncx
+        const navPoints = items.map((it, idx) =>
+            '    <navPoint id="nav-' + (idx + 1) + '" playOrder="' + (idx + 1) + '">\n' +
+            '      <navLabel><text>' + escapeXml(it.title) + '</text></navLabel>\n' +
+            '      <content src="' + escapeXml(it.href) + '"/>\n' +
+            '    </navPoint>'
+        ).join('\n');
+        zip.file('OEBPS/toc.ncx',
+            '<?xml version="1.0" encoding="UTF-8"?>\n' +
+            '<!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">\n' +
+            '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">\n' +
+            '  <head>\n' +
+            '    <meta name="dtb:uid" content="' + bookId + '"/>\n' +
+            '    <meta name="dtb:depth" content="1"/>\n' +
+            '    <meta name="dtb:totalPageCount" content="' + items.length + '"/>\n' +
+            '    <meta name="dtb:maxPageNumber" content="' + items.length + '"/>\n' +
+            '  </head>\n' +
+            '  <docTitle><text>' + escapeXml(bookTitle) + '</text></docTitle>\n' +
+            '  <navMap>\n' + navPoints + '\n  </navMap>\n' +
+            '</ncx>\n'
+        );
+
+        // 7) 生成 Blob
+        const blob = await zip.generateAsync({
+            type: 'blob',
+            mimeType: 'application/epub+zip',
+            compression: 'DEFLATE'
+        });
+        return blob;
+    }
+
+    /**
      * 导出格式注册表：每种格式注册 assemble / extension / mimeType 三个字段。
      * - assemble(bookTitle, selectedChapters, rawMap) -> string | Blob | Promise<string|Blob>
      * - extension: 文件扩展名（不含点）
@@ -1924,6 +2104,11 @@
             assemble: assembleTxt,
             extension: 'txt',
             mimeType: 'text/plain;charset=utf-8'
+        },
+        epub: {
+            assemble: assembleEpub,
+            extension: 'epub',
+            mimeType: 'application/epub+zip'
         }
     };
 
@@ -1959,7 +2144,10 @@
                     elements.exportProgressText.textContent = `正在抓取笔记 ${done}/${total}…`;
                 }
             });
-            if (elements.exportProgressText) elements.exportProgressText.textContent = '正在拼装文档…';
+            if (elements.exportProgressText) {
+                const fmtLabel = exportState.format === 'epub' ? 'EPUB' : (exportState.format === 'txt' ? 'TXT' : 'Markdown');
+                elements.exportProgressText.textContent = `正在拼装${fmtLabel}文档…`;
+            }
             if (elements.exportProgressFill) elements.exportProgressFill.style.width = '90%';
             // 让进度文本有机会渲染，避免大书同步拼装时 UI 假死
             // 用 setTimeout(0) 而非 rAF：浏览器下两者都能让出一帧让 UI 渲染，
