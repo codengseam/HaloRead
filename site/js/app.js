@@ -1675,7 +1675,7 @@
      * 让 Obsidian/Typora/VSCode 的目录识别稳定可控。
      * Setext 标题（下一行 ===/---）也一并转成降级后的 ATX。
      *
-     * 代码块（``` 或 ~~~ 围栏）内的内容不降级，避免污染代码注释/字符串里的 #。
+     * 代码块（三反引号或三波浪号围栏）内的内容不降级，避免污染代码注释/字符串里的井号。
      */
     function downgradeHeadings(body) {
         // 按围栏代码块分段：偶数段为代码块（不处理），奇数段为正文（降级）
@@ -1836,6 +1836,78 @@
     }
 
     /**
+     * BUG-049：TXT 导出。目标场景 = 导出到听书软件，TTS 引擎朗读。
+     * 设计原则：
+     *  1) 完全去除 markdown 语法（井号/星号/反引号/大于号/连字符等），只留纯文本，避免 TTS 把符号读出来
+     *  2) 章节标题用「第 X 章 标题」前缀 + 空行分隔，听书软件易识别
+     *  3) 笔记标题前加全角空行 + 「■ 」标记，让朗读引擎自然停顿
+     *  4) 剥 frontmatter，去掉所有 HTML 标签和代码围栏
+     */
+    function assembleTxt(bookTitle, selectedChapters, rawMap) {
+        const lines = [];
+        lines.push(bookTitle);
+        lines.push('由豪书斋阅读器离线导出 · ' + new Date().toLocaleString('zh-CN'));
+        lines.push('');
+        lines.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        lines.push('');
+
+        const stripMarkdown = (text) => {
+            let out = text;
+            // 剥围栏代码块（三反引号或三波浪号），保留代码内容但去掉围栏
+            out = out.replace(/```[\w-]*\n([\s\S]*?)```/g, '$1');
+            out = out.replace(/~~~[\w-]*\n([\s\S]*?)~~~/g, '$1');
+            // 剥行内代码反引号
+            out = out.replace(/`([^`]+)`/g, '$1');
+            // 剥 HTML 标签
+            out = out.replace(/<[^>]+>/g, '');
+            // 剥 ATX 标题的井号（保留标题文字）
+            out = out.replace(/^#{1,6}\s+/gm, '');
+            // 剥 Setext 标题的下划线（等号/连字符）
+            out = out.replace(/\n=+\s*$/g, '');
+            out = out.replace(/\n-+\s*$/g, '');
+            // 剥引用符号大于号
+            out = out.replace(/^>\s?/gm, '');
+            // 剥无序列表符号（连字符/星号/加号 开头）
+            out = out.replace(/^[\s]*[-*+]\s+/gm, '');
+            // 剥有序列表符号 数字加点
+            out = out.replace(/^[\s]*\d+\.\s+/gm, '');
+            // 剥粗体 / 斜体
+            out = out.replace(/\*\*([^*]+)\*\*/g, '$1');
+            out = out.replace(/__([^_]+)__/g, '$1');
+            out = out.replace(/\*([^*]+)\*/g, '$1');
+            out = out.replace(/_([^_]+)_/g, '$1');
+            // 剥图片和链接，保留文本
+            out = out.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1');
+            out = out.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+            // 水平分隔线（三连字符或三星号）替换为长破折号
+            out = out.replace(/^[\s]*([-*]){3,}\s*$/gm, '────────────────');
+            // 折叠多余空行（连续 3+ 空行 → 2 空行）
+            out = out.replace(/\n{3,}/g, '\n\n');
+            return out;
+        };
+
+        selectedChapters.forEach((chapterNode, chIdx) => {
+            const chapterNotes = (chapterNode.children || []).filter((n) => n.path && rawMap.has(n.path));
+            if (chapterNotes.length === 0) return;
+            lines.push(`第 ${chIdx + 1} 章 · ${chapterNode.title || '未命名章节'}`);
+            lines.push('');
+            chapterNotes.forEach((noteNode, nIdx) => {
+                const raw = rawMap.get(noteNode.path) || '';
+                const { body } = parseFrontmatter(raw);
+                const noteTitle = noteNode.title || noteNode.event || '未命名笔记';
+                lines.push(`■ ${noteTitle}`);
+                lines.push('');
+                lines.push(stripMarkdown(body.replace(/\s+$/, '')));
+                lines.push('');
+                lines.push('────────────────');
+                lines.push('');
+            });
+        });
+
+        return lines.join('\n');
+    }
+
+    /**
      * 导出格式注册表：每种格式注册 assemble / extension / mimeType 三个字段。
      * - assemble(bookTitle, selectedChapters, rawMap) -> string | Blob | Promise<string|Blob>
      * - extension: 文件扩展名（不含点）
@@ -1847,6 +1919,11 @@
             assemble: assembleMarkdown,
             extension: 'md',
             mimeType: 'text/markdown;charset=utf-8'
+        },
+        txt: {
+            assemble: assembleTxt,
+            extension: 'txt',
+            mimeType: 'text/plain;charset=utf-8'
         }
     };
 
