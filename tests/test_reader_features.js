@@ -1148,6 +1148,116 @@ async function runTest() {
         dom.window.close();
     }
 
+    console.log('\n=== 测试29：TXT 导出去除 markdown 语法（BUG-049）===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        let captured = null;
+        const origBlob = window.Blob;
+        window.Blob = function (parts, opts) {
+            captured = { content: parts.join(''), type: opts && opts.type };
+            return { size: captured.content.length, type: captured.type };
+        };
+        window.URL.createObjectURL = () => 'blob:fake';
+        window.URL.revokeObjectURL = () => {};
+        const origCreateElement = document.createElement.bind(document);
+        document.createElement = function (tag) {
+            const el = origCreateElement(tag);
+            if (tag.toLowerCase() === 'a') el.click = () => {};
+            return el;
+        };
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 5000);
+        // 选第一篇笔记
+        const noteCb = exportTree.querySelector('.export-checkbox-note');
+        noteCb.checked = true;
+        noteCb.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        // 切换格式到 txt
+        const txtRadio = document.querySelector('input[name="exportFormat"][value="txt"]');
+        assert(txtRadio !== null, 'TXT radio 存在');
+        txtRadio.checked = true;
+        txtRadio.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        document.getElementById('exportConfirmBtn').click();
+        await waitFor(() => captured !== null, 3000);
+
+        assert(captured !== null, 'TXT 导出触发并捕获到 Blob 内容');
+        assert(captured.type === 'text/plain;charset=utf-8', `Blob 类型为 text/plain，实际 ${captured.type}`);
+
+        const txt = captured.content;
+        // 不应含 markdown 语法
+        assert(!/^#{1,6}\s/m.test(txt), 'TXT 不含 ATX 标题 # 号');
+        assert(!/```/.test(txt), 'TXT 不含代码围栏 ```');
+        assert(!/^[->+*]\s/m.test(txt), 'TXT 不含列表/引用开头符号');
+        assert(!/\*\*[^*]+\*\*/.test(txt), 'TXT 不含粗体 ** 标记');
+        // 应含章节标题前缀
+        assert(/第\s*\d+\s*章/.test(txt), 'TXT 含「第 X 章」前缀');
+        // 应含笔记标题前缀
+        assert(/■\s/.test(txt), 'TXT 含「■ 」笔记标题标记');
+
+        window.Blob = origBlob;
+        document.createElement = origCreateElement;
+        dom.window.close();
+    }
+
+    console.log('\n=== 测试30：EPUB 导出 zip 结构与 mimetype 首位（BUG-049）===');
+    {
+        const { dom, window, document } = await buildDom();
+        await enterReader(document, window);
+
+        let captured = null;
+        const origBlob = window.Blob;
+        window.Blob = function (parts, opts) {
+            captured = { content: parts.join(''), type: opts && opts.type };
+            return { size: captured.content.length, type: captured.type };
+        };
+        window.URL.createObjectURL = () => 'blob:fake';
+        window.URL.revokeObjectURL = () => {};
+        const origCreateElement = document.createElement.bind(document);
+        document.createElement = function (tag) {
+            const el = origCreateElement(tag);
+            if (tag.toLowerCase() === 'a') el.click = () => {};
+            return el;
+        };
+
+        document.getElementById('offlineExportBtn').click();
+        const exportTree = document.getElementById('exportTree');
+        await waitFor(() => exportTree.querySelectorAll('.export-checkbox-note').length > 0, 5000);
+        const noteCb = exportTree.querySelector('.export-checkbox-note');
+        noteCb.checked = true;
+        noteCb.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        const epubRadio = document.querySelector('input[name="exportFormat"][value="epub"]');
+        assert(epubRadio !== null, 'EPUB radio 存在');
+        epubRadio.checked = true;
+        epubRadio.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+        document.getElementById('exportConfirmBtn').click();
+        // EPUB 涉及 JSZip 动态加载 + zip 打包，给 8s 超时
+        await waitFor(() => captured !== null, 8000);
+
+        assert(captured !== null, 'EPUB 导出触发并捕获到 Blob 内容');
+        assert(captured.type === 'application/epub+zip', `Blob 类型为 application/epub+zip，实际 ${captured.type}`);
+
+        // 验证 zip 结构：mimetype 文件首位 + container.xml + content.opf + toc.ncx + 至少 1 个 xhtml
+        // captured.content 是二进制字符串，用简单字串匹配验证关键文件存在
+        const content = captured.content;
+        assert(content.indexOf('mimetype') >= 0, 'EPUB zip 含 mimetype 文件');
+        assert(content.indexOf('application/epub+zip') >= 0, 'mimetype 内容为 application/epub+zip');
+        assert(content.indexOf('container.xml') >= 0, 'EPUB zip 含 META-INF/container.xml');
+        assert(content.indexOf('content.opf') >= 0, 'EPUB zip 含 OEBPS/content.opf');
+        assert(content.indexOf('toc.ncx') >= 0, 'EPUB zip 含 OEBPS/toc.ncx');
+        assert(content.indexOf('.xhtml') >= 0, 'EPUB zip 含 xhtml 正文文件');
+
+        window.Blob = origBlob;
+        document.createElement = origCreateElement;
+        dom.window.close();
+    }
+
     console.log(`\n=== 测试结果：通过 ${passCount}，失败 ${failCount} ===`);
     if (failCount > 0) {
         process.exit(1);

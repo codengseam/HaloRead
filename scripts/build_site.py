@@ -294,6 +294,7 @@ def _copy_static_assets(site_path: Path) -> None:
         ("css/style.css", site_path / "css" / "style.css"),
         ("js/app.js", site_path / "js" / "app.js"),
         ("js/vendor/marked.min.js", site_path / "js" / "vendor" / "marked.min.js"),
+        ("js/vendor/jszip.min.js", site_path / "js" / "vendor" / "jszip.min.js"),
         ("sw.js", site_path / "sw.js"),
     ]
 
