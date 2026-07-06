@@ -1836,6 +1836,53 @@ body[data-view="home"] .bottom-bar {
     border-left: 3px solid var(--accent);
 }
 
+/* BUG-049：格式选择行，固定在 book-tip 与 tree 之间，不参与滚动 */
+.export-format-row {
+    flex-shrink: 0;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.export-format-option {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.85rem;
+    color: var(--ink-secondary);
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    user-select: none;
+}
+
+.export-format-option:hover {
+    background-color: var(--bg-hover);
+    color: var(--ink-primary);
+}
+
+.export-format-option input[type="radio"] {
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.export-format-option:has(input[type="radio"]:checked) {
+    background-color: var(--accent-bg);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+}
+
 .export-tree {
     flex: 1 1 auto;
     min-height: 0;
@@ -2297,6 +2344,17 @@ body[data-view="home"] .bottom-bar {
     .export-checkbox {
         width: 1.1rem;
         height: 1.1rem;
+    }
+
+    .export-format-row {
+        flex-wrap: nowrap;
+        gap: 0.35rem;
+        padding: 0.4rem 0.5rem;
+    }
+
+    .export-format-option {
+        padding: 0.3rem 0.3rem;
+        font-size: 0.78rem;
     }
 
     .export-actions {

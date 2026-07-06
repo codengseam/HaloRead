@@ -1940,6 +1940,22 @@
         if (elements.exportConfirmBtn) {
             elements.exportConfirmBtn.addEventListener('click', performExport);
         }
+        // BUG-049：格式选择 radio 绑定
+        if (elements.exportOverlay) {
+            const radios = elements.exportOverlay.querySelectorAll('input[name="exportFormat"]');
+            radios.forEach((radio) => {
+                radio.addEventListener('change', () => {
+                    if (radio.checked) exportState.format = radio.value;
+                });
+            });
+            // 弹窗打开时重置为 md（避免上次选择残留）
+            elements.exportOverlay.addEventListener('toggle', () => {
+                if (elements.exportOverlay.classList.contains('open')) {
+                    exportState.format = 'md';
+                    radios.forEach((r) => { r.checked = (r.value === 'md'); });
+                }
+            });
+        }
     }
 
     /* ============ 弹窗（静态站点提示） ============ */
