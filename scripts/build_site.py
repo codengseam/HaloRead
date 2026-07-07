@@ -234,6 +234,7 @@ DISPLAY_CATEGORY_MAP: dict[str, tuple[str, str]] = {
     "子": ("ren", "修己"),
     "财": ("cai", ""),
     "商": ("cai", ""),
+    "写作": ("shi", "技能"),
 }
 
 DISPLAY_CATEGORY_ORDER = ["ren", "shi", "cai", "shijian"]
