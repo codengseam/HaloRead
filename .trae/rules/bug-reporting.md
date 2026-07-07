@@ -1,6 +1,6 @@
 # Bug 记录与回归规范
 
-本规则用于指导 HaloRead 项目中 bug 的命名、记录和回归测试，确保问题可追溯、可复测、不反复。
+本规则用于指导 NovelForge AI 小说创作系统中 bug 的命名、记录和回归测试，确保问题可追溯、可复测、不反复。
 
 ## 一、标题规范
 
@@ -13,7 +13,7 @@
 
 ✅ 推荐：
 ```markdown
-## 移动端阅读器壁纸未铺满整篇文章
+## 第 42 章主角境界跳级无修炼场景
 ```
 
 ### 1.2 标题格式
@@ -21,15 +21,15 @@
 二级标题使用**描述性语言**，包含「功能/模块 + 核心问题」：
 
 ```markdown
-## 沉浸模式点击后强制横屏
-## 设置面板滑条难以拖动
-## 代码块在手机端无法自动换行
+## 第 15 章伏笔未回收且无解释
+## 主角性格在第 8 章突然反转
+## 第 3 卷时间线与第 1 卷矛盾
 ```
 
 如果同一批修复包含多个紧密相关问题，允许合并标题：
 
 ```markdown
-## 移动端阅读器多项体验问题（壁纸、自动阅读、代码块、沉浸模式、滑条）
+## 第 4 卷多项一致性问题（境界跳级、伏笔遗漏、角色状态漂移）
 ```
 
 ## 二、编号处理
@@ -59,9 +59,9 @@
 可选字段（按需补充）：
 
 ```markdown
-- **类型**：UI / 兼容性 / 性能 / 数据 / 构建 / 安全
-- **环境**：浏览器、机型、APP 版本、屏幕尺寸
-- **复现步骤**：操作路径，复杂 bug 必填
+- **类型**：一致性 / 状态漂移 / 上下文预算 / 去 AI 味 / 数据 / 工具链
+- **环境**：模式（novel / shortform）、卷章位置、触发的 Skill、上下文注入策略
+- **复现步骤**：触发路径（如"用 writer Skill 生成 ch_042 时"），复杂 bug 必填
 - **频次**：第几次出现，用于识别反复出现的问题
 - **教训/沉淀**：本次修复暴露的共性问题、后续如何预防
 ```
@@ -70,12 +70,14 @@
 
 以下情况必须更新 `tests/bug_regression_list.md`：
 
-1. 修复了会复发的代码/数据 bug。
-2. 修复了线上或真机验收中发现的兼容性问题。
-3. 用户明确要求「计入问题集」。
-4. 修复后补充了新的回归测试或回归断言。
+1. 修复了会复发的状态漂移问题（角色境界/能力/位置/关系突变、世界观矛盾）。
+2. 修复了伏笔遗漏或回收超期问题。
+3. 修复了角色一致性问题（性格反转、语言指纹混乱、动机断裂）。
+4. 修复了上下文预算超限或 L0 摘要漂移问题。
+5. 用户明确要求「计入问题集」。
+6. 修复后补充了新的回归测试或回归断言。
 
-纯代码重构、无 bug 性质的小优化，可不记录。
+纯工具链重构、无 bug 性质的小优化，可不记录。
 
 ## 五、回归测试要求
 
@@ -83,33 +85,25 @@
 
 1. 补充能复现该 bug 的最小测试用例或回归断言。
 2. 若已有相关测试，更新断言以覆盖修复后的行为。
-3. 涉及移动端交互时，优先在 `tests/run_regression_suite.sh` 中增加脚本级断言（如「不调用 XXX API」）。
+3. 涉及一致性/状态机问题时，优先在 `scripts/novelforge/check_consistency.py` 中增加检测规则（如「境界跳级无修炼场景」「伏笔超期未回收」）；涉及去 AI 味问题时，在 `check_ai_novel.py` 中增加检测。
 4. 修复完成后执行完整测试集：
-   - `python scripts/check_book_structure.py --output output --strict`
+   - `python scripts/novelforge/check_consistency.py --vault NovelForge_Vault`
+   - `python scripts/novelforge/check_ai_novel.py --vault NovelForge_Vault`
    - `pytest -q`
-   - `bash tests/run_regression_suite.sh`
-   - 浏览器/模拟器/真机验收（移动端 bug 必须）
+   - 涉及具体章节的 bug，重新生成/校验该章节确认修复
 
 ## 六、示例
 
 ```markdown
-## 沉浸模式点击后强制横屏
+## 第 42 章主角境界跳级无修炼场景
 
-- **编号**：BUG-021
-- **首次出现**：2026-06-24
-- **类型**：兼容性
-- **环境**：小米原生浏览器、竖屏锁定状态
-- **现象**：在阅读页点击「沉浸」按钮后，浏览器被强制切换为横屏，用户必须手动转回竖屏。
-- **复现步骤**：
-  1. 小米原生浏览器打开阅读页
-  2. 确保系统竖屏锁定开启
-  3. 点击顶部工具栏「沉浸」按钮
-  4. 页面变为横屏
-- **根因**：`enterImmersiveMode` 中调用了 `requestFullscreen(document.documentElement)`，小米浏览器在请求全屏时会忽略竖屏锁定并强制横屏。
-- **修复**：移除 Fullscreen API 调用，沉浸模式改为纯 CSS（`body.immersive-mode` 隐藏 UI）。
-- **涉及文件**：`src/web/static-site/js/app.js`
-- **回归测试**：
-  - `tests/test_reader_features.js` 测试11：不调用 `screen.orientation.lock` 和 Fullscreen API
-  - `tests/run_regression_suite.sh` 第3步：脚本级 Fullscreen API 禁用检查
-- **教训**：移动端阅读器应将任何可能影响方向的系统 API（Fullscreen、orientation.lock）视为不安全，优先使用纯 CSS 方案。
+- **编号**：BUG-001
+- **首次出现**：2026-07-07
+- **类型**：一致性
+- **现象**：第 42 章主角从筑基中期直接突破到筑基后期，但本章无修炼/突破场景描写。
+- **根因**：执笔 Skill 生成时未读取 .state/characters/protagonist.json 的 power_level.next_breakthrough 字段，LLM 自行推进了境界。
+- **修复**：执笔 Skill 强制读取主角 power_level 状态，check_consistency.py 新增"境界跳级无修炼场景"检测。
+- **涉及文件**：.trae/skills/writer-polisher/SKILL.md、scripts/novelforge/check_consistency.py
+- **回归测试**：tests/test_power_level_jump.py 新增 3 个断言
+- **教训**：状态机字段必须作为强制上下文注入，不能依赖 LLM 记忆。
 ```
