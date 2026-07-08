@@ -12,6 +12,7 @@
 
 - [2026-07-08 说话之道专栏并行生成（2026-07-08，54 篇 modern 桶 + 11 subagent 三波并行 + 史实核验环节补位）#content_quality #book_structure](loop_log/2026-07.md#loop-20260708-7ed9f6)
 - [2026-07-08 认识自己课专栏生成（2026-07-08，45 篇 knowledge 桶 + 9 subagent 两波并行 + KNOWLEDGE_TERMS_WHITELIST 不含心理学术语发现 + 全角括号唯一防线 + HTML 注释 0 泄漏复验）](loop_log/2026-07.md#loop-20260708-e169e8)
+- [2026-07-08 专栏失踪检测机制建立（2026-07-08，BUG-050 + check_missing_columns.py + git-merge-guardian 接入）#book_structure #git_hygiene](loop_log/2026-07.md#loop-20260708-be127c)
 - [2026-07-06 离线导出多格式扩展（2026-07-06，md → txt/epub，4 commit 拆分 + 三专家评审 + formatter 注册表抽象）](loop_log/2026-07.md#loop-20260706-468119)
 - [2026-07-05 沉浸模式唤出 UI 后正文渲染异常（2026-07-05，桌面端 reader 塌陷 + 移动端 bottom-bar 遮挡）](loop_log/2026-07.md#loop-20260705-02e67a)
 - [2026-07-04 移除 Google Fonts 依赖，系统字体保证跨浏览器渲染极致稳定（2026-07-04，微信/浏览器渲染差异 + 前端外部依赖治理）](loop_log/2026-07.md#loop-20260704-a69abd)
@@ -29,7 +30,6 @@
 - [2026-06-30 学会学习专栏 32 篇并行生成（2026-06-30，专家团评审 + 14 条误传核验 + 跨章 chapter_sort 盲区发现）](loop_log/2026-06.md#loop-20260630-abd1dd)
 - [2026-06-30 字数事实核对脚本（2026-06-30，BUG-038，第一性原理剥离 LLM 数数能力）](loop_log/2026-06.md#loop-20260630-cb4b0f)
 - [2026-06-30 AI 时代全栈知识边界专栏生成（2026-06-30，35 篇 5 批并行 + 四轮质检闭环 + BUG-039）](loop_log/2026-06.md#loop-20260630-de2309)
-- [2026-06-30 新媒体运营实战课专栏生成（modern 桶 40 篇 + 跨篇金句通胀治理）](loop_log/2026-06.md#loop-20260630-169aa7)
 
 ### 主题锚点
 
@@ -45,15 +45,15 @@
 
 | #lesson slug | 出现次数 | 说明 |
 |---|---|---|
-| `#git_hygiene`（推送/合并/冲突/分支治理/commit 覆盖） | 6 | — |
+| `#git_hygiene`（推送/合并/冲突/分支治理/commit 覆盖） | 7 | — |
 | `#reader_interaction`（阅读器/沉浸/翻页/吸底栏/SW 缓存） | 15 | — |
 | `#content_quality`（质检规则/灵魂注入/标题评分） | 34 | — |
-| `#book_structure`（排序/校验/命名/去重/双源同步） | 32 | — |
+| `#book_structure`（排序/校验/命名/去重/双源同步） | 33 | — |
 | `#deployment`（GitHub Pages/魔搭/.nojekyll/SW） | 6 | — |
 | `#soul_injection`（灵魂注入/章回体/总编Agent） | 3 | — |
 | `#ai_course`（专栏批量生成 / subagent 结果丢失） | 20 | — |
 
-> 共 65 条沉淀，按月份分片存储于 `docs/loop_log/`。
+> 共 66 条沉淀，按月份分片存储于 `docs/loop_log/`。
 
 <!-- AUTOGEN END: loop_log index -->
 
