@@ -1,0 +1,47 @@
+title: 抖音心理科普短视频课
+category: 技
+author: 编委会
+description: 面向想用抖音做心理科普的普通人，从第一性原理出发，覆盖赛道定位、抖音算法、心理科普内容内核、选题脚本、拍摄剪辑、心理素材库、爆款案例、运营涨粉、合规伦理、变现可持续。让普通人照着这个专栏能从 0 跑通"定位→算法→脚本→剪辑→心理内容内核→运营→合规→变现"全链路，做出既爆款又合规的心理科普短视频。
+cover: 🎬
+sort: 122
+archetype: modern
+chapters:
+  - chapter: 开篇
+    chapter_sort: 1
+    range: 1-2
+  - chapter: 第一性原理与赛道定位
+    chapter_sort: 2
+    range: 1-3
+  - chapter: 抖音算法与核心标准
+    chapter_sort: 3
+    range: 1-4
+  - chapter: 心理科普内容内核
+    chapter_sort: 4
+    range: 1-7
+  - chapter: 选题策划与脚本结构
+    chapter_sort: 5
+    range: 1-5
+  - chapter: 心理科普内容素材库
+    chapter_sort: 6
+    range: 1-12
+  - chapter: 爆款案例分析
+    chapter_sort: 7
+    range: 1-4
+  - chapter: 拍摄与剪辑基础
+    chapter_sort: 8
+    range: 1-5
+  - chapter: 声音与表达
+    chapter_sort: 9
+    range: 1-4
+  - chapter: 运营与涨粉
+    chapter_sort: 10
+    range: 1-5
+  - chapter: 合规与伦理
+    chapter_sort: 11
+    range: 1-6
+  - chapter: 变现与可持续发展
+    chapter_sort: 12
+    range: 1-3
+  - chapter: 结语
+    chapter_sort: 13
+    range: 1-1
