@@ -1,0 +1,35 @@
+title: 重庆备婚全流程手册
+category: 婚
+author: 编委会
+description: 面向重庆忠县男方 + 重庆彭水女方、相处一年多、双方家长已见面、考虑旅行婚礼或传统婚礼的情侣。从第一性原理出发，覆盖婚前共识、法律财产、重庆两地风俗（汉族巴渝 + 苗族土家族）、婚礼决策、12 月筹备全流程、婚礼当天执行、婚后经营。尊重双方风俗礼仪与面子，目标是顺利完婚并留下深刻印象。每篇文末标注信息截止日期。
+cover: 💍
+sort: 130
+archetype: modern
+chapters:
+  - chapter: 开篇
+    chapter_sort: 1
+    range: 1-2
+  - chapter: 婚前共识
+    chapter_sort: 2
+    range: 1-5
+  - chapter: 法律财产
+    chapter_sort: 3
+    range: 1-5
+  - chapter: 重庆风俗
+    chapter_sort: 4
+    range: 1-8
+  - chapter: 婚礼选择
+    chapter_sort: 5
+    range: 1-6
+  - chapter: 筹备全流程
+    chapter_sort: 6
+    range: 1-8
+  - chapter: 婚礼当天
+    chapter_sort: 7
+    range: 1-5
+  - chapter: 婚后经营
+    chapter_sort: 8
+    range: 1-6
+  - chapter: 结语
+    chapter_sort: 9
+    range: 1-2
