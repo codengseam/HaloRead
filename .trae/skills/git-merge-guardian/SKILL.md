@@ -209,12 +209,21 @@ git rebase master
 
 ```bash
 python scripts/check_book_structure.py --output output --strict
+python scripts/check_missing_columns.py --strict
 python -m pytest tests/test_sorting.py tests/test_check_chapter_order.py tests/test_book_structure.py -q
 python scripts/build_site.py
 python scripts/validate_commit_messages.py origin/master..HEAD
 ```
 
 **全部通过后再继续。任何失败都不得 push/merge。**
+
+### 专栏失踪检测（check_missing_columns.py）
+
+`check_missing_columns.py --strict` 会扫描所有远程分支，找出「在某个 agent 分支生成但从未合入 master」的专栏。这是防止「专栏搞丢」的核心防线。
+
+- 检测到缺失时，脚本会输出找回命令（`git checkout <分支> -- "output/<专栏>"`）。
+- **必须先找回所有缺失专栏再 push/merge**，否则会覆盖 master 已有内容或让失踪专栏继续失踪。
+- 找回后重新跑 `check_book_structure.py --strict` 确认结构无误。
 
 提交信息校验失败时：
 1. 列出不合格的提交标题/正文；

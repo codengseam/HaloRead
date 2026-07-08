@@ -35,6 +35,7 @@
 - [ ] 修改现有逻辑后，相关测试已更新
 - [ ] 运行 `pytest` 全部通过（或明确说明跳过原因）
 - [ ] 运行 `python scripts/check_book_structure.py --output output --strict`，P0/P1/P2 全部清零（合并前必须完成）
+- [ ] 运行 `python scripts/check_missing_columns.py --strict`，无专栏失踪（合并前必须完成，防止 agent 分支覆盖 master 已有专栏，BUG-050）
 - [ ] 边界场景有覆盖：空输入、超长输入、非法路径、并发等
 - [ ] Mock 模式（`DEEP_READING_MOCK=1`）下端到端流程能跑通
 - [ ] 修复了会复发的代码/数据 bug 时，已补充回归测试并按 `.trae/rules/bug-reporting.md` 更新 `tests/bug_regression_list.md`

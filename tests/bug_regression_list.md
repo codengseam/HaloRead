@@ -1038,4 +1038,36 @@
   3. 测试环境与生产环境差异：jsdom 跑 e2e 测试需要 node_modules/jsdom + node_modules/marked，但 `npm install` 会带回 jsdom 导致 run_regression_suite.sh 第 5 步从「跳过」变「失败」；CI 环境应保持 node_modules 不存在
   4. EPUB 是听书场景的「最大公约数」格式——微信读书 / Apple Books / Voice Dream Reader / 得到 全部原生支持，章节结构可被 TTS 引擎准确识别；TXT 是兜底方案，无章节结构但所有听书软件都支持
 
+## agent 分支生成专栏未合入 master 导致专栏失踪
+
+- **编号**：BUG-050
+- **首次出现**：2026-07-08
+- **类型**：数据 / 流程
+- **现象**：用户感觉「专栏搞丢了，特别是财务分类下的」。排查发现三个专栏（网文写作课、产品本质课、重庆备婚全流程手册）在历史 agent 分支上生成但从未合入 master，分支被遗忘后专栏就「失踪」了。另有「决策之道」「认识自己课」在功能分支工作树缺失，差点被 merge 覆盖。
+- **根因**：
+  1. agent 分支生成专栏后未及时合入 master，分支清理或遗忘后专栏就丢了
+  2. 合并前没有「专栏失踪检测」环节，无法发现 master 缺失的专栏
+  3. 功能分支可能基于旧的 master 切出，工作树缺失 master 后续新增的专栏，merge --no-ff 会覆盖
+- **修复**：
+  1. 从 `origin/trae/agent-JkBs2u` 找回网文写作课、产品本质课
+  2. 从 `origin/trae/agent-bgh6jQ` 找回重庆备婚全流程手册
+  3. 从 master 恢复决策之道、认识自己课到功能分支再合并
+  4. 新增 `scripts/check_missing_columns.py`：扫描所有远程分支，找出 master 缺失的专栏，输出找回命令
+  5. 将 `check_missing_columns.py --strict` 接入 git-merge-guardian 第 3 步本地验证
+- **涉及文件**：
+  - `scripts/check_missing_columns.py`（新增）
+  - `tests/test_check_missing_columns.py`（新增回归测试）
+  - `.trae/skills/git-merge-guardian/SKILL.md`（第 3 步加入失踪检测）
+- **回归测试**：
+  - `tests/test_check_missing_columns.py`：3 项断言
+    - 脚本存在且可执行
+    - 当前仓库运行 `--strict` 返回 0（无缺失）
+    - 中文路径解码正确
+  - `python scripts/check_missing_columns.py --strict`：合并前必跑
+- **教训/沉淀**：
+  1. agent 分支是「临时工」，生成的内容必须及时合入 master，否则分支清理时内容会丢
+  2. 合并前必须有「专栏失踪检测」环节——只检查结构不够，还要检查 master 是否被覆盖丢失了已有专栏
+  3. 功能分支基于旧 master 切出时，工作树会缺失 master 后续新增内容，merge --no-ff 会用功能分支状态覆盖 master，导致「倒退」
+  4. `check_missing_columns.py` 是防止此类问题的核心防线，已接入 git-merge-guardian 和回归测试
+
 
