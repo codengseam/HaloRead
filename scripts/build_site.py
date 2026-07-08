@@ -213,13 +213,17 @@ def _category_sort_key(category: str) -> tuple[int, str]:
 
 DISPLAY_TAXONOMY: dict[str, dict[str, Any]] = {
     "ren":     {"full": "观人察己", "short": "人", "desc": "琢磨人", "subs": ["修己", "养生", "礼仪"]},
-    "shi":     {"full": "经事致用", "short": "事", "desc": "琢磨事", "subs": ["技能", "职场升学"]},
+    "shi":     {"full": "经事致用", "short": "事", "desc": "琢磨事", "subs": ["技能", "职场升学", "生活"]},
     "cai":     {"full": "货殖生财", "short": "财", "desc": "琢磨钱", "subs": []},
     "shijian": {"full": "鉴往知今", "short": "世", "desc": "认识世界", "subs": ["经", "史"]},
 }
 
 # 原 category -> (display_category_key, display_subcategory)
 # 争议点已确认：经->世鉴/经，升学->事功/职场升学，商->货殖（无二级）
+# 婚/术/写作 为后续新增专栏的分类，2026-07-08 补齐映射（BUG-051）：
+#   婚->事/生活（备婚是生活事务）
+#   术->人/修己（紫微斗数、认识自己课用命理/心理当镜子照见自己）
+#   写作->事/技能（网文创作是技能）
 DISPLAY_CATEGORY_MAP: dict[str, tuple[str, str]] = {
     "经": ("shijian", "经"),
     "史": ("shijian", "史"),
@@ -234,6 +238,9 @@ DISPLAY_CATEGORY_MAP: dict[str, tuple[str, str]] = {
     "子": ("ren", "修己"),
     "财": ("cai", ""),
     "商": ("cai", ""),
+    "婚": ("shi", "生活"),
+    "术": ("ren", "修己"),
+    "写作": ("shi", "技能"),
 }
 
 DISPLAY_CATEGORY_ORDER = ["ren", "shi", "cai", "shijian"]

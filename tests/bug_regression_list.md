@@ -1070,4 +1070,31 @@
   3. 功能分支基于旧 master 切出时，工作树会缺失 master 后续新增内容，merge --no-ff 会用功能分支状态覆盖 master，导致「倒退」
   4. `check_missing_columns.py` 是防止此类问题的核心防线，已接入 git-merge-guardian 和回归测试
 
+## 新增专栏 category 未在 DISPLAY_CATEGORY_MAP 定义导致首页不显示
+
+- **编号**：BUG-051
+- **首次出现**：2026-07-08
+- **类型**：UI / 数据
+- **现象**：用户感觉「专栏丢了，特别是婚姻分类下的」。排查发现专栏在 master 上都存在（git 层面无丢失），但 4 个专栏（重庆备婚全流程手册、紫微斗数课、认识自己课、网文写作课）的 `_meta.yaml` 的 `category`（婚/术/写作）未在 `build_site.py` 的 `DISPLAY_CATEGORY_MAP` 中定义，被归入「other」兜底分类，而首页只展示 4 大栏（人/事/财/世），导致用户在首页看不到这些专栏。
+- **根因**：
+  1. `DISPLAY_CATEGORY_MAP` 是硬编码映射表，新增 category 时容易漏映射
+  2. 无机制保证「所有专栏的 category 都有映射」
+  3. `check_book_structure.py` 只校验结构，不校验分类映射完整性
+- **修复**：
+  1. `scripts/build_site.py` 的 `DISPLAY_CATEGORY_MAP` 新增 3 个映射：婚→事/生活、术→人/修己、写作→事/技能
+  2. `DISPLAY_TAXONOMY` 的 shi 栏新增「生活」二级子类
+  3. 新增 `tests/test_category_mapping.py`：2 项回归断言
+     - 所有专栏的 category 必须在 DISPLAY_CATEGORY_MAP 有定义
+     - build_site 后无专栏落入 other 分类
+- **涉及文件**：
+  - `scripts/build_site.py`（补 3 个映射 + 1 个二级子类）
+  - `tests/test_category_mapping.py`（新增回归测试）
+- **回归测试**：
+  - `tests/test_category_mapping.py::test_all_categories_have_display_mapping`
+  - `tests/test_category_mapping.py::test_no_book_in_other_after_build`
+- **教训/沉淀**：
+  1. 用户感觉「丢了」不一定是 git 丢失，可能是展示层（分类映射）缺失——排查「丢内容」问题要先区分「git 层」和「展示层」
+  2. 硬编码映射表是脆弱点，必须有测试保证「所有使用的键都有映射」
+  3. `check_missing_columns.py` 管「git 层专栏在不在」，`test_category_mapping.py` 管「展示层专栏显不显示」，两者互补
+
 
