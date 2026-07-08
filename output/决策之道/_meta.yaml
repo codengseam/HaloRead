@@ -1,0 +1,26 @@
+title: 决策之道
+category: 心
+archetype: modern
+author: HaloRead 编委会
+description: 从第一性原理拆解"重大人生决策方法论"——道层面。融合东方修心（王阳明心学/老庄道法/曾国藩拙诚/易经知止/禅宗无住）与西方理性（斯多葛不动心/卡尼曼双系统/芒格多元模型/达利欧原则/塔勒布反脆弱/贝索斯遗憾最小化），建立"修心—认知—框架—实战—复盘"五层决策系统。让读者在换工作、结婚、买房、投资、借钱、防骗等重大选择上，做出当下正确且事后不后悔的决策。
+cover: 🧭
+sort: 132
+chapters:
+  - chapter: 开篇
+    chapter_sort: 1
+    range: 1-2
+  - chapter: 修心之道
+    chapter_sort: 2
+    range: 1-6
+  - chapter: 认知之镜
+    chapter_sort: 3
+    range: 1-4
+  - chapter: 决策之框
+    chapter_sort: 4
+    range: 1-6
+  - chapter: 实战之境
+    chapter_sort: 5
+    range: 1-5
+  - chapter: 结语
+    chapter_sort: 6
+    range: 1-2
