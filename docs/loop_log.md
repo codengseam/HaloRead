@@ -10,7 +10,7 @@
 
 ### 最近 20 条沉淀（按日期倒序）
 
-- [2026-07-08 说话之道专栏并行生成（2026-07-08，54 篇 modern 桶 + 11 subagent 三波并行 + 史实核验环节补位）#content_quality #book_structure](loop_log/2026-07.md#loop-20260708-7ed9f6)
+- [2026-07-08 说话之道专栏并行生成（2026-07-08，54 篇 modern 桶 + 11 subagent 三波并行 + 史实核验环节补位）#content_quality #book_structure](loop_log/2026-07.md#loop-20260708-7ed9f6)- [2026-07-08 认识自己课专栏生成（2026-07-08，45 篇 knowledge 桶 + 9 subagent 两波并行 + KNOWLEDGE_TERMS_WHITELIST 不含心理学术语发现 + 全角括号唯一防线 + HTML 注释 0 泄漏复验）](loop_log/2026-07.md#loop-20260708-e169e8)
 - [2026-07-06 离线导出多格式扩展（2026-07-06，md → txt/epub，4 commit 拆分 + 三专家评审 + formatter 注册表抽象）](loop_log/2026-07.md#loop-20260706-468119)
 - [2026-07-05 沉浸模式唤出 UI 后正文渲染异常（2026-07-05，桌面端 reader 塌陷 + 移动端 bottom-bar 遮挡）](loop_log/2026-07.md#loop-20260705-02e67a)
 - [2026-07-04 移除 Google Fonts 依赖，系统字体保证跨浏览器渲染极致稳定（2026-07-04，微信/浏览器渲染差异 + 前端外部依赖治理）](loop_log/2026-07.md#loop-20260704-a69abd)
@@ -51,7 +51,11 @@
 | `#book_structure`（排序/校验/命名/去重/双源同步） | 31 | — |
 | `#deployment`（GitHub Pages/魔搭/.nojekyll/SW） | 6 | — |
 | `#soul_injection`（灵魂注入/章回体/总编Agent） | 3 | — |
-| `#ai_course`（专栏批量生成 / subagent 结果丢失） | 19 | — |
+| `#ai_course`（专栏批量生成 / subagent 结果丢失） | 19 | — || `#content_quality`（质检规则/灵魂注入/标题评分） | 34 | — |
+| `#book_structure`（排序/校验/命名/去重/双源同步） | 32 | — |
+| `#deployment`（GitHub Pages/魔搭/.nojekyll/SW） | 6 | — |
+| `#soul_injection`（灵魂注入/章回体/总编Agent） | 3 | — |
+| `#ai_course`（专栏批量生成 / subagent 结果丢失） | 20 | — |
 
 > 共 64 条沉淀，按月份分片存储于 `docs/loop_log/`。
 
